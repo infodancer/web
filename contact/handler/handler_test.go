@@ -5,15 +5,72 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/infodancer/web/contact/handler"
 	"github.com/infodancer/web/contact/submissions"
-	"github.com/infodancer/web/contact/submissions/sqlite"
 )
+
+// memStore is an in-memory handler.Store for tests, mirroring the status
+// semantics of submissions.Store (Save→pending, MarkSent→sent, MarkFailed→
+// failed, both bumping attempts) so the handler can be exercised without any
+// database driver. It also exposes Pending for assertions, matching the SQL
+// "status in (pending, failed) and attempts < max" filter.
+type memStore struct {
+	mu     sync.Mutex
+	rows   []submissions.Submission
+	status map[int64]string
+	tries  map[int64]int
+	nextID int64
+}
+
+func newMemStore() *memStore {
+	return &memStore{status: map[int64]string{}, tries: map[int64]int{}}
+}
+
+func (s *memStore) Save(_ context.Context, sub *submissions.Submission) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextID++
+	sub.ID = s.nextID
+	s.rows = append(s.rows, *sub)
+	s.status[sub.ID] = submissions.StatusPending
+	return nil
+}
+
+func (s *memStore) MarkSent(_ context.Context, id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status[id] = submissions.StatusSent
+	s.tries[id]++
+	return nil
+}
+
+func (s *memStore) MarkFailed(_ context.Context, id int64, _ string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status[id] = submissions.StatusFailed
+	s.tries[id]++
+	return nil
+}
+
+func (s *memStore) Pending(_ context.Context, maxAttempts, limit int) ([]submissions.Submission, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []submissions.Submission
+	for _, r := range s.rows {
+		st := s.status[r.ID]
+		if (st == submissions.StatusPending || st == submissions.StatusFailed) && s.tries[r.ID] < maxAttempts {
+			out = append(out, r)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
 
 type recordingMailer struct {
 	mu       sync.Mutex
@@ -46,15 +103,9 @@ func (e stubErr) Error() string { return string(e) }
 
 const errStub = stubErr("stub send failure")
 
-func newHandler(t *testing.T) (*handler.Contact, *recordingMailer, *submissions.Store) {
+func newHandler(t *testing.T) (*handler.Contact, *recordingMailer, *memStore) {
 	t.Helper()
-	dir := t.TempDir()
-	store, err := sqlite.Open(filepath.Join(dir, "contact.db"))
-	if err != nil {
-		t.Fatalf("sqlite.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
+	store := newMemStore()
 	mailer := &recordingMailer{}
 	h := handler.New(store, mailer, "amy@example.org", "contact@example.org")
 	return h, mailer, store
@@ -221,14 +272,7 @@ func TestSendFailureMarksFailed(t *testing.T) {
 }
 
 func TestMultipleRecipients(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	store, err := sqlite.Open(filepath.Join(dir, "contact.db"))
-	if err != nil {
-		t.Fatalf("sqlite.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
+	store := newMemStore()
 	mailer := &recordingMailer{}
 	h := handler.New(store, mailer, " amy@example.org , matthew@example.org ,, ", "contact@example.org")
 

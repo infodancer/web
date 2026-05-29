@@ -3,8 +3,10 @@ go 1.26.3
 use (
 	./blog
 	./contact
+	./contact/submissions/sqlite
 	./integration
 	./newsletter
+	./newsletter/subscribers/sqlite
 	./notify
 	./search
 )

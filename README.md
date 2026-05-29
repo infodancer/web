@@ -18,15 +18,22 @@ builds each module independently against its own `go.mod`.
 |--------|------|---------|---------|
 | [search](search/) | `github.com/infodancer/web/search` | Postgres + pgvector | Full-text + semantic search over a site's content, with reranking. |
 | [notify](notify/) | `github.com/infodancer/web/notify` | Postgres | Notification emission and delivery. |
-| [contact](contact/) | `github.com/infodancer/web/contact` | SQLite (PG migrations scaffolded) | Contact-form intake with anti-abuse and email/SMTP delivery. |
-| [newsletter](newsletter/) | `github.com/infodancer/web/newsletter` | SQLite (PG migrations scaffolded) | Newsletter subscription management (Buttondown / Listmonk backends). |
+| [contact](contact/) | `github.com/infodancer/web/contact` | driver-agnostic core | Contact-form intake with anti-abuse and email/SMTP delivery. |
+| [contact/submissions/sqlite](contact/submissions/sqlite/) | `…/contact/submissions/sqlite` | SQLite | SQLite store backend for contact (separate module). |
+| [newsletter](newsletter/) | `github.com/infodancer/web/newsletter` | driver-agnostic core | Newsletter subscription management (Buttondown / Listmonk backends). |
+| [newsletter/subscribers/sqlite](newsletter/subscribers/sqlite/) | `…/newsletter/subscribers/sqlite` | SQLite | SQLite store backend for newsletter (separate module). |
 | [blog](blog/) | `github.com/infodancer/web/blog` | — | Blog component (design stage). |
 | [integration](integration/) | `github.com/infodancer/web/integration` | Postgres | Cross-component tests against one shared database. |
 
-`contact` and `newsletter` use a SQLite store today; their Postgres migrations
-are already scaffolded, but a Postgres store implementation is not yet written.
-Completing that so they can join the shared-Postgres story is a deliberate
-design decision — see [CONVENTIONS.md](CONVENTIONS.md).
+`contact` and `newsletter` keep their database driver out of the component
+core: the core module is driver-agnostic, and the SQLite store lives in a
+**separate nested module** (`…/submissions/sqlite`, `…/subscribers/sqlite`) that
+a consumer imports only if it wants the SQLite backend. A site mounting these
+with a different backend never compiles `modernc.org/sqlite` or its C-port
+dependency closure. Their Postgres migrations are already scaffolded, but a
+Postgres store implementation is not yet written — completing it so they can
+join the shared-Postgres story is a deliberate design decision, see
+[CONVENTIONS.md](CONVENTIONS.md).
 
 ## Foundation
 

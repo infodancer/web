@@ -26,6 +26,17 @@ type Mailer interface {
 	Send(ctx context.Context, msg Message) error
 }
 
+// Store persists a submission and tracks its delivery status. It is the subset
+// of *submissions.Store that the handler actually uses, declared as an
+// interface here so the handler does not pull in any database driver: the
+// concrete store (and its SQLite backend) is selected by the consumer, and
+// tests can substitute an in-memory fake.
+type Store interface {
+	Save(ctx context.Context, sub *submissions.Submission) error
+	MarkSent(ctx context.Context, id int64) error
+	MarkFailed(ctx context.Context, id int64, errMsg string) error
+}
+
 // Message is the wire representation of an outgoing email.
 type Message struct {
 	From    string
@@ -39,7 +50,7 @@ type Message struct {
 // individual fields after construction for customization.
 type Contact struct {
 	// Required dependencies.
-	Store  *submissions.Store
+	Store  Store
 	Mailer Mailer
 
 	// Required addresses.
@@ -91,7 +102,7 @@ func (h *Contact) Wait() { h.inFlight.Wait() }
 // `to` may be a single address or a comma-separated list ("a@x,b@y"); all
 // addresses end up in the To: header. Whitespace and empty entries are
 // trimmed, so values pulled from env vars work directly.
-func New(store *submissions.Store, mailer Mailer, to, from string) *Contact {
+func New(store Store, mailer Mailer, to, from string) *Contact {
 	c := &Contact{
 		Store:         store,
 		Mailer:        mailer,
