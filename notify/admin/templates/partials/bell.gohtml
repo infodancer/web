@@ -1,0 +1,6 @@
+{{- /* Unread-count bell. Rendered inline in the header and as the GET /bell fragment. */ -}}
+<a class="notify-bell{{if .Unread}} notify-bell-unread{{end}}" href="{{.BasePath}}/"
+   aria-label="{{.Unread}} unread notifications">
+  <span class="notify-bell-icon" aria-hidden="true">&#128276;</span>
+  {{- if .Unread}}<span class="notify-bell-count">{{.Unread}}</span>{{end -}}
+</a>

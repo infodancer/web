@@ -1,0 +1,17 @@
+{{define "content"}}
+<section class="app-search">
+  <h1>{{.SiteName}}</h1>
+  <form class="app-search-form" action="{{.BasePath}}/" method="get" role="search">
+    <input type="search" name="q" value="{{.Query}}" placeholder="Search…"
+           aria-label="Search query" autocomplete="off" autofocus
+           hx-get="{{.BasePath}}/search"
+           hx-trigger="keyup changed delay:200ms, search"
+           hx-target="#search-results"
+           hx-push-url="true">
+    <button type="submit">Search</button>
+  </form>
+</section>
+<div id="search-results" aria-live="polite">
+{{template "partials/results.gohtml" .}}
+</div>
+{{end}}

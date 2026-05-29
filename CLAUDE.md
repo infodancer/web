@@ -1,0 +1,43 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in `infodancer/web`.
+
+## What this is
+
+A multi-module monorepo of reusable web components for infodancer sites:
+`search`, `notify`, `blog`, `contact`, `newsletter`, plus an `integration`
+module for cross-component tests. The repository root is **not** a Go module —
+it holds `go.work`, shared tooling, and the component subdirectories.
+
+Read [CONVENTIONS.md](CONVENTIONS.md) before adding or changing a component:
+toolchain, the mount contract, database posture, and security expectations are
+defined there and apply across all modules.
+
+## Working in a module
+
+`cd` into the component directory. Each module builds against its own `go.mod`
+(`GOWORK=off` matches CI). Run module-specific tasks (sqlc, migrations, local
+servers) from inside the module.
+
+```bash
+task build   # build every module (from the root)
+task test    # test every module
+task all     # build, lint, vulncheck, test
+```
+
+## Workflow
+
+- Open a GitHub issue before starting a distinct change; branch
+  `feature/<issue-number>` or `bug/<issue-number>`; reference the issue URL in
+  commits. PRs merge to `main`.
+- Small, logical, separate commits. Don't bundle unrelated changes.
+- Bump the Go toolchain in lockstep across modules; don't let versions drift.
+
+## Open items
+
+- `contact` and `newsletter` are SQLite-backed; whether to move them onto the
+  shared Postgres (so all components can be tested and run together against one
+  database) is an unmade design decision. The `integration` module currently
+  covers only the Postgres components.
+- `faq` is intended to join this monorepo but is mid-refactor and lives in its
+  own repository for now.

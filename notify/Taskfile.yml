@@ -1,0 +1,94 @@
+version: '3'
+
+vars:
+  COVERAGE_FILE: coverage.out
+  BIN_DIR: bin
+
+tasks:
+  default:
+    cmds:
+      - task: check
+
+  build:
+    desc: Build the notifyctl CLI and verify all packages compile
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build ./...
+      - go build -o {{.BIN_DIR}}/notifyctl ./cmd/notifyctl
+
+  install:
+    desc: Install notifyctl to $GOPATH/bin
+    cmds:
+      - go install ./cmd/notifyctl
+
+  test:
+    desc: Run unit tests with race detector (no Docker required)
+    cmds:
+      - go test -race -count=1 ./...
+
+  test:cover:
+    desc: Run unit tests with coverage
+    cmds:
+      - go test -race -count=1 -coverprofile={{.COVERAGE_FILE}} ./...
+      - go tool cover -func={{.COVERAGE_FILE}} | tail -1
+
+  test:integration:
+    desc: Run integration tests (requires Docker for testcontainers)
+    cmds:
+      - go test -race -count=1 -tags=integration ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Fail if any file needs formatting
+    cmds:
+      - test -z "$(gofmt -l .)"
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  vulncheck:
+    desc: Run govulncheck
+    cmds:
+      - govulncheck ./...
+
+  check:
+    desc: All gating checks (fmt, vet, lint, test, vulncheck)
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: lint
+      - task: test
+      - task: vulncheck
+
+  generate:
+    desc: Regenerate db/ from queries.sql via the pinned sqlc version
+    dir: db
+    cmds:
+      - go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0 generate
+
+  tidy:
+    desc: go mod tidy
+    cmds:
+      - go mod tidy
+
+  hooks:install:
+    desc: Configure git to use the project hooks directory
+    cmds:
+      - git config core.hooksPath .githooks
+      - echo "Git hooks installed from .githooks directory"
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf {{.BIN_DIR}} {{.COVERAGE_FILE}} coverage.html

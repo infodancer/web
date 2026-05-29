@@ -1,0 +1,10 @@
+go 1.26.3
+
+use (
+	./blog
+	./contact
+	./integration
+	./newsletter
+	./notify
+	./search
+)

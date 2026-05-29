@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="notify-toolbar">
+  <form class="notify-filter" hx-get="{{.BasePath}}/" hx-target="#notify-list"
+        hx-swap="innerHTML" hx-push-url="true">
+    <input type="search" name="type" value="{{.Filter.Type}}" placeholder="type, e.g. user.created">
+    <input type="search" name="source" value="{{.Filter.Source}}" placeholder="source">
+    <select name="severity" aria-label="Severity">
+      <option value="">any severity</option>
+      <option value="info"   {{if eq .Filter.Severity "info"}}selected{{end}}>info</option>
+      <option value="notice" {{if eq .Filter.Severity "notice"}}selected{{end}}>notice</option>
+      <option value="warn"   {{if eq .Filter.Severity "warn"}}selected{{end}}>warn</option>
+      <option value="alert"  {{if eq .Filter.Severity "alert"}}selected{{end}}>alert</option>
+    </select>
+    <input type="date" name="since" value="{{.Filter.Since}}" aria-label="Since">
+    <button type="submit">Filter</button>
+  </form>
+  <form class="notify-markread" hx-post="{{.BasePath}}/seen" hx-target="#notify-bell"
+        hx-swap="innerHTML">
+    <input type="hidden" name="up_to" value="{{.NewestCreatedAt}}">
+    <button type="submit"{{if not .Events}} disabled{{end}}>Mark all read</button>
+  </form>
+</div>
+<ul id="notify-list" class="notify-list" role="list">
+{{template "partials/feed_list.gohtml" .}}
+</ul>
+{{end}}

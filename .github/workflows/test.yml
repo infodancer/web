@@ -1,0 +1,49 @@
+name: test
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Each module builds against its own go.mod; the repo go.work is a
+    # local-dev convenience only. A single Postgres service backs the
+    # DB-backed modules; SQLite-backed modules ignore it.
+    env:
+      GOWORK: "off"
+      TEST_DATABASE_URL: postgres://web:web@localhost:5432/web_test?sslmode=disable
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [search, notify, blog, contact, newsletter, integration]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: web
+          POSTGRES_PASSWORD: web
+          POSTGRES_DB: web_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U web"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+
+      - name: Test ${{ matrix.module }}
+        working-directory: ${{ matrix.module }}
+        run: go test -race -count=1 ./...

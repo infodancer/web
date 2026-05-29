@@ -1,0 +1,56 @@
+version: '3'
+
+# Root tasks fan out across every module. Each module is built against its own
+# go.mod (GOWORK=off) so local results match CI. Run module-specific tasks from
+# within the module directory.
+
+vars:
+  MODULES: search notify blog contact newsletter integration
+
+env:
+  GOWORK: 'off'
+
+tasks:
+  build:
+    desc: Build every module
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go build ./...)
+
+  test:
+    desc: Test every module
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go test -race -count=1 ./...)
+
+  lint:
+    desc: Lint every module
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && golangci-lint run ./...)
+
+  vulncheck:
+    desc: Vulnerability scan every module
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && govulncheck ./...)
+
+  fmt:
+    desc: Format every module
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && gofmt -w .)
+
+  tidy:
+    desc: go mod tidy every module
+    cmds:
+      - for: { var: MODULES }
+        cmd: (cd {{.ITEM}} && go mod tidy)
+
+  all:
+    desc: Run build, lint, vulncheck, and test across every module
+    cmds:
+      - task: build
+      - task: lint
+      - task: vulncheck
+      - task: test

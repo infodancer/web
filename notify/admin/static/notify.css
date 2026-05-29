@@ -1,0 +1,105 @@
+/* notify admin UI — layered over infodancer/ui design tokens (--app-*). */
+
+.notify-header {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-sm);
+}
+.notify-header .notify-bell-slot {
+  margin-left: auto;
+}
+.notify-main {
+  padding-block: var(--app-space);
+}
+
+/* Bell */
+.notify-bell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-xs);
+  text-decoration: none;
+  color: var(--app-color-fg-muted);
+}
+.notify-bell-unread {
+  color: var(--app-color-fg);
+}
+.notify-bell-count {
+  background: var(--app-color-accent);
+  color: var(--app-color-accent-on);
+  border-radius: var(--app-radius-pill);
+  padding: 0 var(--app-space-xs);
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Toolbar */
+.notify-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space);
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: var(--app-space);
+}
+.notify-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-sm);
+  align-items: center;
+}
+
+/* Feed */
+.notify-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-xs);
+}
+.notify-event {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--app-space-xs) var(--app-space-sm);
+  align-items: baseline;
+  padding: var(--app-space-sm);
+  background: var(--app-color-bg-raised);
+  border: 1px solid var(--app-color-border);
+  border-left-width: 4px;
+  border-radius: var(--app-radius-sm);
+}
+.notify-event-sev {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--app-color-fg-muted);
+}
+.notify-event-title {
+  font-weight: 600;
+}
+.notify-event-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-sm);
+  font-size: 0.85rem;
+  color: var(--app-color-fg-muted);
+}
+.notify-event-type {
+  font-family: var(--app-font-mono);
+}
+
+/* Severity accents on the left border */
+.notify-sev-info   { border-left-color: var(--app-color-border); }
+.notify-sev-notice { border-left-color: var(--app-color-accent); }
+.notify-sev-warn   { border-left-color: var(--app-color-danger); }
+.notify-sev-alert  { border-left-color: var(--app-color-danger); background: color-mix(in srgb, var(--app-color-danger) 8%, var(--app-color-bg-raised)); }
+
+.notify-empty,
+.notify-more {
+  list-style: none;
+  padding: var(--app-space);
+  text-align: center;
+  color: var(--app-color-fg-muted);
+}

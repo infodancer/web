@@ -1,0 +1,11 @@
+# Build artifacts
+/bin/
+*.test
+*.out
+coverage.*
+
+# Go workspace sums (local-dev convenience only)
+go.work.sum
+
+# Editor / OS
+.DS_Store

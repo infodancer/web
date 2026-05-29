@@ -1,0 +1,20 @@
+{{if .Searched}}
+  {{if .Results}}
+  <ol class="app-card-grid result-list" role="list">
+    {{range .Results}}
+    <li class="app-card result">
+      <h2 class="result-title"><a href="{{.URL}}">{{if .Title}}{{.Title}}{{else}}{{.URL}}{{end}}</a></h2>
+      {{with .Section}}<span class="app-badge">{{.}}</span>{{end}}
+      {{with .Snippet}}<p class="result-snippet">{{.}}</p>{{end}}
+      {{with .Tags}}
+      <ul class="app-tag-list" role="list">
+        {{range .}}<li class="app-tag">{{.}}</li>{{end}}
+      </ul>
+      {{end}}
+    </li>
+    {{end}}
+  </ol>
+  {{else}}
+  <p class="app-search-empty">No results for “{{.Query}}”.</p>
+  {{end}}
+{{end}}

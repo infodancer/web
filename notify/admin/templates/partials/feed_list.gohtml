@@ -1,0 +1,24 @@
+{{- /* Feed rows plus the keyset "load older" control. Rendered inside the page's
+       #notify-list on first load, returned alone for filter changes (swapped into
+       #notify-list) and for load-older (swapped over #notify-more). */ -}}
+{{range .Events}}
+<li class="notify-event {{.SeverityClass}}">
+  <span class="notify-event-sev">{{.Severity}}</span>
+  <span class="notify-event-title">{{.Title}}</span>
+  <span class="notify-event-meta">
+    <span class="notify-event-type">{{.Type}}</span>
+    {{- with .ActorLabel}}<span class="notify-event-actor">{{.}}</span>{{end}}
+    <span class="notify-event-source">{{.Source}}</span>
+    <time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}"
+          title="{{.CreatedAt.Format "2006-01-02 15:04 MST"}}">{{.RelTime}}</time>
+  </span>
+</li>
+{{else}}
+<li class="notify-empty">No notifications.</li>
+{{end}}
+{{- if .NextBeforeID}}
+<li id="notify-more" class="notify-more">
+  <button type="button" hx-get="{{.BasePath}}/?{{.MoreQuery}}"
+          hx-target="#notify-more" hx-swap="outerHTML">Load older</button>
+</li>
+{{- end}}

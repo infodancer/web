@@ -1,0 +1,42 @@
+/* Module-specific styles for search, layered over infodancer/ui tokens + base.
+   Everything resolves through --app-* tokens so a host palette override flows
+   through without touching this file. */
+
+.app-search {
+  margin-block: var(--app-space-lg);
+}
+
+.app-search h1 {
+  margin-block-end: var(--app-space);
+}
+
+.result-list {
+  margin-block-start: var(--app-space-lg);
+}
+
+.result-title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.result-title a {
+  text-decoration: none;
+}
+
+.result-title a:hover {
+  text-decoration: underline;
+}
+
+.result-snippet {
+  margin-block: var(--app-space-sm);
+  color: var(--app-color-fg-muted);
+}
+
+/* ts_headline highlight. The query layer guarantees only these <mark> tags are
+   ever emitted into a snippet; document text is HTML-escaped first. */
+.result-snippet mark {
+  background: var(--app-color-accent);
+  color: var(--app-color-accent-on);
+  padding-inline: 0.15em;
+  border-radius: var(--app-radius-sm);
+}
