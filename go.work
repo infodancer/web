@@ -3,9 +3,10 @@ go 1.26.3
 use (
 	./blog
 	./contact
+	./faq
 	./integration
+	./media
 	./newsletter
 	./notify
-	./faq
 	./search
 )
