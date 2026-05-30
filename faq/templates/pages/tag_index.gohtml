@@ -1,0 +1,11 @@
+{{define "content"}}
+{{- $view := .Page -}}
+<section class="faq-tag-index" aria-labelledby="faq-tag-index-h">
+<header class="app-list-header">
+<h1 id="faq-tag-index-h">Tags</h1>
+</header>
+<div id="faq-tag-index-body">
+{{template "partials/tag_list_body.gohtml" $view}}
+</div>
+</section>
+{{end}}

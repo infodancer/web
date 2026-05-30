@@ -1,0 +1,119 @@
+/*
+ * faq.css — FAQ-specific styles.
+ *
+ * Chrome, utility patterns, and base typography come from infodancer/ui
+ * (tokens.css + base.css), which faq mounts at /static/ui/ and loads
+ * before this file in templates/base.gohtml. This sheet carries only the
+ * widgets that are genuinely FAQ-shaped: questions, answers, semantic
+ * badge variants.
+ *
+ * Themable surface (see DESIGN.md §9.3):
+ *
+ *   Site-wide: override --app-* at :root.
+ *
+ *   FAQ-scoped: override --app-* on .faq, e.g.
+ *     .faq { --app-color-accent: #c44; }
+ *
+ *   Structural: replace templates/partials/{nav,footer}.gohtml via
+ *   faq.Config.Templates.
+ */
+
+.faq {
+  --faq-badge-archived-bg: #fef3c7;
+  --faq-badge-archived-fg: #92400e;
+  --faq-badge-accepted-bg: #d1fae5;
+  --faq-badge-accepted-fg: #065f46;
+}
+
+/* ----- question list ----- */
+
+.faq-q-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--app-space-sm);
+}
+
+/* Composes with .app-card from infodancer/ui: <article class="app-card faq-q-card"> */
+.faq-q-card {
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) 1fr;
+  gap: var(--app-space);
+}
+
+.faq-q-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-xs);
+  align-items: end;
+  color: var(--app-color-fg-muted);
+  font-size: 0.9rem;
+}
+.faq-q-stats small { font-size: 0.75rem; display: block; }
+
+.faq-q-title {
+  margin: 0 0 var(--app-space-sm);
+  font-size: 1.1rem;
+  line-height: 1.3;
+  font-family: var(--app-font-display);
+}
+.faq-q-title a { color: var(--app-color-fg); }
+
+.faq-q-excerpt {
+  margin: 0 0 var(--app-space-sm);
+  color: var(--app-color-fg-muted);
+  font-size: 0.95rem;
+}
+
+.faq-q-attribution {
+  margin: var(--app-space-sm) 0 0;
+  font-size: 0.8rem;
+  color: var(--app-color-fg-muted);
+}
+
+/* ----- question detail ----- */
+
+.faq-q-header {
+  border-bottom: 1px solid var(--app-color-border);
+  padding-bottom: var(--app-space-sm);
+  margin-bottom: var(--app-space);
+}
+.faq-q-meta { color: var(--app-color-fg-muted); font-size: 0.9rem; margin: 0; }
+
+.faq-q-body {
+  line-height: 1.65;
+  color: var(--app-color-prose-fg);
+}
+.faq-q-body pre {
+  background: var(--app-color-bg-raised);
+  padding: var(--app-space-sm);
+  border-radius: var(--app-radius);
+  overflow-x: auto;
+}
+
+/* ----- answers ----- */
+
+.faq-answers { margin-top: var(--app-space-lg); }
+.faq-answer-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--app-space);
+}
+.faq-answer {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: var(--app-space);
+  padding: var(--app-space);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius);
+}
+.faq-answer.is-accepted { border-color: var(--app-color-success); }
+.faq-answer-stats { color: var(--app-color-fg-muted); font-size: 0.9rem; }
+.faq-answer-meta { color: var(--app-color-fg-muted); font-size: 0.85rem; margin-top: var(--app-space-sm); }
+
+/* ----- FAQ-specific badge variants (compose on top of .app-badge) ----- */
+
+.faq-badge-archived { background: var(--faq-badge-archived-bg); color: var(--faq-badge-archived-fg); }
+.faq-badge-accepted { background: var(--faq-badge-accepted-bg); color: var(--faq-badge-accepted-fg); }

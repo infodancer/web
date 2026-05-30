@@ -1,0 +1,12 @@
+{{define "content"}}
+{{- $view := .Page -}}
+<section class="faq-tag-questions" aria-labelledby="faq-tag-h">
+<header class="app-list-header">
+<h1 id="faq-tag-h">Questions tagged <code>{{$view.Name}}</code></h1>
+<p class="faq-tag-meta">{{$view.Total}} question{{if ne $view.Total 1}}s{{end}}</p>
+</header>
+<div id="faq-tag-body">
+{{template "partials/tag_questions_body.gohtml" $view}}
+</div>
+</section>
+{{end}}

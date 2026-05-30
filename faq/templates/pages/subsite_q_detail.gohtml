@@ -1,0 +1,23 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+{{- $sub := $view.Subsite -}}
+{{- $subBase := printf "%s/%s" $base $sub.Slug -}}
+<section class="faq-q-detail" aria-labelledby="faq-q-title">
+<nav class="faq-breadcrumb" aria-label="Breadcrumb">
+<a href="{{$base}}/">All FAQ</a> ·
+<a href="{{$subBase}}">{{$sub.DisplayName}}</a> ·
+<a href="{{$subBase}}/q">Questions</a>
+</nav>
+{{template "partials/q_detail_body.gohtml" $view.Detail}}
+
+{{- if $view.SeeAlso -}}
+<aside class="faq-see-also" aria-label="Also in">
+<h2>Also in</h2>
+<ul role="list">
+{{range $view.SeeAlso}}<li><a href="{{.URL}}">{{.DisplayName}}</a></li>{{end}}
+</ul>
+</aside>
+{{- end -}}
+</section>
+{{end}}

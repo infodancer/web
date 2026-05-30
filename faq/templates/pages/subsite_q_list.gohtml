@@ -1,0 +1,27 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+{{- $subBase := $view.BaseURL -}}
+<section class="faq-list" aria-labelledby="faq-list-title">
+<header class="app-list-header">
+<nav class="faq-breadcrumb" aria-label="Breadcrumb">
+<a href="{{$base}}/">All FAQ</a> · <a href="{{$subBase}}">{{$view.Subsite.DisplayName}}</a>
+</nav>
+<h1 id="faq-list-title">{{$view.Title}}</h1>
+<nav class="app-list-sorts" aria-label="Sort">
+<a href="{{$subBase}}/q?sort=newest" class="app-sort {{if eq $view.Sort "newest"}}is-active{{end}}">Newest</a>
+<a href="{{$subBase}}/q?sort=votes" class="app-sort {{if eq $view.Sort "votes"}}is-active{{end}}">Votes</a>
+<a href="{{$subBase}}/q?sort=unanswered" class="app-sort {{if eq $view.Sort "unanswered"}}is-active{{end}}">Unanswered</a>
+</nav>
+</header>
+<div id="faq-list-body">
+{{- if $view.Questions -}}
+<ol class="faq-q-list" role="list">
+{{range $view.Questions}}{{template "partials/q_card.gohtml" .}}{{end}}
+</ol>
+{{- else -}}
+<p class="faq-empty">No questions yet.</p>
+{{- end -}}
+</div>
+</section>
+{{end}}

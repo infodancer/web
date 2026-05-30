@@ -1,0 +1,16 @@
+{{- /* TagIndexView */ -}}
+{{- if .Tags -}}
+<ul class="app-card-grid" role="list">
+{{range .Tags}}
+<li class="app-card">
+<a class="app-tag" href="{{.URL}}">{{.Name}}</a>
+<span class="app-tag-count">{{.QuestionCount}}</span>
+{{- with .Description -}}
+<p class="faq-tag-desc">{{.}}</p>
+{{- end -}}
+</li>
+{{end}}
+</ul>
+{{- else -}}
+<p class="app-list-empty">No tags yet.</p>
+{{- end -}}

@@ -1,0 +1,25 @@
+{{- /* Answer */ -}}
+<li class="faq-answer{{if .Accepted}} is-accepted{{end}}" id="faq-a-{{.ID}}">
+<div class="faq-answer-stats" aria-label="Stats">
+<span class="faq-answer-score">{{.Score}}<small> score</small></span>
+{{- if .Accepted -}}
+<span class="app-badge faq-badge-accepted" title="Accepted answer">Accepted</span>
+{{- end -}}
+</div>
+<div class="faq-answer-body">
+{{.BodyHTML | safe}}
+</div>
+<footer class="faq-answer-meta">
+answered by <strong>{{.Author}}</strong>
+<time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "Jan 2, 2006"}}</time>
+{{- if .EditedAt -}}
+· edited <time datetime="{{.EditedAt.Format "2006-01-02T15:04:05Z"}}">{{.EditedAt.Format "Jan 2, 2006"}}</time>
+{{- end -}}
+{{- if .LocallyModified}} · Modified after import.{{end -}}
+</footer>
+{{- with .Comments -}}
+<ol class="app-comment-list" role="list">
+{{range .}}{{template "partials/comment.gohtml" .}}{{end}}
+</ol>
+{{- end -}}
+</li>

@@ -1,0 +1,9 @@
+{{- /*
+  base.gohtml renders every full faq page through infodancer/ui's Layer 2
+  ui/document, so the chrome (nav, footer, meta, CSS, analytics, theme,
+  sidebars) is owned by ui and skinned per request by the host via Config.Chrome.
+  The page template supplies the {{define "content"}} block; the faq chrome
+  partial supplies the title/head blocks; the embedded ui.DocumentData on the
+  view supplies ui/document's chrome fields.
+*/ -}}
+{{ template "ui/document" . }}

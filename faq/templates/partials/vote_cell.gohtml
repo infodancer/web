@@ -1,0 +1,18 @@
+{{- /* VoteCellView */ -}}
+<div class="faq-vote-cell" id="faq-vote-{{.AnswerID}}">
+<button type="button" class="faq-vote-up {{if eq .UserVote "up"}}is-active{{end}}"
+        hx-post="../../a/{{.AnswerID}}/vote" hx-vals='{"value":"up"}'
+        hx-target="#faq-vote-{{.AnswerID}}" hx-swap="outerHTML"
+        aria-label="Vote up">▲</button>
+<span class="faq-vote-score">{{.Score}}</span>
+<button type="button" class="faq-vote-down {{if eq .UserVote "down"}}is-active{{end}}"
+        hx-post="../../a/{{.AnswerID}}/vote" hx-vals='{"value":"down"}'
+        hx-target="#faq-vote-{{.AnswerID}}" hx-swap="outerHTML"
+        aria-label="Vote down">▼</button>
+{{- if ne .UserVote "" -}}
+<button type="button" class="faq-vote-clear"
+        hx-delete="../../a/{{.AnswerID}}/vote"
+        hx-target="#faq-vote-{{.AnswerID}}" hx-swap="outerHTML"
+        aria-label="Remove vote">×</button>
+{{- end -}}
+</div>

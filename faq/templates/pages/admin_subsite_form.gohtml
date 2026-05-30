@@ -1,0 +1,111 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-admin-subsite-form" aria-labelledby="faq-admin-sub-h">
+<header class="app-list-header">
+<h1 id="faq-admin-sub-h">{{$view.Heading}}</h1>
+<p><a href="{{$base}}/admin/subsites">← All subsites</a></p>
+</header>
+{{- with $view.Errors -}}
+<ul class="faq-form-errors" role="alert">
+{{range .}}<li>{{.}}</li>{{end}}
+</ul>
+{{- end -}}
+<form class="faq-form" action="{{$view.ActionURL}}" method="post">
+<label class="faq-form-label" for="faq-sub-slug">Slug</label>
+<input id="faq-sub-slug" name="slug" type="text" required maxlength="64" value="{{$view.Slug}}" pattern="[a-z0-9]+(-[a-z0-9]+)*">
+<p class="faq-form-help">Lowercase letters, digits, hyphens. Used in URLs as <code>{{$base}}/&lt;slug&gt;</code>.</p>
+
+<label class="faq-form-label" for="faq-sub-name">Display name</label>
+<input id="faq-sub-name" name="display_name" type="text" required maxlength="200" value="{{$view.DisplayName}}">
+
+<label class="faq-form-label" for="faq-sub-desc">Description (markdown)</label>
+<textarea id="faq-sub-desc" name="description" rows="6">{{$view.Description}}</textarea>
+
+<button type="submit" class="faq-form-submit">{{if $view.ID}}Save changes{{else}}Create{{end}}</button>
+</form>
+
+{{- if $view.ID -}}
+<section class="faq-admin-tags" aria-labelledby="faq-admin-tags-h">
+<h2 id="faq-admin-tags-h">Tag rules</h2>
+<p>Imported questions tagged with any of these surface in this subsite.</p>
+{{- if $view.TagRules -}}
+<table class="faq-admin-table">
+<thead>
+<tr><th>Tag</th><th>Global questions</th><th></th></tr>
+</thead>
+<tbody>
+{{range $view.TagRules}}
+<tr>
+<td><code>{{.Name}}</code></td>
+<td>{{.QuestionCount}}</td>
+<td>
+<form action="{{$base}}/admin/subsites/{{$view.ID}}/tags/{{.TagID}}/delete" method="post" style="display:inline">
+<button type="submit" class="faq-form-submit">Remove</button>
+</form>
+</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+{{- else -}}
+<p class="faq-empty">No tag rules attached yet.</p>
+{{- end -}}
+
+<form class="faq-form" action="{{$base}}/admin/subsites/{{$view.ID}}/tags" method="post">
+<label class="faq-form-label" for="faq-add-tag">Attach tag</label>
+<input id="faq-add-tag" name="tag" type="text" required maxlength="64" pattern="[a-z0-9]+(-[a-z0-9]+)*">
+<button type="submit" class="faq-form-submit">Attach</button>
+</form>
+</section>
+
+<section class="faq-admin-pinned" aria-labelledby="faq-admin-pinned-h">
+<h2 id="faq-admin-pinned-h">Pinned questions</h2>
+<p>Questions added here surface in this subsite regardless of tag rules. Existing tag-matched questions are unaffected.</p>
+{{- if $view.ExplicitQuestions -}}
+<table class="faq-admin-table">
+<thead>
+<tr><th>ID</th><th>Title</th><th></th></tr>
+</thead>
+<tbody>
+{{range $view.ExplicitQuestions}}
+<tr>
+<td><code>{{.ID}}</code></td>
+<td><a href="{{.URL}}">{{.Title}}</a></td>
+<td>
+<form action="{{$base}}/admin/subsites/{{$view.ID}}/questions/{{.ID}}/delete" method="post" style="display:inline">
+<button type="submit" class="faq-form-submit">Remove</button>
+</form>
+</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+{{- else -}}
+<p class="faq-empty">No pinned questions yet.</p>
+{{- end -}}
+
+{{- if or $view.BulkBadTokens $view.BulkMissingIDs -}}
+<ul class="faq-form-errors" role="alert">
+{{range $view.BulkBadTokens}}<li>Not a question ID: <code>{{.}}</code></li>{{end}}
+{{range $view.BulkMissingIDs}}<li>No question with ID <code>{{.}}</code></li>{{end}}
+</ul>
+{{- end -}}
+
+<form class="faq-form" action="{{$base}}/admin/subsites/{{$view.ID}}/questions" method="post">
+<label class="faq-form-label" for="faq-pin-ids">Pin question IDs (whitespace- or comma-separated)</label>
+<textarea id="faq-pin-ids" name="ids" rows="3" placeholder="e.g. 42 1337, 9001"></textarea>
+<button type="submit" class="faq-form-submit">Pin</button>
+</form>
+</section>
+
+<section class="faq-admin-danger">
+<h2>Delete this subsite</h2>
+<p>Removes the subsite, its tag rules, and any pinned-question links. Refuses if native questions are still attached — re-scope them first.</p>
+<form action="{{$base}}/admin/subsites/{{$view.ID}}/delete" method="post">
+<button type="submit" class="faq-form-submit faq-form-danger">Delete subsite</button>
+</form>
+</section>
+{{- end -}}
+</section>
+{{end}}

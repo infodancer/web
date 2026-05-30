@@ -1,0 +1,28 @@
+{{- /* QuestionCard */ -}}
+<li class="app-card faq-q-card">
+<div class="faq-q-stats" aria-label="Stats">
+<span class="faq-q-score">{{.Score}}<small> score</small></span>
+<span class="faq-q-answers">{{.AnswerCount}}<small> {{if eq .AnswerCount 1}}answer{{else}}answers{{end}}</small></span>
+</div>
+<div class="faq-q-body">
+<h3 class="faq-q-title">
+<a href="{{.URL}}">{{.Title}}</a>
+{{- if .Locked -}}
+<span class="app-badge faq-badge-archived" title="Imported and locked">Archived</span>
+{{- end -}}
+</h3>
+{{- with .Excerpt -}}
+<p class="faq-q-excerpt">{{.}}</p>
+{{- end -}}
+{{- if .TagLinks -}}
+<ul class="app-tag-list" role="list">
+{{range .TagLinks}}<li><a class="app-tag" href="{{.URL}}">{{.Name}}</a></li>{{end}}
+</ul>
+{{- end -}}
+{{- with .Source -}}
+<p class="faq-q-attribution">
+From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
+</p>
+{{- end -}}
+</div>
+</li>

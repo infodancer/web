@@ -1,0 +1,13 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-admin faq-admin-deleted" aria-labelledby="faq-admin-deleted-title">
+<header class="faq-admin-header">
+<h1 id="faq-admin-deleted-title">Deleted questions</h1>
+<p class="faq-admin-sub">Soft-deleted rows. Restore puts each one back where it was (locked stays locked; open stays open).</p>
+</header>
+<div id="faq-admin-deleted-body">
+{{template "partials/admin_deleted_body.gohtml" $view}}
+</div>
+</section>
+{{end}}

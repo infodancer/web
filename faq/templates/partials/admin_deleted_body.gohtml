@@ -1,0 +1,39 @@
+{{- /* AdminDeletedView */ -}}
+{{- if .Questions -}}
+<ul class="faq-q-list faq-admin-q-list" role="list">
+{{range .Questions}}
+<li class="faq-q-card faq-admin-row faq-admin-deleted-row" id="faq-admin-deleted-row-{{.ID}}">
+<div class="faq-q-body">
+<h3 class="faq-q-title">{{.Title}}</h3>
+{{- with .Excerpt -}}
+<p class="faq-q-excerpt">{{.}}</p>
+{{- end -}}
+{{- if .Tags -}}
+<ul class="app-tag-list" role="list">
+{{range .Tags}}<li class="app-tag">{{.}}</li>{{end}}
+</ul>
+{{- end -}}
+</div>
+<div class="faq-admin-actions">
+<form method="post" action="../q/{{.ID}}/restore"
+      hx-post="../q/{{.ID}}/restore" hx-target="body">
+<button type="submit" class="faq-mod-btn faq-mod-restore">Restore</button>
+</form>
+</div>
+</li>
+{{end}}
+</ul>
+{{- if gt .Total .PageSize -}}
+<nav class="app-pager" aria-label="Pagination">
+{{- if gt .Page 1 -}}
+<a class="app-pager-prev" href="?page={{sub .Page 1}}">Previous</a>
+{{- end -}}
+<span class="app-pager-pos">Page {{.Page}}</span>
+{{- if .HasMore -}}
+<a class="app-pager-next" href="?page={{add .Page 1}}">Next</a>
+{{- end -}}
+</nav>
+{{- end -}}
+{{- else -}}
+<p class="app-list-empty">No deleted questions.</p>
+{{- end -}}

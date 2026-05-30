@@ -1,0 +1,21 @@
+{{- /* TagDetailView */ -}}
+{{- if .Questions -}}
+<ul class="faq-q-list" role="list">
+{{range .Questions}}
+{{template "partials/q_card.gohtml" .}}
+{{end}}
+</ul>
+{{- if gt .Total .PageSize -}}
+<nav class="app-pager" aria-label="Pagination">
+{{- if gt .Page 1 -}}
+<a class="app-pager-prev" href="?page={{sub .Page 1}}">Previous</a>
+{{- end -}}
+<span class="app-pager-pos">Page {{.Page}}</span>
+{{- if .HasMore -}}
+<a class="app-pager-next" href="?page={{add .Page 1}}">Next</a>
+{{- end -}}
+</nav>
+{{- end -}}
+{{- else -}}
+<p class="app-list-empty">No questions yet for this tag.</p>
+{{- end -}}

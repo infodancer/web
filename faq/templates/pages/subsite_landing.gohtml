@@ -1,0 +1,50 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-subsite-landing" aria-labelledby="faq-subsite-title">
+<header class="faq-subsite-header">
+<nav class="faq-breadcrumb" aria-label="Breadcrumb">
+<a href="{{$base}}/">All FAQ</a> · {{$view.DisplayName}}
+</nav>
+<h1 id="faq-subsite-title">{{$view.DisplayName}}</h1>
+<p class="faq-subsite-count">{{$view.QuestionCount}} {{if eq $view.QuestionCount 1}}question{{else}}questions{{end}}</p>
+{{- with $view.Description -}}
+<p class="faq-subsite-desc">{{.}}</p>
+{{- end -}}
+<div class="faq-subsite-actions">
+<a class="faq-action" href="{{$view.AllQuestionsURL}}">Browse all</a>
+{{- if $.User -}}
+<a class="faq-action faq-action-primary" href="{{$view.AskURL}}">Ask a question</a>
+{{- end -}}
+</div>
+</header>
+
+{{- if $view.TopTags -}}
+<section class="faq-subsite-tags" aria-label="Top tags">
+<h2>Tags</h2>
+<ul class="app-tag-list" role="list">
+{{range $view.TopTags}}<li><a class="app-tag" href="{{.URL}}">{{.Name}}</a></li>{{end}}
+</ul>
+</section>
+{{- end -}}
+
+<section class="faq-subsite-recent" aria-label="Recent questions">
+<h2>Recent questions</h2>
+{{- if $view.Recent -}}
+<ul class="faq-directory-recent-list" role="list">
+{{range $view.Recent}}
+<li class="faq-directory-recent-item">
+<a href="{{.URL}}">{{.Title}}</a>
+{{- if .Locked -}}
+<span class="app-badge faq-badge-archived" title="Imported and locked">Archived</span>
+{{- end -}}
+</li>
+{{end}}
+</ul>
+<p class="faq-directory-recent-more"><a href="{{$view.AllQuestionsURL}}">All questions →</a></p>
+{{- else -}}
+<p class="faq-empty">No questions yet.</p>
+{{- end -}}
+</section>
+</section>
+{{end}}

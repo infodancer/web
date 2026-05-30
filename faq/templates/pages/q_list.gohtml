@@ -1,0 +1,17 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-list" aria-labelledby="faq-list-title">
+<header class="app-list-header">
+<h1 id="faq-list-title">{{$view.Title}}</h1>
+<nav class="app-list-sorts" aria-label="Sort">
+<a href="{{$base}}/q?sort=newest" class="app-sort {{if eq $view.Sort "newest"}}is-active{{end}}">Newest</a>
+<a href="{{$base}}/q?sort=votes" class="app-sort {{if eq $view.Sort "votes"}}is-active{{end}}">Votes</a>
+<a href="{{$base}}/q?sort=unanswered" class="app-sort {{if eq $view.Sort "unanswered"}}is-active{{end}}">Unanswered</a>
+</nav>
+</header>
+<div id="faq-list-body">
+{{template "partials/q_list_body.gohtml" $view}}
+</div>
+</section>
+{{end}}

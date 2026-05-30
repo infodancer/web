@@ -1,0 +1,29 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-admin-subsites" aria-labelledby="faq-admin-subs-h">
+<header class="app-list-header">
+<h1 id="faq-admin-subs-h">Subsites</h1>
+<p><a class="faq-action faq-action-primary" href="{{$base}}/admin/subsites/new">New subsite</a></p>
+</header>
+{{- if $view.Subsites -}}
+<table class="faq-admin-table">
+<thead>
+<tr><th>Slug</th><th>Display name</th><th>Questions</th><th>Actions</th></tr>
+</thead>
+<tbody>
+{{range $view.Subsites}}
+<tr>
+<td><code>{{.Slug}}</code></td>
+<td><a href="{{.PublicURL}}">{{.DisplayName}}</a></td>
+<td>{{.QuestionCount}}</td>
+<td><a href="{{.EditURL}}">edit</a></td>
+</tr>
+{{end}}
+</tbody>
+</table>
+{{- else -}}
+<p class="faq-empty">No subsites yet. <a href="{{$base}}/admin/subsites/new">Create one</a>.</p>
+{{- end -}}
+</section>
+{{end}}
