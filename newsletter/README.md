@@ -22,14 +22,12 @@ import (
 
 ## Quick start (Postgres + Listmonk)
 
-Bring your own Postgres connection (the module never imports a driver):
+Hand the store the host's pgx connection pool:
 
 ```go
-import _ "github.com/jackc/pgx/v5/stdlib"
-
-db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL"))
-if err := subscribers.Migrate(ctx, db); err != nil { ... }
-store := subscribers.New(db)
+pool, _ := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+if err := subscribers.Migrate(ctx, pool); err != nil { ... }
+store := subscribers.New(pool)
 
 lm := listmonk.NewClient("http://listmonk:9000")
 
@@ -47,7 +45,8 @@ mux.Handle("POST /subscribe",
 
 - **`handler/`** — `http.Handler` for `POST /subscribe`. Persists the
   email locally, forwards to Listmonk, returns a small HTML fragment.
-- **`subscribers/`** — PostgreSQL store with embedded
+- **`subscribers/`** — PostgreSQL store ([sqlc](https://sqlc.dev/)-generated
+  queries in `subscribers/db`) with embedded
   [goose](https://github.com/pressly/goose) migrations. One table:
   `email`, `created_at`, `synced_at`.
 - **`listmonk/`** — Posts to Listmonk's public subscription API. No-ops
@@ -64,15 +63,15 @@ mux.Handle("POST /subscribe",
 ## Storage
 
 ```go
-db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL"))
-if err := subscribers.Migrate(ctx, db); err != nil { ... }
-store := subscribers.New(db)
+pool, _ := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+if err := subscribers.Migrate(ctx, pool); err != nil { ... }
+store := subscribers.New(pool)
 ```
 
-The core `subscribers` package uses `database/sql` and imports no SQL
-driver — supply `github.com/jackc/pgx/v5/stdlib` (or `github.com/lib/pq`)
-at the host and pass the `*sql.DB` in. `Migrate` applies the embedded
-migrations; the caller owns the connection, so the store has no `Close`.
+The host opens one `*pgxpool.Pool` and passes it in. `Migrate` applies the
+embedded migrations (tracked in a dedicated `newsletter_goose_db_version`
+table so several components can share one database); the caller owns the
+pool, so the store has no `Close`.
 
 ## Anti-bot
 

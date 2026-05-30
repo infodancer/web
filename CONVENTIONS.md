@@ -17,7 +17,9 @@ conventions.
 - **Migrations**: [goose](https://github.com/pressly/goose). Each component owns
   a **distinct goose version table** (`<component>_goose_db_version`) so multiple
   components can run their migrations into one database without colliding.
-- **SQL codegen** (Postgres components): [sqlc](https://sqlc.dev/) with `pgx/v5`.
+- **SQL codegen**: [sqlc](https://sqlc.dev/) with `pgx/v5` for every component's
+  queries — type-safe generated code, one way to write and review SQL. The
+  generated `db` package is committed; regenerate with `sqlc generate`.
 
 ## Module shape (the mount contract)
 
@@ -43,11 +45,13 @@ and mount path from the host.
   them side by side. There is no SQLite backend — standardizing on one engine is
   deliberate: it keeps the components consistent and removes the maintenance and
   drift cost of a second store implementation per component.
-- **Host owns the connection**: a component core never imports a database
-  driver. It uses `database/sql` + goose and takes a `*sql.DB` from the host,
-  which opens one pool (with the pgx stdlib driver) and passes the handle to
-  each component. Cores expose `New(db)` to build a store and `Migrate(ctx, db)`
-  to apply their migrations.
+- **Host owns the pool**: every component takes a `*pgxpool.Pool` from the host,
+  which opens one pool and passes that same handle to each component. Cores
+  expose `New(pool)` to build a store and `Migrate(ctx, pool)` to apply their
+  migrations (migrations run through `stdlib.OpenDBFromPool` internally, since
+  goose speaks `database/sql`). Each component scopes its migration history to a
+  dedicated `<component>_goose_db_version` table so several can share one
+  database without colliding.
 - **Handlers depend on interfaces, not the concrete store**: each handler
   declares the small store interface it needs (e.g. `Save`/`MarkSent`/
   `MarkFailed`), so it pulls in no driver and is tested with an in-memory fake.
