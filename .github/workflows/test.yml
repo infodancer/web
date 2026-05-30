@@ -15,14 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     # Each module builds against its own go.mod; the repo go.work is a
     # local-dev convenience only. A single Postgres service backs the
-    # DB-backed modules; SQLite-backed modules ignore it.
+    # DB-backed modules.
     env:
       GOWORK: "off"
       TEST_DATABASE_URL: postgres://web:web@localhost:5432/web_test?sslmode=disable
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, contact/submissions/sqlite, newsletter, newsletter/subscribers/sqlite, integration]
+        module: [search, notify, blog, contact, newsletter, integration]
     services:
       postgres:
         image: pgvector/pgvector:pg17

@@ -35,9 +35,11 @@ task all     # build, lint, vulncheck, test
 
 ## Open items
 
-- `contact` and `newsletter` are SQLite-backed; whether to move them onto the
-  shared Postgres (so all components can be tested and run together against one
-  database) is an unmade design decision. The `integration` module currently
-  covers only the Postgres components.
+- All components are Postgres-backed (SQLite was purged so the suite runs on one
+  database). The `contact` and `newsletter` store packages have no PostgreSQL
+  tests yet — their SQLite tests were removed with the backend; cover the SQL in
+  the `integration` module against the CI Postgres service.
+- `contact` lost its runnable example when the SQLite backend module was
+  deleted; a Postgres-backed example is worth adding.
 - `faq` is intended to join this monorepo but is mid-refactor and lives in its
   own repository for now.

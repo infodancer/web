@@ -1,9 +1,9 @@
 # contact
 
 A small, reusable Go HTTP handler for contact-form submissions.
-Validates → persists → emails. SQLite or PostgreSQL on the back, SMTP on
-the front. Designed for small, low-volume sites where reaching for a
-SaaS form-builder feels excessive.
+Validates → persists → emails. PostgreSQL on the back, SMTP on the front.
+Designed for small, low-volume sites where reaching for a SaaS
+form-builder feels excessive.
 
 > Maintained as a personal utility for my own sites. Issues and PRs are
 > welcome but I may not respond quickly. See [SECURITY.md](SECURITY.md)
@@ -12,16 +12,22 @@ SaaS form-builder feels excessive.
 ```
 import (
     "github.com/infodancer/web/contact/handler"
-    "github.com/infodancer/web/contact/submissions/sqlite"
+    "github.com/infodancer/web/contact/submissions"
     "github.com/infodancer/web/contact/smtp"
 )
 ```
 
-## Quick start (SQLite + SMTP)
+## Quick start (Postgres + SMTP)
+
+Bring your own Postgres connection (the module never imports a driver) and
+hand it to the store:
 
 ```go
-store, _ := sqlite.Open("data/contact.db")
-defer store.Close()
+import _ "github.com/jackc/pgx/v5/stdlib"
+
+db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+if err := submissions.Migrate(ctx, db); err != nil { ... }
+store := submissions.New(db)
 
 mailer := smtp.New(smtp.Config{
     Host: "smtp.fastmail.com", Port: 587,
@@ -36,8 +42,6 @@ http.Handle("/contact", h)
 The `to` argument accepts a single address or a comma-separated list
 (`"a@x,b@y"`); all addresses appear in the `To:` header. Whitespace and
 empty entries are trimmed, so values pulled directly from env vars work.
-
-A complete runnable example lives in [`example/`](example/main.go).
 
 ## What the handler does
 
@@ -57,7 +61,7 @@ address — you hit Reply in your email client and it goes to them.
 
 ## Storage
 
-One table, identical schema in both backends, applied via embedded
+One table, applied via embedded
 [goose](https://github.com/pressly/goose) migrations:
 
 | column            | notes                                             |
@@ -71,29 +75,20 @@ One table, identical schema in both backends, applied via embedded
 | `email_last_error`| last error string                                 |
 | `sent_at`         | populated on first successful delivery            |
 
-### SQLite
-
-```go
-import "github.com/infodancer/web/contact/submissions/sqlite"
-
-store, err := sqlite.Open("data/contact.db")
-```
-
-`sqlite.Open` creates the parent directory, runs migrations, sets max
-connections to 1 (SQLite is a single-writer DB). Importing the
-`submissions/sqlite` subpackage registers the `modernc.org/sqlite` driver;
-Postgres-only consumers import just `submissions` and avoid that dependency.
-
-### PostgreSQL
+The module uses `database/sql` and never imports a Postgres driver — the
+host opens the connection (typically its shared pool) with a driver of its
+choice (`github.com/jackc/pgx/v5/stdlib` or `github.com/lib/pq`) and passes
+the `*sql.DB` in:
 
 ```go
 db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL"))
-if err := submissions.MigratePostgres(ctx, db); err != nil { ... }
-store := submissions.New(db, submissions.Postgres)
+if err := submissions.Migrate(ctx, db); err != nil { ... }
+store := submissions.New(db)
 ```
 
-The contact module never imports a Postgres driver directly — bring
-your own (`github.com/jackc/pgx/v5/stdlib` or `github.com/lib/pq`).
+`submissions.Migrate` applies the embedded migrations; `New` wraps the
+connection. The caller owns `db`, so the store has no `Close` — close the
+pool at the host level.
 
 ## Email transport
 
@@ -156,7 +151,7 @@ before exiting:
 ```go
 srv.Shutdown(ctx)
 h.Wait()
-store.Close()
+// the host closes its pool after all components have drained
 ```
 
 ## Status
@@ -180,4 +175,4 @@ Calibrate to your own situation; this is not legal advice.
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0 — see the repository [LICENSE](../LICENSE).

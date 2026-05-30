@@ -5,7 +5,7 @@ version: '3'
 # within the module directory.
 
 vars:
-  MODULES: search notify blog contact contact/submissions/sqlite newsletter newsletter/subscribers/sqlite integration
+  MODULES: search notify blog contact newsletter integration
 
 env:
   GOWORK: 'off'

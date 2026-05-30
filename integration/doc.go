@@ -3,9 +3,7 @@
 // exercises the interactions between them (for example, content created in
 // one component becoming searchable in search).
 //
-// Today the Postgres-backed components (search, notify) are the ones that can
-// share one database with prefixed tables and per-component goose version
-// tables. contact and newsletter are still SQLite-backed; folding them into
-// the shared-Postgres story is a separate design decision, tracked in the
-// suite's CONVENTIONS.md.
+// Every component is Postgres-backed and shares one database via prefixed
+// tables and per-component goose version tables, so the same database can host
+// search, notify, contact, and newsletter side by side for these tests.
 package integration

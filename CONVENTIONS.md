@@ -38,25 +38,20 @@ and mount path from the host.
 - **Table prefixes**: every component prefixes its tables with the component
   name (`search_documents`, `search_chunks`, …) so a single database can host
   several components.
-- **Postgres components** (`search`, `notify`) are the ones that share one
-  database today; `integration/` exercises them together.
-- **Driver isolation**: a component core never imports a database driver. The
-  store interface and the dialect-specific SQL live in the core module; each
-  concrete backend that pulls a driver lives in its **own nested module** at its
-  natural path (`contact/submissions/sqlite`, `newsletter/subscribers/sqlite`).
-  A subtree with its own `go.mod` is excluded from the parent module, so the
-  driver's dependency closure (for SQLite, the heavy `modernc.org/sqlite` +
-  `libc`/`memory`/`mathutil` C-port packages) is compiled only by consumers that
-  choose that backend. The handler depends on a small store *interface*, so it
-  is tested with an in-memory fake and pulls no driver. Nested backend modules
-  carry a relative `replace` to their parent for local/CI builds while the
-  parent is unpublished.
-- **SQLite components** (`contact`, `newsletter`) ship a SQLite backend module
-  today. Their Postgres migrations are already scaffolded (`migrations/postgres`),
-  but no Postgres store implementation exists yet. Completing the Postgres
-  backend, so contact submissions and newsletter state can live next to search
-  and notify in one database, is an open decision, not yet made. Until it is,
-  the integration suite covers only the Postgres components.
+- **Postgres everywhere**: every component is Postgres-backed. A site mounting
+  several components runs one database, and the `integration` module can test
+  them side by side. There is no SQLite backend — standardizing on one engine is
+  deliberate: it keeps the components consistent and removes the maintenance and
+  drift cost of a second store implementation per component.
+- **Host owns the connection**: a component core never imports a database
+  driver. It uses `database/sql` + goose and takes a `*sql.DB` from the host,
+  which opens one pool (with the pgx stdlib driver) and passes the handle to
+  each component. Cores expose `New(db)` to build a store and `Migrate(ctx, db)`
+  to apply their migrations.
+- **Handlers depend on interfaces, not the concrete store**: each handler
+  declares the small store interface it needs (e.g. `Save`/`MarkSent`/
+  `MarkFailed`), so it pulls in no driver and is tested with an in-memory fake.
+  The concrete `*Store` satisfies the interface, so call sites are unchanged.
 
 ## Security
 

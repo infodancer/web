@@ -1,7 +1,7 @@
 # newsletter
 
 A small Go toolkit for newsletter subscription on low-volume sites:
-a subscribe handler, a local subscriber store (SQLite/PostgreSQL), thin
+a subscribe handler, a PostgreSQL subscriber store, thin
 clients for [Listmonk](https://listmonk.app/) and
 [Buttondown](https://buttondown.email/), and a few composable anti-bot
 middlewares.
@@ -17,15 +17,19 @@ import (
     "github.com/infodancer/web/newsletter/handler"
     "github.com/infodancer/web/newsletter/listmonk"
     "github.com/infodancer/web/newsletter/subscribers"
-    "github.com/infodancer/web/newsletter/subscribers/sqlite"
 )
 ```
 
-## Quick start (SQLite + Listmonk)
+## Quick start (Postgres + Listmonk)
+
+Bring your own Postgres connection (the module never imports a driver):
 
 ```go
-store, _ := sqlite.Open("data/newsletter.db")
-defer store.Close()
+import _ "github.com/jackc/pgx/v5/stdlib"
+
+db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL"))
+if err := subscribers.Migrate(ctx, db); err != nil { ... }
+store := subscribers.New(db)
 
 lm := listmonk.NewClient("http://listmonk:9000")
 
@@ -43,7 +47,7 @@ mux.Handle("POST /subscribe",
 
 - **`handler/`** — `http.Handler` for `POST /subscribe`. Persists the
   email locally, forwards to Listmonk, returns a small HTML fragment.
-- **`subscribers/`** — SQLite or PostgreSQL store with embedded
+- **`subscribers/`** — PostgreSQL store with embedded
   [goose](https://github.com/pressly/goose) migrations. One table:
   `email`, `created_at`, `synced_at`.
 - **`listmonk/`** — Posts to Listmonk's public subscription API. No-ops
@@ -54,28 +58,21 @@ mux.Handle("POST /subscribe",
   `Timing` (token-stamped submit), `IPRateLimiter` (per-IP sliding
   window), and `ValidateMX` (domain has MX records). Each is independent
   — pick the ones you want.
-- **`migrations/`** — Embedded SQL for SQLite and PostgreSQL. Applied
-  automatically by `subscribers/sqlite`'s `Open` (SQLite); for PostgreSQL,
-  run `migrations/postgres`'s embedded FS through goose yourself.
+- **`migrations/`** — Embedded PostgreSQL SQL, applied by
+  `subscribers.Migrate`.
 
 ## Storage
 
 ```go
-// SQLite — single file, one open connection (writer-serialized).
-// Importing subscribers/sqlite registers the modernc.org/sqlite driver.
-store, err := sqlite.Open("data/newsletter.db")
-
-// PostgreSQL — bring your own driver and run the embedded migrations.
 db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL"))
-p, _ := goose.NewProvider(goose.DialectPostgres, db, pgmigrations.FS)
-if _, err := p.Up(ctx); err != nil { ... }
-store := subscribers.New(db, subscribers.Postgres)
+if err := subscribers.Migrate(ctx, db); err != nil { ... }
+store := subscribers.New(db)
 ```
 
-The core `subscribers` package imports no SQL driver. For SQLite, import
-`subscribers/sqlite` (pulls `modernc.org/sqlite`); for PostgreSQL, supply
-`github.com/jackc/pgx/v5/stdlib` or `github.com/lib/pq` and apply
-`github.com/infodancer/web/newsletter/migrations/postgres` via goose.
+The core `subscribers` package uses `database/sql` and imports no SQL
+driver — supply `github.com/jackc/pgx/v5/stdlib` (or `github.com/lib/pq`)
+at the host and pass the `*sql.DB` in. `Migrate` applies the embedded
+migrations; the caller owns the connection, so the store has no `Close`.
 
 ## Anti-bot
 
@@ -109,4 +106,4 @@ if that matters to you.
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0 — see the repository [LICENSE](../LICENSE).

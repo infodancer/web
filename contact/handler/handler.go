@@ -29,8 +29,8 @@ type Mailer interface {
 // Store persists a submission and tracks its delivery status. It is the subset
 // of *submissions.Store that the handler actually uses, declared as an
 // interface here so the handler does not pull in any database driver: the
-// concrete store (and its SQLite backend) is selected by the consumer, and
-// tests can substitute an in-memory fake.
+// concrete store and its connection are supplied by the consumer, and tests
+// can substitute an in-memory fake.
 type Store interface {
 	Save(ctx context.Context, sub *submissions.Submission) error
 	MarkSent(ctx context.Context, id int64) error

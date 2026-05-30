@@ -7,14 +7,21 @@ import (
 
 	"github.com/infodancer/web/newsletter/antibot"
 	"github.com/infodancer/web/newsletter/listmonk"
-	"github.com/infodancer/web/newsletter/subscribers"
 )
 
+// Store records subscribers and tracks their sync state. It is the subset of
+// *subscribers.Store the handler uses, declared as an interface so the handler
+// pulls in no database driver and can be tested with an in-memory fake.
+type Store interface {
+	Insert(email string) (bool, error)
+	MarkSynced(email string) error
+}
+
 // Subscribe is an http.Handler that accepts POST /subscribe requests,
-// records the email in a local SQLite store, and forwards to Listmonk.
+// records the email in the subscriber store, and forwards to Listmonk.
 // Response messages are configurable HTML fragments.
 type Subscribe struct {
-	Store    *subscribers.Store
+	Store    Store
 	Listmonk *listmonk.Client
 	ListUUID string
 
@@ -27,7 +34,7 @@ type Subscribe struct {
 }
 
 // New returns a Subscribe handler with default response messages.
-func New(store *subscribers.Store, lm *listmonk.Client, listUUID string) *Subscribe {
+func New(store Store, lm *listmonk.Client, listUUID string) *Subscribe {
 	return &Subscribe{
 		Store:            store,
 		Listmonk:         lm,
@@ -74,7 +81,7 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.ListUUID != "" {
 		if err := h.Listmonk.Subscribe(email, h.ListUUID); err != nil {
 			log.Printf("listmonk error for %s: %v", email, err)
-			// Don't fail the request — email is safely in SQLite.
+			// Don't fail the request — email is safely in the database.
 		} else if err := h.Store.MarkSynced(email); err != nil {
 			log.Printf("mark synced error for %s: %v", email, err)
 		}

@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, contact/submissions/sqlite, newsletter, newsletter/subscribers/sqlite, integration]
+        module: [search, notify, blog, contact, newsletter, integration]
     steps:
       - uses: actions/checkout@v6
 
