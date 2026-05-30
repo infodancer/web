@@ -1,6 +1,10 @@
+{{define "title"}}{{if .Query}}Search: {{.Query}}{{else}}Search{{end}}{{with .Meta.SiteName}} — {{.}}{{end}}{{end}}
+
+{{define "head"}}<link rel="stylesheet" href="{{.BasePath}}/static/search.css">{{end}}
+
 {{define "content"}}
 <section class="app-search">
-  <h1>{{.SiteName}}</h1>
+  <h1>Search</h1>
   <form class="app-search-form" action="{{.BasePath}}/" method="get" role="search">
     <input type="search" name="q" value="{{.Query}}" placeholder="Search…"
            aria-label="Search query" autocomplete="off" autofocus

@@ -3,7 +3,9 @@ package search
 import (
 	"io/fs"
 	"log/slog"
+	"net/http"
 
+	"github.com/infodancer/ui"
 	"github.com/jackc/pgx/v5/pgxpool"
 	embedding "github.com/matthewjhunter/go-embedding"
 )
@@ -73,6 +75,14 @@ type Config struct {
 
 	// LogoURL is an optional brand mark in the nav.
 	LogoURL string
+
+	// Chrome, when set, supplies the full host page chrome (nav, footer, meta,
+	// theme, analytics, asset base, head tags) per request as a ui.DocumentData
+	// that pages render through ui/document. A host site sets this to inject its
+	// own live, auth-aware navigation so search matches the rest of the site.
+	// nil keeps the SiteName/HomeURL-derived default chrome, so a standalone
+	// `search serve` still renders a complete page.
+	Chrome func(*http.Request) ui.DocumentData
 
 	// Templates and Static optionally overlay the embedded defaults: a
 	// same-named file in the overlay wins over the module's bundled copy.

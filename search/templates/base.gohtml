@@ -1,20 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{with .PageTitle}}{{.}} — {{end}}{{.SiteName}}</title>
-<link rel="stylesheet" href="{{.BasePath}}/static/ui/css/tokens.css">
-<link rel="stylesheet" href="{{.BasePath}}/static/ui/css/base.css">
-<link rel="stylesheet" href="{{.BasePath}}/static/search.css">
-<script src="{{.BasePath}}/static/htmx.min.js" defer></script>
-{{block "head_extra" .}}{{end}}
-</head>
-<body class="search">
-{{template "ui/nav" .Nav}}
-<main class="app-container">
-{{block "content" .}}{{end}}
-</main>
-{{template "ui/footer" .Footer}}
-</body>
-</html>
+{{- /*
+  base.gohtml renders the page through infodancer/ui's Layer 2 ui/document, so
+  the chrome (nav, footer, meta, CSS, analytics, theme) is owned by ui and
+  skinned per request by the host via Config.Chrome. The page template
+  (pages/search.gohtml) supplies the content/title/head blocks; the embedded
+  ui.DocumentData on the view supplies ui/document's chrome fields.
+*/ -}}
+{{ template "ui/document" . }}

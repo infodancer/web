@@ -54,6 +54,23 @@ write path even in one process.
 - `search seed` — load `testdata/seed.sql` sample documents.
 - Library mount: `search.New(cfg).Routes()`.
 
+### Skinning (host chrome)
+
+Pages render through infodancer/ui's `ui/document`. A host site owns the chrome
+by setting `Config.Chrome`, called per request to supply a `ui.DocumentData`
+(nav, footer, meta, theme, analytics, asset base, head tags) — so search wears
+the host's live, auth-aware navigation instead of the module's. Leave it nil for
+a standalone deployment and the module renders a complete default page from
+`SiteName`/`HomeURL`. The module never invents chrome; it owns the search
+content (the page's `content`/`title`/`head` blocks) and nothing else.
+
+```go
+m, _ := search.New(search.Config{
+    DB:     pool,
+    Chrome: func(r *http.Request) ui.DocumentData { return host.PageChrome(r) },
+})
+```
+
 ## Embeddings and reranking (optional)
 
 Both are opt-in and read from `go-embedding`'s env. With neither set the corpus
