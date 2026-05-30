@@ -16,7 +16,7 @@ func (s *Server) searchPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return // run already wrote an error response
 	}
-	view := s.newPageView(s.pageTitle(q), q, results, searched)
+	view := s.newPageView(r, s.pageTitle(q), q, results, searched)
 	s.deps.Templates.Render(w, "pages/search.gohtml", view)
 }
 
@@ -33,7 +33,7 @@ func (s *Server) searchFrag(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	view := s.newPageView(s.pageTitle(q), q, results, searched)
+	view := s.newPageView(r, s.pageTitle(q), q, results, searched)
 	s.deps.Templates.Render(w, "partials/results.gohtml", view)
 }
 

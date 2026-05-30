@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/infodancer/ui"
+
 	"github.com/infodancer/web/search/internal/query"
 	"github.com/infodancer/web/search/internal/render"
 )
@@ -35,10 +37,16 @@ type Deps struct {
 	// BasePath is the URL prefix the module is mounted at (e.g. "/search").
 	BasePath string
 
-	// SiteName, HomeURL, LogoURL drive the nav/footer chrome.
+	// SiteName, HomeURL, LogoURL drive the default nav/footer chrome (used when
+	// Chrome is nil).
 	SiteName string
 	HomeURL  string
 	LogoURL  string
+
+	// Chrome, when set, supplies the full host page chrome per request as a
+	// ui.DocumentData rendered through ui/document. nil falls back to the
+	// SiteName/HomeURL-derived default (see newPageView).
+	Chrome func(*http.Request) ui.DocumentData
 
 	// PageSize is how many results a query returns. Clamped to [1,100].
 	PageSize int

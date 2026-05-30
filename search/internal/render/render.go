@@ -101,11 +101,16 @@ func New(embedded, override, uiPartials fs.FS, log *slog.Logger) (*Templates, er
 		if _, err := tpl.Parse(baseSrc); err != nil {
 			return nil, fmt.Errorf("render: parse base for %s: %w", n, err)
 		}
-		if _, err := tpl.New(n).Parse(src); err != nil {
-			return nil, fmt.Errorf("render: parse %s: %w", n, err)
-		}
+		// Parse the partials (module partials and the ui partials, including
+		// ui/document) BEFORE the page, so a page's {{define "content"}} /
+		// {{define "title"}} / {{define "head"}} overrides ui/document's
+		// same-named {{block}} defaults rather than being clobbered by them. The
+		// page must be the last source parsed for any block name it redefines.
 		if err := parsePartials(tpl, n); err != nil {
 			return nil, err
+		}
+		if _, err := tpl.New(n).Parse(src); err != nil {
+			return nil, fmt.Errorf("render: parse %s: %w", n, err)
 		}
 		t.pages[n] = tpl
 		t.partialIndex = tpl
