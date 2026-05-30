@@ -1,0 +1,46 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-directory" aria-labelledby="faq-directory-title">
+<header class="faq-directory-header">
+<h1 id="faq-directory-title">FAQ</h1>
+<p class="faq-directory-intro">Browse by topic, or scan the most recent questions across the whole corpus.</p>
+</header>
+
+{{- if $view.Subsites -}}
+<section class="faq-directory-subsites" aria-label="Topics">
+<h2>Topics</h2>
+<ul class="faq-subsite-cards" role="list">
+{{range $view.Subsites}}
+<li class="faq-subsite-card">
+<h3 class="faq-subsite-name"><a href="{{$base}}/{{.Slug}}">{{.DisplayName}}</a></h3>
+{{- with .Description -}}
+<p class="faq-subsite-desc">{{.}}</p>
+{{- end -}}
+<p class="faq-subsite-count">{{.QuestionCount}} {{if eq .QuestionCount 1}}question{{else}}questions{{end}}</p>
+</li>
+{{end}}
+</ul>
+</section>
+{{- end -}}
+
+<section class="faq-directory-recent" aria-label="Recent questions">
+<h2>Recent questions</h2>
+{{- if $view.Recent -}}
+<ul class="faq-directory-recent-list" role="list">
+{{range $view.Recent}}
+<li class="faq-directory-recent-item">
+<a href="{{.URL}}">{{.Title}}</a>
+{{- if .Locked -}}
+<span class="app-badge faq-badge-archived" title="Imported and locked">Archived</span>
+{{- end -}}
+</li>
+{{end}}
+</ul>
+<p class="faq-directory-recent-more"><a href="{{$base}}/q">All questions →</a></p>
+{{- else -}}
+<p class="faq-empty">No questions yet.</p>
+{{- end -}}
+</section>
+</section>
+{{end}}

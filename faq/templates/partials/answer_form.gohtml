@@ -1,0 +1,13 @@
+{{- /* AnswerFormView */ -}}
+<form class="faq-form faq-form-answer"
+      hx-post="../../q/{{.QuestionID}}/answers"
+      hx-target="closest .faq-q-detail" hx-swap="innerHTML">
+{{- with .Errors -}}
+<ul class="faq-form-errors" role="alert">
+{{range .}}<li>{{.}}</li>{{end}}
+</ul>
+{{- end -}}
+<label class="faq-form-label" for="faq-a-body-{{.QuestionID}}">Your answer</label>
+<textarea id="faq-a-body-{{.QuestionID}}" name="body" rows="8" required maxlength="30000">{{.Body}}</textarea>
+<button type="submit" class="faq-form-submit">Post answer</button>
+</form>

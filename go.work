@@ -6,5 +6,6 @@ use (
 	./integration
 	./newsletter
 	./notify
+	./faq
 	./search
 )

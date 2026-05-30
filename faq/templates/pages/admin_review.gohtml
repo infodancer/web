@@ -1,0 +1,25 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-admin faq-admin-review" aria-labelledby="faq-admin-review-title">
+<header class="faq-admin-header">
+<h1 id="faq-admin-review-title">Review queue</h1>
+<p class="faq-admin-sub">Questions flagged needs_review (or whose answers are flagged). Marking a question reviewed clears the flag on it and on every one of its answers.</p>
+{{- if $view.Sources -}}
+<form class="faq-admin-filter" method="get" action="{{$base}}/admin/review">
+<label for="faq-admin-source">Source:</label>
+<select id="faq-admin-source" name="source" onchange="this.form.submit()">
+<option value="">All sources</option>
+{{- range $view.Sources -}}
+<option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.DisplayName}}</option>
+{{- end -}}
+</select>
+<noscript><button type="submit">Filter</button></noscript>
+</form>
+{{- end -}}
+</header>
+<div id="faq-admin-review-body">
+{{template "partials/admin_review_body.gohtml" $view}}
+</div>
+</section>
+{{end}}

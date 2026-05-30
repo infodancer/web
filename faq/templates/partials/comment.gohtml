@@ -1,0 +1,8 @@
+{{- /* Comment */ -}}
+<li class="app-comment" id="faq-c-{{.ID}}">
+<span class="faq-comment-body">{{.BodyHTML | safe}}</span>
+<span class="faq-comment-meta">
+— {{.Author}}
+<time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "Jan 2, 2006"}}</time>
+</span>
+</li>

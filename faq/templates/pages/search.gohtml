@@ -1,0 +1,17 @@
+{{define "content"}}
+{{- $base := .BasePath -}}
+{{- $view := .Page -}}
+<section class="faq-search" aria-labelledby="faq-search-h">
+<header class="app-list-header">
+<h1 id="faq-search-h">Search</h1>
+<form class="app-search-form" action="{{$base}}/search" method="get" role="search">
+<label class="app-visually-hidden" for="faq-search-q">Search questions</label>
+<input id="faq-search-q" name="q" type="search" value="{{$view.Query}}" placeholder="Search questions..." autofocus>
+<button type="submit">Search</button>
+</form>
+</header>
+<div id="faq-search-body">
+{{template "partials/search_body.gohtml" $view}}
+</div>
+</section>
+{{end}}

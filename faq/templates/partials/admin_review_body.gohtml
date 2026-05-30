@@ -1,0 +1,55 @@
+{{- /* AdminReviewView */ -}}
+{{- if .Questions -}}
+<ul class="faq-q-list faq-admin-q-list" role="list">
+{{range .Questions}}
+<li class="faq-q-card faq-admin-row" id="faq-admin-row-{{.ID}}">
+<div class="faq-q-stats" aria-label="Stats">
+<span class="faq-q-score">{{.Score}}<small> score</small></span>
+<span class="faq-q-answers">{{.AnswerCount}}<small> {{if eq .AnswerCount 1}}answer{{else}}answers{{end}}</small></span>
+</div>
+<div class="faq-q-body">
+<h3 class="faq-q-title">
+<a href="../q/{{.ID}}/{{.Slug}}">{{.Title}}</a>
+{{- if .Locked -}}
+<span class="app-badge faq-badge-archived" title="Locked">Locked</span>
+{{- end -}}
+</h3>
+{{- with .Excerpt -}}
+<p class="faq-q-excerpt">{{.}}</p>
+{{- end -}}
+{{- if .Tags -}}
+<ul class="app-tag-list" role="list">
+{{range .Tags}}<li><a class="app-tag" href="../tags/{{.}}">{{.}}</a></li>{{end}}
+</ul>
+{{- end -}}
+{{- with .Source -}}
+<p class="faq-q-attribution">
+From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
+</p>
+{{- end -}}
+</div>
+<div class="faq-admin-actions">
+<form method="post" action="../admin/review/{{.ID}}/reviewed"
+      hx-post="../admin/review/{{.ID}}/reviewed"
+      hx-target="#faq-admin-review-body" hx-swap="innerHTML">
+<input type="hidden" name="source" value="{{$.SelectedSource}}">
+<button type="submit" class="faq-mod-btn faq-mod-reviewed">Mark reviewed</button>
+</form>
+</div>
+</li>
+{{end}}
+</ul>
+{{- if gt .Total .PageSize -}}
+<nav class="app-pager" aria-label="Pagination">
+{{- if gt .Page 1 -}}
+<a class="app-pager-prev" href="?source={{.SelectedSource}}&page={{sub .Page 1}}">Previous</a>
+{{- end -}}
+<span class="app-pager-pos">Page {{.Page}}</span>
+{{- if .HasMore -}}
+<a class="app-pager-next" href="?source={{.SelectedSource}}&page={{add .Page 1}}">Next</a>
+{{- end -}}
+</nav>
+{{- end -}}
+{{- else -}}
+<p class="app-list-empty">Nothing to review.</p>
+{{- end -}}

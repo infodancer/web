@@ -1,0 +1,27 @@
+# Build artifacts
+/bin/
+/dist/
+/faq-serve
+
+# Test artifacts
+*.test
+coverage.out
+coverage.html
+*.cover
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.local
+
+# Claude Code per-user state
+.claude/settings.local.json

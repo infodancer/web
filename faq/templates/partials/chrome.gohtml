@@ -1,0 +1,12 @@
+{{- /*
+  faq's overrides of ui/document's title/head blocks. Parsed after the ui
+  partials (so these win over ui/document's defaults) and before the page (so a
+  page could still override). Single-sourced here for all faq pages rather than
+  repeated per page.
+*/ -}}
+{{ define "title" }}{{ with .PageTitle }}{{ . }} — {{ end }}{{ with .Meta.SiteName }}{{ . }}{{ else }}FAQ{{ end }}{{ end }}
+
+{{ define "head" }}
+{{- with .CanonicalURL }}<link rel="canonical" href="{{ . }}">{{ end }}
+<link rel="stylesheet" href="{{ .BasePath }}/static/faq.css">
+{{- end }}

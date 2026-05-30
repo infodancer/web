@@ -1,0 +1,17 @@
+{{- /* EditAnswerView */ -}}
+<form class="faq-form faq-form-edit"
+      hx-patch="../../a/{{.ID}}"
+      hx-target="closest .faq-q-detail" hx-swap="innerHTML">
+{{- with .Errors -}}
+<ul class="faq-form-errors" role="alert">
+{{range .}}<li>{{.}}</li>{{end}}
+</ul>
+{{- end -}}
+<label class="faq-form-label" for="faq-a-edit-body-{{.ID}}">Body (Markdown)</label>
+<textarea id="faq-a-edit-body-{{.ID}}" name="body" rows="8" required maxlength="30000">{{.Body}}</textarea>
+<div class="faq-form-actions">
+<button type="submit" class="faq-form-submit">Save</button>
+<button type="button" class="faq-form-cancel"
+        hx-get="../../q/{{.QuestionID}}" hx-target="closest .faq-q-detail" hx-swap="innerHTML">Cancel</button>
+</div>
+</form>

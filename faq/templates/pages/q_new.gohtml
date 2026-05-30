@@ -1,0 +1,23 @@
+{{define "content"}}
+{{- $view := .Page -}}
+<section class="faq-q-new" aria-labelledby="faq-ask-h">
+<h1 id="faq-ask-h">{{$view.Heading}}</h1>
+{{- with $view.Errors -}}
+<ul class="faq-form-errors" role="alert">
+{{range .}}<li>{{.}}</li>{{end}}
+</ul>
+{{- end -}}
+<form class="faq-form" action="{{$view.ActionURL}}" method="post">
+<label class="faq-form-label" for="faq-q-title">Title</label>
+<input id="faq-q-title" name="title" type="text" required maxlength="150" value="{{$view.Title}}">
+
+<label class="faq-form-label" for="faq-q-body">Body (Markdown)</label>
+<textarea id="faq-q-body" name="body" rows="10" required maxlength="30000">{{$view.Body}}</textarea>
+
+<label class="faq-form-label" for="faq-q-tags">Tags (comma-separated, max 5)</label>
+<input id="faq-q-tags" name="tags" type="text" value="{{$view.Tags}}">
+
+<button type="submit" class="faq-form-submit">Post question</button>
+</form>
+</section>
+{{end}}

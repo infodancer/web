@@ -1,0 +1,22 @@
+{{- /* SearchView */ -}}
+{{- if eq .Query "" -}}
+<p class="app-search-empty">Enter a search term to find questions.</p>
+{{- else if not .Results -}}
+<p class="app-search-empty">No questions match <code>{{.Query}}</code>.</p>
+{{- else -}}
+<p class="faq-search-summary">Results for <code>{{.Query}}</code></p>
+<ul class="faq-q-list" role="list">
+{{range .Results}}{{template "partials/q_card.gohtml" .}}{{end}}
+</ul>
+{{- if or (gt .Page 1) .HasMore -}}
+<nav class="app-pager" aria-label="Pagination">
+{{- if gt .Page 1 -}}
+<a class="app-pager-prev" href="?q={{.Query}}&page={{sub .Page 1}}">Previous</a>
+{{- end -}}
+<span class="app-pager-pos">Page {{.Page}}</span>
+{{- if .HasMore -}}
+<a class="app-pager-next" href="?q={{.Query}}&page={{add .Page 1}}">Next</a>
+{{- end -}}
+</nav>
+{{- end -}}
+{{- end -}}

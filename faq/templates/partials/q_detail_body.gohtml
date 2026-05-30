@@ -1,0 +1,98 @@
+{{- /* QuestionDetailView */ -}}
+{{- $q := .Question -}}
+<article class="faq-q" id="faq-q-{{$q.ID}}">
+<header class="faq-q-header">
+<h1 id="faq-q-title">{{$q.Title}}
+{{- if eq $q.Status "locked" -}}
+<span class="app-badge faq-badge-archived" title="Imported and locked">Archived</span>
+{{- end -}}
+</h1>
+<p class="faq-q-meta">
+asked by <strong>{{$q.Author}}</strong>
+<time datetime="{{$q.CreatedAt.Format "2006-01-02T15:04:05Z"}}">{{$q.CreatedAt.Format "Jan 2, 2006"}}</time>
+{{- if $q.EditedAt -}}
+· edited <time datetime="{{$q.EditedAt.Format "2006-01-02T15:04:05Z"}}">{{$q.EditedAt.Format "Jan 2, 2006"}}</time>
+{{- end -}}
+</p>
+</header>
+<div class="faq-q-body">
+{{$q.BodyHTML | safe}}
+</div>
+{{- if .Tags -}}
+<ul class="app-tag-list" role="list">
+{{range .Tags}}<li><a class="app-tag" href="../../tags/{{.}}">{{.}}</a></li>{{end}}
+</ul>
+{{- end -}}
+{{- with .Source -}}
+<p class="faq-q-attribution">
+From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
+{{- if $.Question.LocallyModified }} · Modified after import.{{end -}}
+</p>
+{{- end -}}
+{{- if .IsAdmin -}}
+<div class="faq-mod-bar" role="group" aria-label="Moderation">
+{{- if eq $q.Status "open" -}}
+<form method="post" action="../../q/{{$q.ID}}/lock"
+      hx-post="../../q/{{$q.ID}}/lock"
+      hx-target="article.faq-q" hx-swap="outerHTML">
+<button type="submit" class="faq-mod-btn faq-mod-lock">Lock</button>
+</form>
+{{- else if eq $q.Status "locked" -}}
+<form method="post" action="../../q/{{$q.ID}}/unlock"
+      hx-post="../../q/{{$q.ID}}/unlock"
+      hx-target="article.faq-q" hx-swap="outerHTML">
+<button type="submit" class="faq-mod-btn faq-mod-unlock">Unlock</button>
+</form>
+{{- end -}}
+<form method="post" action="../../q/{{$q.ID}}/delete"
+      hx-post="../../q/{{$q.ID}}/delete"
+      hx-confirm="Delete this question? Admins can restore from /admin/deleted.">
+<button type="submit" class="faq-mod-btn faq-mod-delete">Delete</button>
+</form>
+</div>
+{{- with .AdminCurate -}}
+<aside class="faq-admin-curate" aria-label="Subsite curation">
+<h2>Pinned into</h2>
+{{- if .Pinned -}}
+<ul class="faq-admin-curate-list" role="list">
+{{range .Pinned}}
+<li>
+<a href="{{.URL}}">{{.DisplayName}}</a>
+<form method="post" action="../../admin/q/{{$q.ID}}/subsites/{{.ID}}/delete" style="display:inline">
+<button type="submit" class="faq-form-submit">Remove</button>
+</form>
+</li>
+{{end}}
+</ul>
+{{- else -}}
+<p class="faq-empty">Not pinned to any subsite.</p>
+{{- end -}}
+{{- if .Available -}}
+<form method="post" action="../../admin/q/{{$q.ID}}/subsites" class="faq-form">
+<label class="faq-form-label" for="faq-add-sub-{{$q.ID}}">Pin into subsite</label>
+<select id="faq-add-sub-{{$q.ID}}" name="subsite_id" required>
+<option value="">— select —</option>
+{{range .Available}}<option value="{{.ID}}">{{.DisplayName}}</option>{{end}}
+</select>
+<button type="submit" class="faq-form-submit">Pin</button>
+</form>
+{{- end -}}
+</aside>
+{{- end -}}
+{{- end -}}
+</article>
+
+{{- with .Comments -}}
+<aside class="faq-q-comments" aria-label="Question comments">
+<ol class="app-comment-list" role="list">
+{{range .}}{{template "partials/comment.gohtml" .}}{{end}}
+</ol>
+</aside>
+{{- end -}}
+
+<section class="faq-answers" aria-labelledby="faq-answers-h">
+<h2 id="faq-answers-h">{{len .Answers}} {{if eq (len .Answers) 1}}answer{{else}}answers{{end}}</h2>
+<ol class="faq-answer-list" role="list">
+{{range .Answers}}{{template "partials/answer.gohtml" .}}{{end}}
+</ol>
+</section>
