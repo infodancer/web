@@ -146,7 +146,10 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Content-Disposition", "inline")
-	_, _ = w.Write(data)
+	// data is a re-encoded image (Process guarantees it), served with a fixed
+	// image Content-Type and X-Content-Type-Options: nosniff — not HTML, so the
+	// XSS taint warning does not apply.
+	_, _ = w.Write(data) //nolint:gosec // G705: re-encoded image bytes, nosniff + image content-type
 }
 
 // objectURL builds the public URL for a stored object.

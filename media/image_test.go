@@ -2,6 +2,7 @@ package media
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"hash/crc32"
 	"image"
@@ -82,25 +83,20 @@ func bombPNG(t *testing.T, w, h uint32) []byte {
 	b.Write([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}) // signature
 
 	ihdr := make([]byte, 13)
-	be := func(off int, v uint32) {
-		ihdr[off] = byte(v >> 24)
-		ihdr[off+1] = byte(v >> 16)
-		ihdr[off+2] = byte(v >> 8)
-		ihdr[off+3] = byte(v)
-	}
-	be(0, w)
-	be(4, h)
+	binary.BigEndian.PutUint32(ihdr[0:4], w)
+	binary.BigEndian.PutUint32(ihdr[4:8], h)
 	ihdr[8] = 8 // bit depth
 	ihdr[9] = 2 // color type: truecolor
 	// compression=0, filter=0, interlace=0 already zero
 
 	// chunk: length, "IHDR", data, crc32(type+data)
-	length := uint32(len(ihdr))
-	b.Write([]byte{byte(length >> 24), byte(length >> 16), byte(length >> 8), byte(length)})
+	var u32 [4]byte
+	binary.BigEndian.PutUint32(u32[:], 13) // IHDR data length
+	b.Write(u32[:])
 	typeAndData := append([]byte("IHDR"), ihdr...)
 	b.Write(typeAndData)
-	crc := crc32.ChecksumIEEE(typeAndData)
-	b.Write([]byte{byte(crc >> 24), byte(crc >> 16), byte(crc >> 8), byte(crc)})
+	binary.BigEndian.PutUint32(u32[:], crc32.ChecksumIEEE(typeAndData))
+	b.Write(u32[:])
 	return b.Bytes()
 }
 

@@ -42,6 +42,7 @@ func NewMemoryBlobStore() *MemoryBlobStore {
 	return &MemoryBlobStore{data: make(map[string]memBlob)}
 }
 
+// Put stores data under hash; storing an existing hash is a no-op.
 func (m *MemoryBlobStore) Put(_ context.Context, hash, contentType string, data []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -55,6 +56,7 @@ func (m *MemoryBlobStore) Put(_ context.Context, hash, contentType string, data 
 	return nil
 }
 
+// Get returns the bytes and content type for hash, or [ErrBlobNotFound].
 func (m *MemoryBlobStore) Get(_ context.Context, hash string) ([]byte, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -65,6 +67,7 @@ func (m *MemoryBlobStore) Get(_ context.Context, hash string) ([]byte, string, e
 	return b.bytes, b.contentType, nil
 }
 
+// Has reports whether a blob with hash is stored.
 func (m *MemoryBlobStore) Has(_ context.Context, hash string) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
