@@ -51,7 +51,7 @@ func (c *Client) Subscribe(email string, tags []string) error {
 	req.Header.Set("Authorization", "Token "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(req) //nolint:gosec // G704: URL is the host-configured Buttondown API endpoint, not request-derived — no SSRF
 	if err != nil {
 		return fmt.Errorf("request: %w", err)
 	}

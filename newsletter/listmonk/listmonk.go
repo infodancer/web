@@ -48,7 +48,7 @@ func (c *Client) Subscribe(email, listUUID string) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(req) //nolint:gosec // G704: URL is the host-configured Listmonk base URL, not request-derived — no SSRF
 	if err != nil {
 		return fmt.Errorf("request: %w", err)
 	}
