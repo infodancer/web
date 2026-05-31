@@ -41,6 +41,8 @@ type Store interface {
 type Message struct {
 	From    string
 	To      []string
+	Cc      []string // visible carbon-copy recipients; appear in the Cc: header
+	Bcc     []string // blind copies; receive the mail but never appear in headers
 	ReplyTo string
 	Subject string
 	Body    string
@@ -56,6 +58,14 @@ type Contact struct {
 	// Required addresses.
 	To   []string // destination address(es); all appear in the To: header
 	From string   // From: header on outgoing mail; should align with SPF/DKIM
+
+	// Optional operator-configured copy recipients on the primary email. These
+	// are set by the site operator, never read from the submitted form, so the
+	// form cannot be used to mail arbitrary third parties. Cc addresses appear
+	// in the Cc: header; Bcc addresses receive the mail but never appear in any
+	// header. Confirmation emails to the visitor are not copied.
+	Cc  []string
+	Bcc []string
 
 	// Auto-reply / confirmation back to the visitor.
 	SendConfirmation     bool
@@ -264,6 +274,8 @@ func (h *Contact) renderPrimary(sub submissions.Submission) (Message, error) {
 	return Message{
 		From:    h.From,
 		To:      append([]string(nil), h.To...),
+		Cc:      append([]string(nil), h.Cc...),
+		Bcc:     append([]string(nil), h.Bcc...),
 		ReplyTo: sub.Email,
 		Subject: strings.TrimSpace(subjectBuf.String()),
 		Body:    bodyBuf.String(),

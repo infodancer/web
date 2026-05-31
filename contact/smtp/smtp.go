@@ -103,7 +103,9 @@ func (c *Client) Send(ctx context.Context, msg handler.Message) error {
 	if err := client.Mail(msg.From); err != nil {
 		return fmt.Errorf("MAIL FROM: %w", err)
 	}
-	for _, rcpt := range msg.To {
+	// Envelope recipients are To + Cc + Bcc. Bcc addresses are delivered here
+	// but are deliberately omitted from the message headers built below.
+	for _, rcpt := range envelopeRecipients(msg) {
 		if err := client.Rcpt(rcpt); err != nil {
 			return fmt.Errorf("RCPT TO %s: %w", rcpt, err)
 		}
@@ -135,6 +137,11 @@ func buildRFC5322(m handler.Message) string {
 		{"From", scrubHeader(m.From)},
 		{"To", scrubHeader(strings.Join(m.To, ", "))},
 	}
+	// Cc is a visible header; Bcc is intentionally never emitted here so blind
+	// copies stay blind.
+	if len(m.Cc) > 0 {
+		headers = append(headers, [2]string{"Cc", scrubHeader(strings.Join(m.Cc, ", "))})
+	}
 	if m.ReplyTo != "" {
 		headers = append(headers, [2]string{"Reply-To", scrubHeader(m.ReplyTo)})
 	}
@@ -163,6 +170,17 @@ func buildRFC5322(m handler.Message) string {
 		b.WriteString("\r\n")
 	}
 	return b.String()
+}
+
+// envelopeRecipients returns the full SMTP RCPT TO set for a message:
+// To + Cc + Bcc, in that order. Bcc recipients are part of the envelope
+// (they receive the mail) even though they never appear in the headers.
+func envelopeRecipients(m handler.Message) []string {
+	rcpts := make([]string, 0, len(m.To)+len(m.Cc)+len(m.Bcc))
+	rcpts = append(rcpts, m.To...)
+	rcpts = append(rcpts, m.Cc...)
+	rcpts = append(rcpts, m.Bcc...)
+	return rcpts
 }
 
 func scrubHeader(s string) string {
