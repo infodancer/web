@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 func freshStore(t *testing.T) *Store {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
-		`TRUNCATE notify_events, notify_admin_read_cursor RESTART IDENTITY`)
+		`TRUNCATE notify_events, notify_user_notifications, notify_admin_read_cursor RESTART IDENTITY`)
 	require.NoError(t, err)
 	return NewStore(testPool)
 }

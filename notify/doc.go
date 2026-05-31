@@ -2,8 +2,9 @@
 //
 // A host site records events — usually from user actions, such as a new
 // account being created — as small, flexible objects in PostgreSQL. Admins
-// (the primary audience) see them in a bell + feed; users (a later phase) see
-// a personalized subset and can opt into email per type.
+// (the primary audience) see them in a bell + feed; users see a personalized
+// subset, delivered by setting [Event.Recipients] and read via [Store.UserFeed]
+// (the user-facing UI and per-type email are later phases).
 //
 // The host's integration surface is deliberately small:
 //

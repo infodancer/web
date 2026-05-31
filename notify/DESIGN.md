@@ -45,6 +45,10 @@ First consumer: **osg** (`old-school-gamers/osg`).
   CHECK constraints pin `severity` and `audience` to their domains.
 - `notify_admin_read_cursor` — one row per admin identity (`issuer`, `subject`,
   `last_seen_at`). Not one row per event.
+- `notify_user_notifications` — per-recipient delivery rows (added later, see
+  below). One row per (`event_id`, `recipient_issuer`, `recipient_subject`) with
+  its own `read_at`/`dismissed_at`. A unique constraint makes fan-out
+  idempotent; an event with no recipients writes nothing here.
 
 ### Unread without a row per event per admin
 
@@ -57,9 +61,22 @@ bell uses a **monotonic cursor**:
   events arriving between render and click are not silently swallowed.
 
 Tradeoff: a cursor gives an accurate count and a "what's new since" line but no
-per-event read state. That is correct for an admin firehose. Users (phase 4)
-get a different model — explicit `notify_user_notifications` rows with per-event
+per-event read state. That is correct for an admin firehose. Users get a
+different model — explicit `notify_user_notifications` rows with per-event
 `read_at`/`dismissed_at`, since they receive only a subset.
+
+### User fan-out (implemented: storage + emit + query)
+
+An `Event` carries an optional `Recipients []Identity`. When non-empty, `Insert`
+writes the event row and one `notify_user_notifications` row per recipient
+**atomically in one transaction**, so a partial fan-out is never observed.
+Empty-subject recipients are dropped and duplicates collapsed before the write.
+`Recipients` and `Audience` are orthogonal: an event may be user-targeted
+(`Recipients` set, `Audience='user'` so it stays out of the admin firehose),
+admin-visible, or both. The query side is `UserFeed` (newest-first, keyset over
+the event id, dismissed rows excluded), `UserUnreadCount` (neither read nor
+dismissed), `MarkRead`, and `Dismiss`. The user-facing HTMX bell/feed UI is the
+remaining phase; this layer is the storage and producer substrate it builds on.
 
 ## Pagination
 

@@ -30,3 +30,13 @@ type NotifyEvents struct {
 	Payload        []byte
 	CreatedAt      time.Time
 }
+
+type NotifyUserNotifications struct {
+	ID               int64
+	EventID          int64
+	RecipientIssuer  string
+	RecipientSubject string
+	ReadAt           *time.Time
+	DismissedAt      *time.Time
+	CreatedAt        time.Time
+}

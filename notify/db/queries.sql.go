@@ -137,6 +137,26 @@ func (q *Queries) AdminUnreadCount(ctx context.Context, cursor time.Time) (int64
 	return count, err
 }
 
+const dismissUser = `-- name: DismissUser :exec
+UPDATE notify_user_notifications
+SET dismissed_at = COALESCE(dismissed_at, now())
+WHERE recipient_issuer = $1 AND recipient_subject = $2 AND event_id = $3
+`
+
+type DismissUserParams struct {
+	RecipientIssuer  string
+	RecipientSubject string
+	EventID          int64
+}
+
+// DismissUser stamps dismissed_at for one recipient's view of one event,
+// removing it from the feed and the unread count. COALESCE keeps the first
+// dismissal instant.
+func (q *Queries) DismissUser(ctx context.Context, arg DismissUserParams) error {
+	_, err := q.db.Exec(ctx, dismissUser, arg.RecipientIssuer, arg.RecipientSubject, arg.EventID)
+	return err
+}
+
 const insertEvent = `-- name: InsertEvent :one
 INSERT INTO notify_events (
     source, type, title, severity, audience,
@@ -188,4 +208,149 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (Inser
 	var i InsertEventRow
 	err := row.Scan(&i.ID, &i.CreatedAt)
 	return i, err
+}
+
+const insertUserNotification = `-- name: InsertUserNotification :exec
+INSERT INTO notify_user_notifications (event_id, recipient_issuer, recipient_subject)
+VALUES ($3, $1, $2)
+ON CONFLICT (event_id, recipient_issuer, recipient_subject) DO NOTHING
+`
+
+type InsertUserNotificationParams struct {
+	RecipientIssuer  string
+	RecipientSubject string
+	EventID          int64
+}
+
+// InsertUserNotification fans one event out to one recipient. Idempotent: a
+// redundant Emit (same event, same recipient) is a no-op, so the fan-out can be
+// retried without double-delivering.
+func (q *Queries) InsertUserNotification(ctx context.Context, arg InsertUserNotificationParams) error {
+	_, err := q.db.Exec(ctx, insertUserNotification, arg.RecipientIssuer, arg.RecipientSubject, arg.EventID)
+	return err
+}
+
+const markUserRead = `-- name: MarkUserRead :exec
+UPDATE notify_user_notifications
+SET read_at = COALESCE(read_at, now())
+WHERE recipient_issuer = $1 AND recipient_subject = $2 AND event_id = $3
+`
+
+type MarkUserReadParams struct {
+	RecipientIssuer  string
+	RecipientSubject string
+	EventID          int64
+}
+
+// MarkUserRead stamps read_at for one recipient's view of one event. COALESCE
+// keeps the first read instant, so re-marking is a no-op.
+func (q *Queries) MarkUserRead(ctx context.Context, arg MarkUserReadParams) error {
+	_, err := q.db.Exec(ctx, markUserRead, arg.RecipientIssuer, arg.RecipientSubject, arg.EventID)
+	return err
+}
+
+const userFeed = `-- name: UserFeed :many
+SELECT
+    e.id, e.source, e.type, e.title, e.severity, e.audience,
+    e.actor_issuer, e.actor_subject, e.actor_label,
+    e.subject_issuer, e.subject_subject, e.payload, e.created_at,
+    n.read_at, n.dismissed_at
+FROM notify_user_notifications n
+JOIN notify_events e ON e.id = n.event_id
+WHERE n.recipient_issuer = $1 AND n.recipient_subject = $2
+  AND n.dismissed_at IS NULL
+  AND ($3::bigint IS NULL OR e.id < $3)
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT $4
+`
+
+type UserFeedParams struct {
+	RecipientIssuer  string
+	RecipientSubject string
+	BeforeID         *int64
+	Lim              int32
+}
+
+type UserFeedRow struct {
+	ID             int64
+	Source         string
+	Type           string
+	Title          string
+	Severity       string
+	Audience       string
+	ActorIssuer    *string
+	ActorSubject   *string
+	ActorLabel     *string
+	SubjectIssuer  *string
+	SubjectSubject *string
+	Payload        []byte
+	CreatedAt      time.Time
+	ReadAt         *time.Time
+	DismissedAt    *time.Time
+}
+
+// UserFeed returns one recipient's notifications newest-first, joined to the
+// underlying event, excluding dismissed rows. Keyset pagination is over the
+// event id (a recipient holds at most one row per event), matching the admin
+// feed's cursor shape.
+func (q *Queries) UserFeed(ctx context.Context, arg UserFeedParams) ([]UserFeedRow, error) {
+	rows, err := q.db.Query(ctx, userFeed,
+		arg.RecipientIssuer,
+		arg.RecipientSubject,
+		arg.BeforeID,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserFeedRow
+	for rows.Next() {
+		var i UserFeedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Source,
+			&i.Type,
+			&i.Title,
+			&i.Severity,
+			&i.Audience,
+			&i.ActorIssuer,
+			&i.ActorSubject,
+			&i.ActorLabel,
+			&i.SubjectIssuer,
+			&i.SubjectSubject,
+			&i.Payload,
+			&i.CreatedAt,
+			&i.ReadAt,
+			&i.DismissedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const userUnreadCount = `-- name: UserUnreadCount :one
+SELECT count(*)
+FROM notify_user_notifications
+WHERE recipient_issuer = $1 AND recipient_subject = $2
+  AND read_at IS NULL AND dismissed_at IS NULL
+`
+
+type UserUnreadCountParams struct {
+	RecipientIssuer  string
+	RecipientSubject string
+}
+
+// UserUnreadCount counts a recipient's notifications that are neither read nor
+// dismissed — the number for an unread badge.
+func (q *Queries) UserUnreadCount(ctx context.Context, arg UserUnreadCountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, userUnreadCount, arg.RecipientIssuer, arg.RecipientSubject)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }

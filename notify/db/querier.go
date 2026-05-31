@@ -21,9 +21,28 @@ type Querier interface {
 	AdminMarkSeen(ctx context.Context, arg AdminMarkSeenParams) error
 	// AdminUnreadCount counts admin events newer than the given cursor instant.
 	AdminUnreadCount(ctx context.Context, cursor time.Time) (int64, error)
+	// DismissUser stamps dismissed_at for one recipient's view of one event,
+	// removing it from the feed and the unread count. COALESCE keeps the first
+	// dismissal instant.
+	DismissUser(ctx context.Context, arg DismissUserParams) error
 	// InsertEvent appends one event to the append-only log. created_at is set by
 	// the database so ordering is consistent across producers.
 	InsertEvent(ctx context.Context, arg InsertEventParams) (InsertEventRow, error)
+	// InsertUserNotification fans one event out to one recipient. Idempotent: a
+	// redundant Emit (same event, same recipient) is a no-op, so the fan-out can be
+	// retried without double-delivering.
+	InsertUserNotification(ctx context.Context, arg InsertUserNotificationParams) error
+	// MarkUserRead stamps read_at for one recipient's view of one event. COALESCE
+	// keeps the first read instant, so re-marking is a no-op.
+	MarkUserRead(ctx context.Context, arg MarkUserReadParams) error
+	// UserFeed returns one recipient's notifications newest-first, joined to the
+	// underlying event, excluding dismissed rows. Keyset pagination is over the
+	// event id (a recipient holds at most one row per event), matching the admin
+	// feed's cursor shape.
+	UserFeed(ctx context.Context, arg UserFeedParams) ([]UserFeedRow, error)
+	// UserUnreadCount counts a recipient's notifications that are neither read nor
+	// dismissed — the number for an unread badge.
+	UserUnreadCount(ctx context.Context, arg UserUnreadCountParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

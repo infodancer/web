@@ -34,7 +34,10 @@ func NewStore(pool *pgxpool.Pool) *Store {
 // tests and callers that need transactional control.
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
-// Insert validates and appends one event, returning its assigned id.
+// Insert validates and appends one event, returning its assigned id. When the
+// event carries Recipients, the event row and one notify_user_notifications row
+// per recipient are written atomically in a single transaction, so a partial
+// fan-out can never be observed. With no recipients it is a single statement.
 func (s *Store) Insert(ctx context.Context, ev Event) (int64, error) {
 	if err := ev.normalize(); err != nil {
 		return 0, err
@@ -62,11 +65,62 @@ func (s *Store) Insert(ctx context.Context, ev Event) (int64, error) {
 		params.SubjectSubject = nullStr(ev.Subject.Subject)
 	}
 
-	row, err := s.q.InsertEvent(ctx, params)
+	recipients := validRecipients(ev.Recipients)
+	if len(recipients) == 0 {
+		row, err := s.q.InsertEvent(ctx, params)
+		if err != nil {
+			return 0, fmt.Errorf("notify: insert event: %w", err)
+		}
+		return row.ID, nil
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("notify: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := s.q.WithTx(tx)
+	row, err := qtx.InsertEvent(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("notify: insert event: %w", err)
 	}
+	for _, r := range recipients {
+		if err := qtx.InsertUserNotification(ctx, db.InsertUserNotificationParams{
+			EventID:          row.ID,
+			RecipientIssuer:  r.Issuer,
+			RecipientSubject: r.Subject,
+		}); err != nil {
+			return 0, fmt.Errorf("notify: insert user notification: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("notify: commit fan-out: %w", err)
+	}
 	return row.ID, nil
+}
+
+// validRecipients drops recipients with an empty Subject (an unaddressable row)
+// and deduplicates on (issuer, subject) so a caller that lists the same user
+// twice produces one delivery row without relying on the ON CONFLICT path.
+func validRecipients(in []Identity) []Identity {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[[2]string]struct{}, len(in))
+	out := make([]Identity, 0, len(in))
+	for _, r := range in {
+		if r.Subject == "" {
+			continue
+		}
+		key := [2]string{r.Issuer, r.Subject}
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, r)
+	}
+	return out
 }
 
 // Filter constrains an admin feed query. Zero-value fields impose no
@@ -156,6 +210,114 @@ func (s *Store) AdminMarkSeen(ctx context.Context, id Identity, upTo time.Time) 
 	})
 	if err != nil {
 		return fmt.Errorf("notify: mark seen: %w", err)
+	}
+	return nil
+}
+
+// UserNotification is one recipient's view of an event: the event itself plus
+// this recipient's read/dismiss state.
+type UserNotification struct {
+	Event
+	ReadAt      *time.Time
+	DismissedAt *time.Time
+}
+
+// UserFilter constrains a user feed query. Limit is clamped to [1, 100]
+// (default 25); BeforeID drives keyset pagination over the event id (rows
+// strictly older than that id).
+type UserFilter struct {
+	Limit    int
+	BeforeID int64
+}
+
+// UserFeed returns a recipient's notifications newest-first, excluding the ones
+// they have dismissed.
+func (s *Store) UserFeed(ctx context.Context, recipient Identity, f UserFilter) ([]UserNotification, error) {
+	lim := f.Limit
+	switch {
+	case lim <= 0:
+		lim = defaultFeedLimit
+	case lim > maxFeedLimit:
+		lim = maxFeedLimit
+	}
+
+	params := db.UserFeedParams{
+		RecipientIssuer:  recipient.Issuer,
+		RecipientSubject: recipient.Subject,
+		Lim:              int32(lim),
+	}
+	if f.BeforeID > 0 {
+		params.BeforeID = &f.BeforeID
+	}
+
+	rows, err := s.q.UserFeed(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("notify: user feed: %w", err)
+	}
+	out := make([]UserNotification, 0, len(rows))
+	for _, r := range rows {
+		payload, err := decodePayload(r.Payload)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, UserNotification{
+			Event: Event{
+				ID:        r.ID,
+				Type:      r.Type,
+				Source:    r.Source,
+				Title:     r.Title,
+				Severity:  Severity(r.Severity),
+				Audience:  Audience(r.Audience),
+				Actor:     ident(r.ActorIssuer, r.ActorSubject, r.ActorLabel),
+				Subject:   ident(r.SubjectIssuer, r.SubjectSubject, nil),
+				Payload:   payload,
+				CreatedAt: r.CreatedAt,
+			},
+			ReadAt:      r.ReadAt,
+			DismissedAt: r.DismissedAt,
+		})
+	}
+	return out, nil
+}
+
+// UserUnreadCount returns how many of a recipient's notifications are neither
+// read nor dismissed.
+func (s *Store) UserUnreadCount(ctx context.Context, recipient Identity) (int, error) {
+	n, err := s.q.UserUnreadCount(ctx, db.UserUnreadCountParams{
+		RecipientIssuer:  recipient.Issuer,
+		RecipientSubject: recipient.Subject,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("notify: user unread count: %w", err)
+	}
+	return int(n), nil
+}
+
+// MarkRead stamps the recipient's view of eventID as read. It is idempotent —
+// the first read instant is kept — and a no-op if the recipient has no row for
+// that event.
+func (s *Store) MarkRead(ctx context.Context, recipient Identity, eventID int64) error {
+	err := s.q.MarkUserRead(ctx, db.MarkUserReadParams{
+		RecipientIssuer:  recipient.Issuer,
+		RecipientSubject: recipient.Subject,
+		EventID:          eventID,
+	})
+	if err != nil {
+		return fmt.Errorf("notify: mark read: %w", err)
+	}
+	return nil
+}
+
+// Dismiss stamps the recipient's view of eventID as dismissed, removing it from
+// UserFeed and the unread count. Idempotent; a no-op when there is no such row.
+func (s *Store) Dismiss(ctx context.Context, recipient Identity, eventID int64) error {
+	err := s.q.DismissUser(ctx, db.DismissUserParams{
+		RecipientIssuer:  recipient.Issuer,
+		RecipientSubject: recipient.Subject,
+		EventID:          eventID,
+	})
+	if err != nil {
+		return fmt.Errorf("notify: dismiss: %w", err)
 	}
 	return nil
 }
