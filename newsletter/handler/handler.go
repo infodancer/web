@@ -53,9 +53,11 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ParseMultipartForm handles both multipart (fetch/FormData) and
-	// URL-encoded (HTMX default) bodies. Ignore error for non-multipart.
-	r.ParseMultipartForm(1 << 20) //nolint:errcheck
+	// Bound the body, then parse. ParseMultipartForm handles both multipart
+	// (fetch/FormData) and URL-encoded (HTMX default) bodies; the error is
+	// ignored for non-multipart requests.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	r.ParseMultipartForm(1 << 20) //nolint:errcheck,gosec // body bounded above; non-multipart parse error is expected
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
@@ -66,24 +68,24 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := antibot.ValidateMX(email); err != nil {
-		log.Printf("MX validation failed for %s: %v", email, err)
-		w.Write([]byte(h.MsgInvalidDomain)) //nolint:errcheck
+		log.Printf("MX validation failed for %q: %v", email, err)
+		_, _ = w.Write([]byte(h.MsgInvalidDomain))
 		return
 	}
 
 	isNew, err := h.Store.Insert(email)
 	if err != nil {
-		log.Printf("db error for %s: %v", email, err)
+		log.Printf("db error for %q: %v", email, err)
 		_, _ = w.Write([]byte(h.MsgError))
 		return
 	}
 
 	if h.ListUUID != "" {
 		if err := h.Listmonk.Subscribe(email, h.ListUUID); err != nil {
-			log.Printf("listmonk error for %s: %v", email, err)
+			log.Printf("listmonk error for %q: %v", email, err)
 			// Don't fail the request — email is safely in the database.
 		} else if err := h.Store.MarkSynced(email); err != nil {
-			log.Printf("mark synced error for %s: %v", email, err)
+			log.Printf("mark synced error for %q: %v", email, err)
 		}
 	}
 

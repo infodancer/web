@@ -36,7 +36,8 @@ func TimingWith(fieldName string, minDuration time.Duration, now func() time.Tim
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
-				r.ParseMultipartForm(1 << 20) //nolint:errcheck
+				r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+				r.ParseMultipartForm(1 << 20) //nolint:errcheck,gosec // body bounded above; non-multipart parse error is expected
 
 				token := r.FormValue(fieldName)
 				if token == "" {
