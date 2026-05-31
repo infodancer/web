@@ -90,7 +90,7 @@ func TestFeedFullPageVsFragment(t *testing.T) {
 		t.Fatalf("full status = %d", full.Code)
 	}
 	body := full.Body.String()
-	if !strings.Contains(body, "<!DOCTYPE html>") {
+	if !strings.Contains(body, "<!doctype html>") {
 		t.Error("full page missing doctype")
 	}
 	if !strings.Contains(body, "notify-toolbar") {
@@ -106,7 +106,7 @@ func TestFeedFullPageVsFragment(t *testing.T) {
 	req.Header.Set("HX-Request", "true")
 	h.ServeHTTP(frag, req)
 	fbody := frag.Body.String()
-	if strings.Contains(fbody, "<!DOCTYPE html>") {
+	if strings.Contains(fbody, "<!doctype html>") {
 		t.Error("fragment should not contain doctype")
 	}
 	if !strings.Contains(fbody, "New account") {

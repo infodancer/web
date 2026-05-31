@@ -73,6 +73,16 @@ type Config struct {
 	// HomeURL is where the brand link points. Defaults to "/".
 	HomeURL string
 
+	// Chrome, when set, supplies the full host page chrome (nav, footer, meta,
+	// theme, analytics, asset base, head tags) per request as a
+	// [ui.DocumentData] that pages render through ui/document. A host site sets
+	// this to inject its own live, auth-aware navigation so the admin UI matches
+	// the rest of the site. nil keeps a SiteName/HomeURL-derived default chrome,
+	// so a standalone mount still renders. Either way the notification bell is
+	// the GET {BasePath}/bell fragment the host embeds in its own nav; notify's
+	// own page does not render it.
+	Chrome func(r *http.Request) uiassets.DocumentData
+
 	// PageSize is the feed page size, clamped to [1, 100]. Defaults to 25.
 	PageSize int
 
@@ -116,15 +126,16 @@ type Handler struct {
 	log      *slog.Logger
 	static   http.Handler
 
-	basePath    string
-	siteName    string
-	homeURL     string
-	pageSize    int
-	pollSeconds int
-	htmxHead    string
+	basePath string
+	siteName string
+	homeURL  string
+	pageSize int
 
 	// now is the clock used for relative timestamps; overridable in tests.
 	now func() time.Time
+
+	// chrome supplies the host page chrome per request; nil uses defaultChrome.
+	chrome func(r *http.Request) uiassets.DocumentData
 }
 
 // New constructs a Handler from cfg. It returns an error if Store or Resolver
@@ -138,7 +149,7 @@ func New(cfg Config) (*Handler, error) {
 	}
 	cfg.applyDefaults()
 
-	tpl, err := newTemplates(templatesFS, cfg.Templates, cfg.Logger)
+	tpl, err := newTemplates(templatesFS, cfg.Templates, uiassets.PartialsFS(), cfg.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -150,18 +161,17 @@ func New(cfg Config) (*Handler, error) {
 	assets := overlayStatic(withUIAssets(staticFiles), cfg.Static)
 
 	h := &Handler{
-		store:       cfg.Store,
-		resolver:    cfg.Resolver,
-		tpl:         tpl,
-		log:         cfg.Logger,
-		static:      http.StripPrefix("/static/", http.FileServerFS(assets)),
-		basePath:    cfg.BasePath,
-		siteName:    cfg.SiteName,
-		homeURL:     cfg.HomeURL,
-		pageSize:    cfg.PageSize,
-		pollSeconds: cfg.PollSeconds,
-		htmxHead:    string(uiassets.HeadTags(cfg.BasePath + "/static/ui")),
-		now:         time.Now,
+		store:    cfg.Store,
+		resolver: cfg.Resolver,
+		tpl:      tpl,
+		log:      cfg.Logger,
+		static:   http.StripPrefix("/static/", http.FileServerFS(assets)),
+		basePath: cfg.BasePath,
+		siteName: cfg.SiteName,
+		homeURL:  cfg.HomeURL,
+		pageSize: cfg.PageSize,
+		now:      time.Now,
+		chrome:   cfg.Chrome,
 	}
 	return h, nil
 }
