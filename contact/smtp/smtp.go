@@ -26,7 +26,7 @@ type Config struct {
 	Host     string // SMTP server hostname
 	Port     int    // typically 587 (STARTTLS) or 465 (implicit TLS) or 25
 	Username string // PLAIN auth username (often the From address)
-	Password string // PLAIN auth password / app password
+	Password string //nolint:gosec // G117: host-populated SMTP credential, not serialized to clients
 	// UseTLS forces implicit TLS on connect (port 465-style). When false,
 	// the client uses STARTTLS opportunistically and refuses unencrypted
 	// auth.

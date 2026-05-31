@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	pgmig "github.com/infodancer/web/contact/migrations/postgres"
@@ -108,6 +109,11 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, errMsg string) error {
 // (slated for v0.2 — exposed now so the worker can be wired in without an
 // API change).
 func (s *Store) Pending(ctx context.Context, maxAttempts, limit int) ([]Submission, error) {
+	// Guard the narrowing to int32 (the DB column type) so a caller can't
+	// overflow it with an out-of-range value.
+	if maxAttempts < 0 || maxAttempts > math.MaxInt32 || limit < 0 || limit > math.MaxInt32 {
+		return nil, fmt.Errorf("contact: pending: maxAttempts/limit out of range: %d/%d", maxAttempts, limit)
+	}
 	rows, err := s.q.PendingSubmissions(ctx, db.PendingSubmissionsParams{
 		MaxAttempts: int32(maxAttempts),
 		RowLimit:    int32(limit),
