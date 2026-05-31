@@ -1,0 +1,8 @@
+version: "2"
+
+# Add gosec (the suite's static security scanner) to this module's default
+# linters. The other modules enable it as part of a fuller golangci config;
+# this keeps the module covered without changing its other lint behavior.
+linters:
+  enable:
+    - gosec

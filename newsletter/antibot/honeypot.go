@@ -18,11 +18,12 @@ func Honeypot(fieldName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
-				r.ParseMultipartForm(1 << 20) //nolint:errcheck
+				r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+				r.ParseMultipartForm(1 << 20) //nolint:errcheck,gosec // body bounded above; non-multipart parse error is expected
 				if val := r.FormValue(fieldName); val != "" {
 					log.Printf("antibot: honeypot field %q filled by %s", fieldName, clientIP(r))
 					w.Header().Set("Content-Type", "text/html; charset=utf-8")
-					w.Write([]byte(`<p class="success">Thanks for subscribing!</p>`)) //nolint:errcheck
+					_, _ = w.Write([]byte(`<p class="success">Thanks for subscribing!</p>`))
 					return
 				}
 			}

@@ -1,0 +1,17 @@
+version: "2"
+
+# Add gosec (the suite's static security scanner) to this module's default
+# linters. The other modules enable it as part of a fuller golangci config;
+# this keeps the module covered without changing its other lint behavior.
+linters:
+  enable:
+    - gosec
+  settings:
+    gosec:
+      excludes:
+        # G706 (log-injection taint) is excluded: it is low severity (the
+        # values are diagnostic-log fields, already escaped with %q so control
+        # characters can't forge log lines), and its taint pass is noisy and
+        # non-deterministic — it surfaces a different subset of call sites each
+        # run, which would make a per-line-nolint approach flaky in CI.
+        - G706
