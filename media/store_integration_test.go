@@ -65,12 +65,13 @@ func fresh(t *testing.T) (*Store, *PostgresBlobStore) {
 
 func sampleMeta() ObjectMeta {
 	return ObjectMeta{
+		Category:    "campaign",
 		Hash:        "a1b2c3d4e5f600112233445566778899aabbccddeeff00112233445566778899",
 		ContentType: "image/png",
 		Width:       30,
 		Height:      20,
 		ByteSize:    1234,
-		Owner:       "alice",
+		Subject:     "shadowmaze",
 		CreatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 	}
 }
@@ -82,23 +83,37 @@ func TestStore_PutLookupRoundTrip(t *testing.T) {
 
 	require.NoError(t, store.Put(ctx, in))
 
-	got, ok, err := store.Lookup(ctx, in.Hash)
+	got, ok, err := store.Lookup(ctx, in.Category, in.Hash)
 	require.NoError(t, err)
 	require.True(t, ok)
+	require.Equal(t, in.Category, got.Category)
 	require.Equal(t, in.Hash, got.Hash)
 	require.Equal(t, in.ContentType, got.ContentType)
 	require.Equal(t, in.Width, got.Width)
 	require.Equal(t, in.Height, got.Height)
 	require.Equal(t, in.ByteSize, got.ByteSize)
-	require.Equal(t, in.Owner, got.Owner)
+	require.Equal(t, in.Subject, got.Subject)
 	require.WithinDuration(t, in.CreatedAt, got.CreatedAt, time.Second)
 }
 
 func TestStore_LookupMissing(t *testing.T) {
 	store, _ := fresh(t)
-	_, ok, err := store.Lookup(context.Background(), sampleMeta().Hash)
+	in := sampleMeta()
+	_, ok, err := store.Lookup(context.Background(), in.Category, in.Hash)
 	require.NoError(t, err)
 	require.False(t, ok)
+}
+
+// A different category is a different key — Lookup must not cross categories.
+func TestStore_CategoryScopesLookup(t *testing.T) {
+	store, _ := fresh(t)
+	ctx := context.Background()
+	in := sampleMeta()
+	require.NoError(t, store.Put(ctx, in))
+
+	_, ok, err := store.Lookup(ctx, "creature", in.Hash)
+	require.NoError(t, err)
+	require.False(t, ok, "same hash under a different category must not be found")
 }
 
 func TestStore_PutIdempotent(t *testing.T) {
@@ -110,32 +125,66 @@ func TestStore_PutIdempotent(t *testing.T) {
 
 	var count int
 	require.NoError(t, testPool.QueryRow(ctx,
-		`SELECT count(*) FROM media_objects WHERE hash = $1`, in.Hash).Scan(&count))
+		`SELECT count(*) FROM media_objects WHERE category = $1 AND hash = $2`,
+		in.Category, in.Hash).Scan(&count))
 	require.Equal(t, 1, count)
+}
+
+func TestStore_ListBySubject(t *testing.T) {
+	store, _ := fresh(t)
+	ctx := context.Background()
+
+	mk := func(hash, subject string) ObjectMeta {
+		m := sampleMeta()
+		m.Hash = hash
+		m.Subject = subject
+		return m
+	}
+	hashes := []string{
+		"1111111111111111111111111111111111111111111111111111111111111111",
+		"2222222222222222222222222222222222222222222222222222222222222222",
+		"3333333333333333333333333333333333333333333333333333333333333333",
+	}
+	require.NoError(t, store.Put(ctx, mk(hashes[0], "shadowmaze")))
+	require.NoError(t, store.Put(ctx, mk(hashes[1], "shadowmaze")))
+	require.NoError(t, store.Put(ctx, mk(hashes[2], "osrrealms")))
+
+	got, err := store.ListBySubject(ctx, "campaign", "shadowmaze")
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	for _, m := range got {
+		require.Equal(t, "shadowmaze", m.Subject)
+		require.Equal(t, "campaign", m.Category)
+	}
 }
 
 func TestPostgresBlobStore_RoundTrip(t *testing.T) {
 	_, blobs := fresh(t)
 	ctx := context.Background()
-	hash := sampleMeta().Hash
+	cat, hash := "campaign", sampleMeta().Hash
 	payload := []byte("\x89PNG fake bytes for storage round trip")
 
-	has, err := blobs.Has(ctx, hash)
+	has, err := blobs.Has(ctx, cat, hash)
 	require.NoError(t, err)
 	require.False(t, has)
 
-	require.NoError(t, blobs.Put(ctx, hash, "image/png", payload))
+	require.NoError(t, blobs.Put(ctx, cat, hash, "image/png", payload))
 
-	has, err = blobs.Has(ctx, hash)
+	has, err = blobs.Has(ctx, cat, hash)
 	require.NoError(t, err)
 	require.True(t, has)
 
-	got, ct, err := blobs.Get(ctx, hash)
+	got, ct, err := blobs.Get(ctx, cat, hash)
 	require.NoError(t, err)
 	require.Equal(t, payload, got)
 	require.Equal(t, "image/png", ct)
 
-	_, _, err = blobs.Get(ctx, "0000000000000000000000000000000000000000000000000000000000000000")
+	// A different category does not see this blob.
+	has, err = blobs.Has(ctx, "creature", hash)
+	require.NoError(t, err)
+	require.False(t, has)
+
+	_, _, err = blobs.Get(ctx, cat, "0000000000000000000000000000000000000000000000000000000000000000")
 	require.ErrorIs(t, err, ErrBlobNotFound)
 }
 
@@ -148,7 +197,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 // and blob backend — to confirm the pieces compose against a real database.
 func TestEndToEnd_UploadServe(t *testing.T) {
 	store, blobs := fresh(t)
-	h := NewHandler(store, blobs, Config{PublicBaseURL: "/media"})
+	h, err := NewHandler(store, blobs, Config{Category: "campaign", PublicBaseURL: "/media"})
+	require.NoError(t, err)
 
 	up := httptest.NewRecorder()
 	h.Routes().ServeHTTP(up, uploadRequest(t, "image", pngBytes(t, 16, 9)))

@@ -2,10 +2,19 @@ package media
 
 import "net/http"
 
-// Config tunes the upload pipeline and serving. The pipeline ([Process]) reads
-// only MaxUploadBytes and MaxPixels; the remaining fields are used by the HTTP
-// handler. A zero Config is valid — the pipeline applies its defaults.
+// Config tunes the upload pipeline, serving, and the category a handler stores
+// under. The pipeline ([Process]) reads only MaxUploadBytes and MaxPixels; the
+// rest is used by the HTTP handler.
 type Config struct {
+	// Category is the server-side bucket this handler stores under (e.g.
+	// "campaign", "creature", "character"). It is a property of the mount, NOT
+	// of the request — the client never sets it. A host registers one handler
+	// per category over a single shared store, so images are physically
+	// separated on disk (<root>/<category>/ab/cd/<hash>) and by composite key
+	// in the database, not by metadata alone. Required and validated by
+	// [NewHandler]; must match [ValidCategory].
+	Category string
+
 	// MaxUploadBytes caps the accepted upload size. Zero uses the default
 	// (10 MiB).
 	MaxUploadBytes int64
@@ -15,14 +24,20 @@ type Config struct {
 	MaxPixels int
 
 	// PublicBaseURL is the externally-visible prefix the handler builds object
-	// URLs from (e.g. "/media" for same-origin, or
-	// "https://cdn.example.com/media" to front the bytes with a CDN or a
-	// separate origin for defense in depth). Trailing slash optional.
+	// URLs from — point it at where this handler's GET route is mounted, which
+	// is category-specific (e.g. "/media/campaign", or
+	// "https://cdn.example.com/media/campaign"). Trailing slash optional.
 	PublicBaseURL string
 
-	// Authorize gates uploads. It runs before any bytes are processed and
-	// returns the owner id to record plus whether the request may upload.
-	// Authentication and authorization policy belong to the host; when nil,
-	// uploads are open (suitable only for a trusted/dev mount).
-	Authorize func(r *http.Request) (owner string, ok bool)
+	// Authorize gates every upload and identifies the owning record. media does
+	// not allow free-floating uploads: an image is always tied to some other
+	// record the user may write to (e.g. a campaign), and that record's kind is
+	// what the handler's Category names. Authorize returns the subject — the id
+	// of that owning record, derived server-side from the request's route or
+	// session — and whether the request may write to it. ok=false rejects the
+	// upload; the subject is recorded in the image's metadata.
+	//
+	// A nil Authorize allows uploads with an empty subject. That is for trusted
+	// or development mounts only — a production mount must set it.
+	Authorize func(r *http.Request) (subject string, ok bool)
 }

@@ -12,7 +12,8 @@ import (
 	"testing"
 )
 
-// fakeStore is an in-memory objectStore for handler unit tests.
+// fakeStore is an in-memory objectStore for handler unit tests, keyed by
+// (category, hash).
 type fakeStore struct {
 	mu      sync.Mutex
 	objects map[string]ObjectMeta
@@ -21,28 +22,37 @@ type fakeStore struct {
 
 func newFakeStore() *fakeStore { return &fakeStore{objects: map[string]ObjectMeta{}} }
 
+func (f *fakeStore) key(category, hash string) string { return category + "\x00" + hash }
+
 func (f *fakeStore) Put(_ context.Context, m ObjectMeta) error {
 	if f.putErr != nil {
 		return f.putErr
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.objects[m.Hash] = m
+	f.objects[f.key(m.Category, m.Hash)] = m
 	return nil
 }
 
-func (f *fakeStore) Lookup(_ context.Context, hash string) (ObjectMeta, bool, error) {
+func (f *fakeStore) Lookup(_ context.Context, category, hash string) (ObjectMeta, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	m, ok := f.objects[hash]
+	m, ok := f.objects[f.key(category, hash)]
 	return m, ok, nil
 }
 
 func newHandler(t *testing.T, cfg Config) (*Handler, *fakeStore, *MemoryBlobStore) {
 	t.Helper()
+	if cfg.Category == "" {
+		cfg.Category = "campaign"
+	}
 	store := newFakeStore()
 	blobs := NewMemoryBlobStore()
-	return NewHandler(store, blobs, cfg), store, blobs
+	h, err := NewHandler(store, blobs, cfg)
+	if err != nil {
+		t.Fatalf("NewHandler: %v", err)
+	}
+	return h, store, blobs
 }
 
 // uploadRequest builds a multipart POST with the bytes in the "image" field.
@@ -65,8 +75,16 @@ func uploadRequest(t *testing.T, field string, content []byte) *http.Request {
 	return req
 }
 
+func TestNewHandler_RejectsBadCategory(t *testing.T) {
+	for _, bad := range []string{"", "../evil", "UPPER", "has space"} {
+		if _, err := NewHandler(newFakeStore(), NewMemoryBlobStore(), Config{Category: bad}); err == nil {
+			t.Errorf("NewHandler(category=%q) = nil error, want error", bad)
+		}
+	}
+}
+
 func TestHandler_UploadPNG(t *testing.T) {
-	h, store, blobs := newHandler(t, Config{PublicBaseURL: "/media"})
+	h, store, blobs := newHandler(t, Config{Category: "campaign", PublicBaseURL: "/media"})
 	rec := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rec, uploadRequest(t, "image", pngBytes(t, 30, 20)))
 
@@ -83,13 +101,16 @@ func TestHandler_UploadPNG(t *testing.T) {
 	if !bytes.HasPrefix([]byte(resp.URL), []byte("/media/")) || !bytes.HasSuffix([]byte(resp.URL), []byte(".png")) {
 		t.Errorf("url = %q, want /media/<hash>.png", resp.URL)
 	}
-	// Side effects: one metadata row and one blob, both keyed by the hash.
+	// Side effects: one metadata row and one blob, both under the category.
 	if len(store.objects) != 1 {
 		t.Errorf("stored %d objects, want 1", len(store.objects))
 	}
-	for hash := range store.objects {
-		if ok, _ := blobs.Has(context.Background(), hash); !ok {
-			t.Errorf("blob for %s not stored", hash)
+	for _, m := range store.objects {
+		if m.Category != "campaign" {
+			t.Errorf("stored category = %q, want campaign", m.Category)
+		}
+		if ok, _ := blobs.Has(context.Background(), m.Category, m.Hash); !ok {
+			t.Errorf("blob for %s/%s not stored", m.Category, m.Hash)
 		}
 	}
 }
@@ -125,8 +146,8 @@ func TestHandler_UploadAuthDenied(t *testing.T) {
 	}
 }
 
-func TestHandler_UploadRecordsOwner(t *testing.T) {
-	cfg := Config{Authorize: func(*http.Request) (string, bool) { return "alice", true }}
+func TestHandler_UploadRecordsSubject(t *testing.T) {
+	cfg := Config{Authorize: func(*http.Request) (string, bool) { return "shadowmaze", true }}
 	h, store, _ := newHandler(t, cfg)
 	rec := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rec, uploadRequest(t, "image", pngBytes(t, 8, 8)))
@@ -134,8 +155,8 @@ func TestHandler_UploadRecordsOwner(t *testing.T) {
 		t.Fatalf("status = %d, want 201", rec.Code)
 	}
 	for _, m := range store.objects {
-		if m.Owner != "alice" {
-			t.Errorf("owner = %q, want alice", m.Owner)
+		if m.Subject != "shadowmaze" {
+			t.Errorf("subject = %q, want shadowmaze", m.Subject)
 		}
 	}
 }
@@ -164,7 +185,7 @@ func TestHandler_UploadStoreErrorIs500(t *testing.T) {
 
 // upload then serve: the round trip returns the bytes with the security headers.
 func TestHandler_ServeRoundTrip(t *testing.T) {
-	h, _, _ := newHandler(t, Config{PublicBaseURL: "/media"})
+	h, _, _ := newHandler(t, Config{Category: "campaign", PublicBaseURL: "/media"})
 	up := httptest.NewRecorder()
 	h.Routes().ServeHTTP(up, uploadRequest(t, "image", pngBytes(t, 12, 12)))
 	var resp uploadResponse
@@ -206,7 +227,6 @@ func TestHandler_ServeRoundTrip(t *testing.T) {
 
 func TestHandler_ServeUnknownHashIs404(t *testing.T) {
 	h, _, _ := newHandler(t, Config{})
-	// 64 hex chars that were never uploaded.
 	path := "/" + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" + ".png"
 	rec := httptest.NewRecorder()
 	h.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -227,7 +247,6 @@ func TestHandler_ServeMalformedHashIs404(t *testing.T) {
 func TestHandler_MethodNotAllowed(t *testing.T) {
 	h, _, _ := newHandler(t, Config{})
 	rec := httptest.NewRecorder()
-	// GET on the upload root is not registered (only POST /{$}).
 	h.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405", rec.Code)

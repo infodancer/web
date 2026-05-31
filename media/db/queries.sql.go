@@ -13,69 +13,129 @@ import (
 const getBlob = `-- name: GetBlob :one
 SELECT bytes, content_type
 FROM media_blobs
-WHERE hash = $1
+WHERE category = $1 AND hash = $2
 `
+
+type GetBlobParams struct {
+	Category string
+	Hash     string
+}
 
 type GetBlobRow struct {
 	Bytes       []byte
 	ContentType string
 }
 
-func (q *Queries) GetBlob(ctx context.Context, hash string) (GetBlobRow, error) {
-	row := q.db.QueryRow(ctx, getBlob, hash)
+func (q *Queries) GetBlob(ctx context.Context, arg GetBlobParams) (GetBlobRow, error) {
+	row := q.db.QueryRow(ctx, getBlob, arg.Category, arg.Hash)
 	var i GetBlobRow
 	err := row.Scan(&i.Bytes, &i.ContentType)
 	return i, err
 }
 
 const getObject = `-- name: GetObject :one
-SELECT hash, content_type, width, height, byte_size, owner, created_at
+SELECT category, hash, content_type, width, height, byte_size, subject, created_at
 FROM media_objects
-WHERE hash = $1
+WHERE category = $1 AND hash = $2
 `
 
-func (q *Queries) GetObject(ctx context.Context, hash string) (MediaObjects, error) {
-	row := q.db.QueryRow(ctx, getObject, hash)
+type GetObjectParams struct {
+	Category string
+	Hash     string
+}
+
+func (q *Queries) GetObject(ctx context.Context, arg GetObjectParams) (MediaObjects, error) {
+	row := q.db.QueryRow(ctx, getObject, arg.Category, arg.Hash)
 	var i MediaObjects
 	err := row.Scan(
+		&i.Category,
 		&i.Hash,
 		&i.ContentType,
 		&i.Width,
 		&i.Height,
 		&i.ByteSize,
-		&i.Owner,
+		&i.Subject,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const hasBlob = `-- name: HasBlob :one
-SELECT EXISTS (SELECT 1 FROM media_blobs WHERE hash = $1)
+SELECT EXISTS (SELECT 1 FROM media_blobs WHERE category = $1 AND hash = $2)
 `
 
-func (q *Queries) HasBlob(ctx context.Context, hash string) (bool, error) {
-	row := q.db.QueryRow(ctx, hasBlob, hash)
+type HasBlobParams struct {
+	Category string
+	Hash     string
+}
+
+func (q *Queries) HasBlob(ctx context.Context, arg HasBlobParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasBlob, arg.Category, arg.Hash)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
+const listObjectsBySubject = `-- name: ListObjectsBySubject :many
+SELECT category, hash, content_type, width, height, byte_size, subject, created_at
+FROM media_objects
+WHERE category = $1 AND subject = $2
+ORDER BY created_at DESC, hash
+`
+
+type ListObjectsBySubjectParams struct {
+	Category string
+	Subject  string
+}
+
+// All images tied to one owning record within a category, newest first.
+func (q *Queries) ListObjectsBySubject(ctx context.Context, arg ListObjectsBySubjectParams) ([]MediaObjects, error) {
+	rows, err := q.db.Query(ctx, listObjectsBySubject, arg.Category, arg.Subject)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MediaObjects
+	for rows.Next() {
+		var i MediaObjects
+		if err := rows.Scan(
+			&i.Category,
+			&i.Hash,
+			&i.ContentType,
+			&i.Width,
+			&i.Height,
+			&i.ByteSize,
+			&i.Subject,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const putBlob = `-- name: PutBlob :exec
-INSERT INTO media_blobs (hash, content_type, bytes, byte_size)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (hash) DO NOTHING
+INSERT INTO media_blobs (category, hash, content_type, bytes, byte_size)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (category, hash) DO NOTHING
 `
 
 type PutBlobParams struct {
+	Category    string
 	Hash        string
 	ContentType string
 	Bytes       []byte
 	ByteSize    int64
 }
 
-// Store bytes for a content address. Idempotent on the hash.
+// Store bytes for a content address. Idempotent on (category, hash).
 func (q *Queries) PutBlob(ctx context.Context, arg PutBlobParams) error {
 	_, err := q.db.Exec(ctx, putBlob,
+		arg.Category,
 		arg.Hash,
 		arg.ContentType,
 		arg.Bytes,
@@ -85,31 +145,33 @@ func (q *Queries) PutBlob(ctx context.Context, arg PutBlobParams) error {
 }
 
 const putObject = `-- name: PutObject :exec
-INSERT INTO media_objects (hash, content_type, width, height, byte_size, owner, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT (hash) DO NOTHING
+INSERT INTO media_objects (category, hash, content_type, width, height, byte_size, subject, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (category, hash) DO NOTHING
 `
 
 type PutObjectParams struct {
+	Category    string
 	Hash        string
 	ContentType string
 	Width       int32
 	Height      int32
 	ByteSize    int64
-	Owner       string
+	Subject     string
 	CreatedAt   time.Time
 }
 
 // Insert object metadata. Idempotent: a re-upload of identical content
-// (same hash) is a no-op.
+// (same category + hash) is a no-op.
 func (q *Queries) PutObject(ctx context.Context, arg PutObjectParams) error {
 	_, err := q.db.Exec(ctx, putObject,
+		arg.Category,
 		arg.Hash,
 		arg.ContentType,
 		arg.Width,
 		arg.Height,
 		arg.ByteSize,
-		arg.Owner,
+		arg.Subject,
 		arg.CreatedAt,
 	)
 	return err

@@ -29,8 +29,8 @@ func NewStore(pool *pgxpool.Pool) *Store {
 // tests and callers that need transactional control.
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
-// Put records object metadata. It is idempotent on the content address, so a
-// re-upload of identical content does not error or duplicate.
+// Put records object metadata. It is idempotent on the (category, hash) key, so
+// a re-upload of identical content does not error or duplicate.
 func (s *Store) Put(ctx context.Context, m ObjectMeta) error {
 	// Dimensions are bounded by Config.MaxPixels upstream in Process; guard the
 	// narrowing to int32 anyway so a hand-built ObjectMeta can't overflow.
@@ -38,12 +38,13 @@ func (s *Store) Put(ctx context.Context, m ObjectMeta) error {
 		return fmt.Errorf("media: put object: dimensions out of range: %dx%d", m.Width, m.Height)
 	}
 	err := s.q.PutObject(ctx, db.PutObjectParams{
+		Category:    m.Category,
 		Hash:        m.Hash,
 		ContentType: m.ContentType,
 		Width:       int32(m.Width),
 		Height:      int32(m.Height),
 		ByteSize:    m.ByteSize,
-		Owner:       m.Owner,
+		Subject:     m.Subject,
 		CreatedAt:   m.CreatedAt,
 	})
 	if err != nil {
@@ -52,25 +53,44 @@ func (s *Store) Put(ctx context.Context, m ObjectMeta) error {
 	return nil
 }
 
-// Lookup returns the metadata for hash. The boolean is false (with a nil error)
-// when no object has that hash.
-func (s *Store) Lookup(ctx context.Context, hash string) (ObjectMeta, bool, error) {
-	row, err := s.q.GetObject(ctx, hash)
+// Lookup returns the metadata for (category, hash). The boolean is false (with
+// a nil error) when no object has that key.
+func (s *Store) Lookup(ctx context.Context, category, hash string) (ObjectMeta, bool, error) {
+	row, err := s.q.GetObject(ctx, db.GetObjectParams{Category: category, Hash: hash})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ObjectMeta{}, false, nil
 	}
 	if err != nil {
 		return ObjectMeta{}, false, fmt.Errorf("media: get object: %w", err)
 	}
+	return metaFromRow(row), true, nil
+}
+
+// ListBySubject returns every image tied to the owning record subject within
+// category, newest first — e.g. all images for one campaign.
+func (s *Store) ListBySubject(ctx context.Context, category, subject string) ([]ObjectMeta, error) {
+	rows, err := s.q.ListObjectsBySubject(ctx, db.ListObjectsBySubjectParams{Category: category, Subject: subject})
+	if err != nil {
+		return nil, fmt.Errorf("media: list by subject: %w", err)
+	}
+	out := make([]ObjectMeta, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, metaFromRow(row))
+	}
+	return out, nil
+}
+
+func metaFromRow(row db.MediaObjects) ObjectMeta {
 	return ObjectMeta{
+		Category:    row.Category,
 		Hash:        row.Hash,
 		ContentType: row.ContentType,
 		Width:       int(row.Width),
 		Height:      int(row.Height),
 		ByteSize:    row.ByteSize,
-		Owner:       row.Owner,
+		Subject:     row.Subject,
 		CreatedAt:   row.CreatedAt,
-	}, true, nil
+	}
 }
 
 // Compile-time proof the concrete store satisfies the handler's interface.

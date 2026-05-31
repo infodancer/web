@@ -14,7 +14,8 @@ import (
 // PostgresBlobStore is the default [BlobStore]: bytes in Postgres (`bytea`),
 // consistent with the suite's one-database posture. It is self-contained — it
 // carries each blob's content type — so the serve path does not consult the
-// metadata table.
+// metadata table. Bytes are keyed by (category, hash), so one store serves
+// every category.
 type PostgresBlobStore struct {
 	q *db.Queries
 }
@@ -25,9 +26,10 @@ func NewPostgresBlobStore(pool *pgxpool.Pool) *PostgresBlobStore {
 	return &PostgresBlobStore{q: db.New(pool)}
 }
 
-// Put stores data under hash; storing an existing hash is a no-op.
-func (p *PostgresBlobStore) Put(ctx context.Context, hash, contentType string, data []byte) error {
+// Put stores data under (category, hash); storing an existing key is a no-op.
+func (p *PostgresBlobStore) Put(ctx context.Context, category, hash, contentType string, data []byte) error {
 	err := p.q.PutBlob(ctx, db.PutBlobParams{
+		Category:    category,
 		Hash:        hash,
 		ContentType: contentType,
 		Bytes:       data,
@@ -39,9 +41,9 @@ func (p *PostgresBlobStore) Put(ctx context.Context, hash, contentType string, d
 	return nil
 }
 
-// Get returns the bytes and content type for hash, or [ErrBlobNotFound].
-func (p *PostgresBlobStore) Get(ctx context.Context, hash string) ([]byte, string, error) {
-	row, err := p.q.GetBlob(ctx, hash)
+// Get returns the bytes and content type for (category, hash), or [ErrBlobNotFound].
+func (p *PostgresBlobStore) Get(ctx context.Context, category, hash string) ([]byte, string, error) {
+	row, err := p.q.GetBlob(ctx, db.GetBlobParams{Category: category, Hash: hash})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, "", ErrBlobNotFound
 	}
@@ -51,9 +53,9 @@ func (p *PostgresBlobStore) Get(ctx context.Context, hash string) ([]byte, strin
 	return row.Bytes, row.ContentType, nil
 }
 
-// Has reports whether a blob with hash is stored.
-func (p *PostgresBlobStore) Has(ctx context.Context, hash string) (bool, error) {
-	ok, err := p.q.HasBlob(ctx, hash)
+// Has reports whether a blob with (category, hash) is stored.
+func (p *PostgresBlobStore) Has(ctx context.Context, category, hash string) (bool, error) {
+	ok, err := p.q.HasBlob(ctx, db.HasBlobParams{Category: category, Hash: hash})
 	if err != nil {
 		return false, fmt.Errorf("media: has blob: %w", err)
 	}

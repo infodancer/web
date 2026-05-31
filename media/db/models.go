@@ -9,6 +9,7 @@ import (
 )
 
 type MediaBlobs struct {
+	Category    string
 	Hash        string
 	ContentType string
 	Bytes       []byte
@@ -17,11 +18,12 @@ type MediaBlobs struct {
 }
 
 type MediaObjects struct {
+	Category    string
 	Hash        string
 	ContentType string
 	Width       int32
 	Height      int32
 	ByteSize    int64
-	Owner       string
+	Subject     string
 	CreatedAt   time.Time
 }

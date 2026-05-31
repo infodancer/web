@@ -11,15 +11,15 @@ import (
 
 // FilesystemBlobStore stores blob bytes on the local filesystem — the same
 // "image files under a root directory" posture osg uses for chronicle images,
-// adapted to media's content-addressed model. One file holds the bytes and a
-// small sidecar records the content type; paths are sharded by the first two
-// bytes of the hash (<root>/ab/cd/<hash>) so a single directory never holds the
-// whole corpus.
+// adapted to media's content-addressed, category-partitioned model. One file
+// holds the bytes and a small sidecar records the content type; paths are
+// <root>/<category>/ab/cd/<hash> (the category folder gives the logical
+// separation; the first two bytes of the hash shard so no directory holds the
+// whole corpus). An empty category drops the category folder (<root>/ab/cd/...).
 //
 // It satisfies [BlobStore], so a host swaps it for [PostgresBlobStore] with no
 // other change. Like the Postgres backend it is content-addressed and
-// idempotent: a hash's bytes never change, so Put of an existing hash is a
-// no-op. Bytes are still served through the media handler (Content-Type +
+// idempotent. Bytes are still served through the media handler (Content-Type +
 // nosniff + immutable caching), never via a bare directory listing.
 type FilesystemBlobStore struct {
 	root string
@@ -37,26 +37,31 @@ func NewFilesystemBlobStore(dir string) (*FilesystemBlobStore, error) {
 	return &FilesystemBlobStore{root: dir}, nil
 }
 
-// paths returns the blob and sidecar paths for hash. ok is false when hash is
-// not a clean content address — the guard that makes path traversal impossible,
-// since a key is only ever a sha256 hex string (no separator, no dot, fixed
-// length) joined under the fixed root.
-func (f *FilesystemBlobStore) paths(hash string) (blobPath, typePath string, ok bool) {
-	if !looksLikeHash(hash) {
+// paths returns the blob and sidecar paths for (category, hash). ok is false
+// when the category or hash is not clean — the guard that makes path traversal
+// impossible, since a category is the ValidCategory set (no separator or dot)
+// and a key is only ever a sha256 hex string, both joined under the fixed root.
+func (f *FilesystemBlobStore) paths(category, hash string) (blobPath, typePath string, ok bool) {
+	if !ValidCategory(category) || !looksLikeHash(hash) {
 		return "", "", false
 	}
-	blobPath = filepath.Join(f.root, hash[:2], hash[2:4], hash)
+	parts := []string{f.root}
+	if category != "" {
+		parts = append(parts, category)
+	}
+	parts = append(parts, hash[:2], hash[2:4], hash)
+	blobPath = filepath.Join(parts...)
 	return blobPath, blobPath + ".type", true
 }
 
-// Put writes the bytes and a content-type sidecar; storing an existing hash is
-// a no-op.
-func (f *FilesystemBlobStore) Put(_ context.Context, hash, contentType string, data []byte) error {
-	blobPath, typePath, ok := f.paths(hash)
+// Put writes the bytes and a content-type sidecar; storing an existing key is a
+// no-op.
+func (f *FilesystemBlobStore) Put(_ context.Context, category, hash, contentType string, data []byte) error {
+	blobPath, typePath, ok := f.paths(category, hash)
 	if !ok {
-		return fmt.Errorf("media: filesystem put: invalid hash %q", hash)
+		return fmt.Errorf("media: filesystem put: invalid category/hash %q/%q", category, hash)
 	}
-	if _, err := os.Stat(blobPath); err == nil { //nolint:gosec // G703: blobPath is <root>/<validated-hash shards>; looksLikeHash forbids traversal
+	if _, err := os.Stat(blobPath); err == nil { //nolint:gosec // G703: blobPath is <root>/<validated-category>/<validated-hash shards>; no traversal
 		return nil // content-addressed: already stored
 	}
 	if err := os.MkdirAll(filepath.Dir(blobPath), 0o700); err != nil { //nolint:gosec // G703: see above
@@ -73,13 +78,13 @@ func (f *FilesystemBlobStore) Put(_ context.Context, hash, contentType string, d
 	return nil
 }
 
-// Get returns the bytes and content type for hash, or [ErrBlobNotFound].
-func (f *FilesystemBlobStore) Get(_ context.Context, hash string) ([]byte, string, error) {
-	blobPath, typePath, ok := f.paths(hash)
+// Get returns the bytes and content type for (category, hash), or [ErrBlobNotFound].
+func (f *FilesystemBlobStore) Get(_ context.Context, category, hash string) ([]byte, string, error) {
+	blobPath, typePath, ok := f.paths(category, hash)
 	if !ok {
 		return nil, "", ErrBlobNotFound
 	}
-	data, err := os.ReadFile(blobPath) //nolint:gosec // G304: path is <root>/<validated-hash-shards>; looksLikeHash forbids traversal
+	data, err := os.ReadFile(blobPath) //nolint:gosec // G304: path is <root>/<validated-category>/<validated-hash shards>; no traversal
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, "", ErrBlobNotFound
@@ -97,13 +102,13 @@ func (f *FilesystemBlobStore) Get(_ context.Context, hash string) ([]byte, strin
 	return data, contentType, nil
 }
 
-// Has reports whether a blob with hash is stored.
-func (f *FilesystemBlobStore) Has(_ context.Context, hash string) (bool, error) {
-	blobPath, _, ok := f.paths(hash)
+// Has reports whether a blob with (category, hash) is stored.
+func (f *FilesystemBlobStore) Has(_ context.Context, category, hash string) (bool, error) {
+	blobPath, _, ok := f.paths(category, hash)
 	if !ok {
 		return false, nil
 	}
-	switch _, err := os.Stat(blobPath); {
+	switch _, err := os.Stat(blobPath); { //nolint:gosec // G703: validated category/hash path
 	case err == nil:
 		return true, nil
 	case errors.Is(err, os.ErrNotExist):
@@ -136,7 +141,7 @@ func writeFileAtomic(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path) //nolint:gosec // G703: both paths under <root>/<validated-hash shards>
+	return os.Rename(tmpName, path) //nolint:gosec // G703: both paths under <root>/<validated-category>/<validated-hash shards>
 }
 
 // Compile-time proof the filesystem store satisfies the seam.

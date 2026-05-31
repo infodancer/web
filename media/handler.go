@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ import (
 // depend on an interface, not the concrete store.)
 type objectStore interface {
 	Put(ctx context.Context, m ObjectMeta) error
-	Lookup(ctx context.Context, hash string) (ObjectMeta, bool, error)
+	Lookup(ctx context.Context, category, hash string) (ObjectMeta, bool, error)
 }
 
 // Handler serves the media HTTP contract: POST an image to upload, GET its
@@ -27,8 +28,14 @@ type Handler struct {
 }
 
 // NewHandler wires a metadata store, a blob store, and config into a handler.
-func NewHandler(store objectStore, blobs BlobStore, cfg Config) *Handler {
-	return &Handler{store: store, blobs: blobs, cfg: cfg}
+// cfg.Category is the server-side bucket this handler stores under; it must be
+// a non-empty valid category (see [ValidCategory]). A host registers one
+// handler per category over a single shared store.
+func NewHandler(store objectStore, blobs BlobStore, cfg Config) (*Handler, error) {
+	if cfg.Category == "" || !ValidCategory(cfg.Category) {
+		return nil, fmt.Errorf("media: NewHandler: invalid category %q", cfg.Category)
+	}
+	return &Handler{store: store, blobs: blobs, cfg: cfg}, nil
 }
 
 // Routes returns the handler's mux. Mount it under a path with
@@ -59,10 +66,13 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	owner := ""
+	// Authorize gates the upload and names the owning record (subject). An
+	// upload is always tied to a record the user may write to; the host derives
+	// it from the request. A nil Authorize is a trusted/dev mount (empty subject).
+	subject := ""
 	if h.cfg.Authorize != nil {
 		var ok bool
-		owner, ok = h.cfg.Authorize(r)
+		subject, ok = h.cfg.Authorize(r)
 		if !ok {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
@@ -90,17 +100,18 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	if err := h.blobs.Put(ctx, processed.SHA256, processed.ContentType, processed.Bytes); err != nil {
+	if err := h.blobs.Put(ctx, h.cfg.Category, processed.SHA256, processed.ContentType, processed.Bytes); err != nil {
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
 	meta := ObjectMeta{
+		Category:    h.cfg.Category,
 		Hash:        processed.SHA256,
 		ContentType: processed.ContentType,
 		Width:       processed.Width,
 		Height:      processed.Height,
 		ByteSize:    int64(len(processed.Bytes)),
-		Owner:       owner,
+		Subject:     subject,
 		CreatedAt:   time.Now().UTC(),
 	}
 	if err := h.store.Put(ctx, meta); err != nil {
@@ -124,7 +135,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, contentType, err := h.blobs.Get(r.Context(), hash)
+	data, contentType, err := h.blobs.Get(r.Context(), h.cfg.Category, hash)
 	if err != nil {
 		if errors.Is(err, ErrBlobNotFound) {
 			http.NotFound(w, r)

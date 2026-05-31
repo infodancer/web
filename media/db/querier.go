@@ -9,13 +9,15 @@ import (
 )
 
 type Querier interface {
-	GetBlob(ctx context.Context, hash string) (GetBlobRow, error)
-	GetObject(ctx context.Context, hash string) (MediaObjects, error)
-	HasBlob(ctx context.Context, hash string) (bool, error)
-	// Store bytes for a content address. Idempotent on the hash.
+	GetBlob(ctx context.Context, arg GetBlobParams) (GetBlobRow, error)
+	GetObject(ctx context.Context, arg GetObjectParams) (MediaObjects, error)
+	HasBlob(ctx context.Context, arg HasBlobParams) (bool, error)
+	// All images tied to one owning record within a category, newest first.
+	ListObjectsBySubject(ctx context.Context, arg ListObjectsBySubjectParams) ([]MediaObjects, error)
+	// Store bytes for a content address. Idempotent on (category, hash).
 	PutBlob(ctx context.Context, arg PutBlobParams) error
 	// Insert object metadata. Idempotent: a re-upload of identical content
-	// (same hash) is a no-op.
+	// (same category + hash) is a no-op.
 	PutObject(ctx context.Context, arg PutObjectParams) error
 }
 
