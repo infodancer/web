@@ -91,8 +91,10 @@ there is no import cycle; the root maps domain types to/from generated types.
   identity resolver; notify owns no authentication. The feed page renders
   through infodancer/ui's `ui/document`, so the host supplies the page chrome
   (nav/footer/meta/analytics) via `Config.Chrome` and the UI matches the rest
-  of the site; the unread bell is the `GET /bell` fragment the host embeds in
-  its own nav (notify draws no nav of its own).
+  of the site; the unread bell is host-placed (notify draws no nav of its own).
+  The host embeds either `GET /bell` (a self-contained `<a>` fragment) or, when
+  its nav is built from `ui.MenuItem`s, a `ui.Badge.PollURL` pointing at
+  `GET /bell/count` (the bare number ui's nav badge swaps in).
 
 ## Risks (accepted)
 

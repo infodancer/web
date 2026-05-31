@@ -83,18 +83,31 @@ mux.Handle("/admin/notifications/", http.StripPrefix("/admin/notifications", h.R
 ```
 
 Routes (relative to `BasePath`): `GET /` (feed page, or a fragment for htmx
-requests), `GET /bell` (unread-count fragment), `POST /seen` (advance the read
-cursor), and `GET /static/...` (bundled CSS + vendored htmx).
+requests), `GET /bell` (self-contained unread-count anchor), `GET /bell/count`
+(bare unread number), `POST /seen` (advance the read cursor), and
+`GET /static/...` (bundled CSS + vendored htmx).
 
 **The bell is the host's to place.** The feed page renders through `ui/document`,
-where the host owns the nav — so notify no longer draws the bell itself. Embed
-the `GET /bell` fragment wherever your menu bar lives, and have it refresh on the
-`notify:read` event that `POST /seen` fires (so "Mark all read" updates it live):
+where the host owns the nav — so notify no longer draws the bell itself. There
+are two ways to embed it, matching how your nav is built:
+
+*Self-contained anchor* — embed the `GET /bell` fragment (a full `<a>` with icon
+and count) wherever your menu bar lives, refreshing on the `notify:read` event
+that `POST /seen` fires (so "Mark all read" updates it live):
 
 ```html
 <span id="notify-bell"
       hx-get="/admin/notifications/bell"
       hx-trigger="load, every 30s, notify:read from:body"></span>
+```
+
+*infodancer/ui nav badge* — if your nav is built from `ui.MenuItem`s, give the
+bell item a `ui.Badge` whose `PollURL` points at `GET /bell/count` (the bare
+number, which drops into the badge span's innerHTML). ui's `ui/nav-glyph` already
+polls it on `load` and every 30s:
+
+```go
+bell.Badge = &ui.Badge{Label: "Notifications", PollURL: "/admin/notifications/bell/count"}
 ```
 
 For a quick local look, `notifyctl serve` mounts the UI with auth stubbed
