@@ -13,10 +13,11 @@ the mount contract are in the root [`CONVENTIONS.md`](../CONVENTIONS.md).
 
 - **Untrusted in, safe out.** Every upload is sniffed by content, allowlisted
   to PNG/JPEG/GIF/WebP, dimension-guarded before decode, and **re-encoded** to
-  strip metadata and kill polyglots. Never accept an image by extension or the
-  client's declared type, and never serve original bytes without the re-encode.
-  SVG and animated GIF are rejected — do not "just allow" them without a
-  hardened sanitizer and explicit approval.
+  strip metadata and kill polyglots — lossless WebP for PNG/GIF/WebP, q85 JPEG
+  for JPEG (WebP encode is pure Go via nativewebp; no cgo). Never accept an image
+  by extension or the client's declared type, and never serve original bytes
+  without the re-encode. SVG, animated GIF, and animated WebP are rejected — do
+  not "just allow" them without a hardened sanitizer and explicit approval.
 - **The corpus is the contract.** `image_test.go` is a malicious-upload corpus
   driven TDD-style: add the failing payload test first, then the code. New
   vectors are *added*, never removed.

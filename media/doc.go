@@ -8,8 +8,10 @@
 // concentrates Markdown sanitization. Every upload is sniffed by content (never
 // by extension or the client's declared type), checked against a PNG/JPEG/GIF/
 // WebP allowlist, guarded against decompression bombs before decode, and
-// re-encoded to a canonical raster that strips EXIF and neutralizes polyglots;
-// SVG and animated GIF are rejected. The result is content-addressed by SHA-256
+// re-encoded to a canonical raster that strips EXIF and neutralizes polyglots
+// (lossless WebP for PNG/GIF/WebP, q85 JPEG for JPEG; WebP encode is pure Go);
+// SVG, animated GIF, and animated WebP are rejected. The result is
+// content-addressed by SHA-256
 // and served with Content-Type, X-Content-Type-Options: nosniff, immutable
 // caching, and ETag.
 //

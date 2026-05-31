@@ -98,8 +98,8 @@ func TestHandler_UploadPNG(t *testing.T) {
 	if resp.Width != 30 || resp.Height != 20 {
 		t.Errorf("dims = %dx%d, want 30x20", resp.Width, resp.Height)
 	}
-	if !bytes.HasPrefix([]byte(resp.URL), []byte("/media/")) || !bytes.HasSuffix([]byte(resp.URL), []byte(".png")) {
-		t.Errorf("url = %q, want /media/<hash>.png", resp.URL)
+	if !bytes.HasPrefix([]byte(resp.URL), []byte("/media/")) || !bytes.HasSuffix([]byte(resp.URL), []byte(".webp")) {
+		t.Errorf("url = %q, want /media/<hash>.webp (PNG re-encodes to WebP)", resp.URL)
 	}
 	// Side effects: one metadata row and one blob, both under the category.
 	if len(store.objects) != 1 {
@@ -193,7 +193,7 @@ func TestHandler_ServeRoundTrip(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	// resp.URL is "/media/<hash>.png"; strip the mount prefix to hit Routes.
+	// resp.URL is "/media/<hash>.webp"; strip the mount prefix to hit Routes.
 	path := resp.URL[len("/media"):]
 	get := httptest.NewRequest(http.MethodGet, path, nil)
 	rec := httptest.NewRecorder()
@@ -202,8 +202,8 @@ func TestHandler_ServeRoundTrip(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("serve status = %d, want 200", rec.Code)
 	}
-	if ct := rec.Header().Get("Content-Type"); ct != "image/png" {
-		t.Errorf("content-type = %q, want image/png", ct)
+	if ct := rec.Header().Get("Content-Type"); ct != "image/webp" {
+		t.Errorf("content-type = %q, want image/webp", ct)
 	}
 	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Errorf("missing nosniff header")

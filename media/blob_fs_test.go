@@ -193,7 +193,7 @@ func TestFilesystemBlobStore_HandlerRoundTrip(t *testing.T) {
 	if get.Code != http.StatusOK {
 		t.Fatalf("serve status = %d, want 200", get.Code)
 	}
-	if get.Header().Get("Content-Type") != "image/png" || get.Header().Get("X-Content-Type-Options") != "nosniff" {
+	if get.Header().Get("Content-Type") != "image/webp" || get.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Errorf("serve headers wrong: ct=%q nosniff=%q",
 			get.Header().Get("Content-Type"), get.Header().Get("X-Content-Type-Options"))
 	}

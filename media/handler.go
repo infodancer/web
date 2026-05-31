@@ -185,10 +185,14 @@ func writeProcessError(w http.ResponseWriter, err error) {
 
 func extFor(contentType string) string {
 	switch contentType {
-	case "image/png":
-		return ".png"
+	case "image/webp":
+		return ".webp"
 	case "image/jpeg":
 		return ".jpg"
+	case "image/png":
+		// No longer produced (PNG re-encodes to WebP), but objects stored
+		// before that change still serve under their .png URL.
+		return ".png"
 	default:
 		return ""
 	}
