@@ -58,7 +58,17 @@ type BlobStore interface {
 
 Metadata (`media_objects`: hash, content_type, width, height, byte_size, owner,
 created_at) is always in Postgres; only the bytes move when the backend is
-swapped. The default `PostgresBlobStore` stores bytes in `media_blobs`.
+swapped. Shipped backends:
+
+- `PostgresBlobStore` — bytes in `media_blobs` (default).
+- `FilesystemBlobStore` — bytes on disk under a root dir, content-addressed and
+  sharded `<root>/ab/cd/<hash>` with a content-type sidecar and atomic
+  (temp-file + rename) writes. This is the same "image files under a root"
+  posture osg uses for chronicle images, adapted to the content-addressed
+  model; the hash is validated (`looksLikeHash`) before any path is built, so
+  traversal is impossible, and bytes are still served through the handler
+  (Content-Type + nosniff), never via a bare directory listing.
+- `MemoryBlobStore` — in-memory, for tests and no-database dev mounts.
 
 ### Transform policy: re-encode raster; reject SVG and animated
 

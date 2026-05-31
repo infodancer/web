@@ -49,5 +49,7 @@ the mount contract are in the root [`CONVENTIONS.md`](../CONVENTIONS.md).
 - mdedit's `Field.UploadURL` + EasyMDE `imageUploadFunction` wiring is the
   consumer side; it lands when a host (blog/osg) mounts media. See
   [infodancer/ui#14](https://github.com/infodancer/ui/issues/14).
-- Deferred: a filesystem/object-store `BlobStore` backend; thumbnails/derived
-  sizes; a hardened sanitized-SVG path; per-owner quotas.
+- `BlobStore` backends shipped: `PostgresBlobStore` (default),
+  `FilesystemBlobStore` (sharded, atomic writes), `MemoryBlobStore` (tests/dev).
+- Deferred: an object-store (S3) `BlobStore` backend; thumbnails/derived sizes;
+  a hardened sanitized-SVG path; per-owner quotas.

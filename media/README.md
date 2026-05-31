@@ -72,9 +72,19 @@ type BlobStore interface {
 }
 ```
 
-A filesystem or object-store backend can replace `PostgresBlobStore` without
-touching the pipeline, metadata, or handler. `MemoryBlobStore` is provided for
-tests and no-database dev mounts.
+Backends, all behind the same seam (swap one for another with no other change):
+
+- `PostgresBlobStore` — bytes in Postgres `bytea` (default).
+- `FilesystemBlobStore` — bytes on disk under a root dir, content-addressed and
+  sharded (`<root>/ab/cd/<hash>`) with a content-type sidecar; the same
+  filesystem-image posture osg uses, with atomic writes. Bytes are still served
+  through the handler (so `nosniff` + headers apply), never a bare directory
+  listing.
+- `MemoryBlobStore` — in-memory, for tests and no-database dev mounts.
+
+```go
+blobs, err := media.NewFilesystemBlobStore("/var/lib/app/media")
+```
 
 ## What the host owns
 
