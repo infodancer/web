@@ -155,8 +155,10 @@ func (h *Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	logger := h.logger()
 
-	// Accept both URL-encoded and multipart bodies (matches the newsletter pattern).
-	r.ParseMultipartForm(1 << 20) //nolint:errcheck
+	// Bound the body, then parse. Accept both URL-encoded and multipart bodies
+	// (matches the newsletter pattern); the error is ignored for non-multipart.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	r.ParseMultipartForm(1 << 20) //nolint:errcheck,gosec // body bounded above; non-multipart parse error is expected
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
