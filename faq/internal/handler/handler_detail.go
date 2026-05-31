@@ -124,22 +124,28 @@ func (s *Server) loadDetail(ctx context.Context, id int64, curr *faquser.User, c
 			tagNames[i] = t.Name
 		}
 
-		// Answers + per-answer comments + per-answer score.
-		ansRows, err := q.ListAnswersForQuestion(ctx, row.ID)
+		// Viewer state drives the interactive controls (answer form, vote
+		// cells, accept/edit/delete). The gates reuse the same checks the write
+		// handlers enforce, so the UI never offers an action the POST rejects.
+		authed := curr != nil
+		open := row.Status == store.FaqQuestionStatusOpen
+		canAccept := s.canAccept(curr, currLocalID, row)
+		isAdmin := curr != nil && curr.Admin
+
+		// Answers + per-answer comments + per-answer score. Soft-deleted answers
+		// are hidden from everyone but admins, who see them inline with Restore.
+		ansRows, err := q.ListAnswersForQuestion(ctx, store.ListAnswersForQuestionParams{
+			QuestionID:     row.ID,
+			IncludeDeleted: isAdmin,
+		})
 		if err != nil {
 			return fmt.Errorf("answers: %w", err)
 		}
 
-		// Viewer state drives the interactive controls (answer form, vote
-		// cells, accept toggle). canAccept reuses the same gate the accept
-		// handler enforces, so the UI never offers an action the POST rejects.
-		authed := curr != nil
-		open := row.Status == store.FaqQuestionStatusOpen
-		canAccept := s.canAccept(curr, currLocalID, row)
-
-		answers, err := buildAnswers(ctx, q, ansRows, row.AcceptedAnswerID, answerRenderCtx{
+		answers, err := s.buildAnswers(ctx, q, ansRows, row.AcceptedAnswerID, answerRenderCtx{
 			questionID: row.ID,
 			localID:    currLocalID,
+			curr:       curr,
 			authed:     authed,
 			open:       open,
 			canAccept:  canAccept,
@@ -261,17 +267,30 @@ func (s *Server) loadDetail(ctx context.Context, id int64, curr *faquser.User, c
 	return view, nil
 }
 
+// renderDetailBody reloads the question and renders the q_detail_body fragment —
+// the response the answer / vote / accept / delete handlers swap back into the
+// page via htmx.
+func (s *Server) renderDetailBody(w http.ResponseWriter, r *http.Request, qid int64, u *faquser.User, localID int64) {
+	view, err := s.loadDetail(r.Context(), qid, u, localID)
+	if err != nil {
+		s.internalError(w, r, "load detail", err)
+		return
+	}
+	s.deps.Templates.Render(w, "partials/q_detail_body.gohtml", view)
+}
+
 // answerRenderCtx carries the per-viewer state buildAnswers needs to decide
 // which interactive controls each answer renders.
 type answerRenderCtx struct {
 	questionID int64
-	localID    int64 // viewer's faq_users.id, 0 when anonymous
+	localID    int64         // viewer's faq_users.id, 0 when anonymous
+	curr       *faquser.User // viewer, nil when anonymous
 	authed     bool
 	open       bool // question is open (not locked/deleted)
 	canAccept  bool // viewer may accept answers on this question
 }
 
-func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswersForQuestionRow, accepted *int64, rc answerRenderCtx) ([]Answer, error) {
+func (s *Server) buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswersForQuestionRow, accepted *int64, rc answerRenderCtx) ([]Answer, error) {
 	out := make([]Answer, len(rows))
 	for i, a := range rows {
 		authorName, err := resolveAuthor(ctx, q, a.AuthorUserID, a.ImportedAuthorID)
@@ -299,28 +318,8 @@ func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswer
 			LocallyModified: a.LocallyModified,
 			NeedsReview:     a.NeedsReview,
 			Comments:        comments,
-			CanAccept:       rc.canAccept,
+			Deleted:         a.DeletedAt.Valid,
 		}
-
-		// Interactive vote cell for a signed-in viewer on an open question —
-		// but never on their own answer, which the score trigger forbids them
-		// from voting (rendering the buttons would just earn a 403). Anonymous
-		// viewers and self-answers fall through to the read-only score.
-		mine := a.AuthorUserID != nil && *a.AuthorUserID == rc.localID
-		if rc.authed && rc.open && !mine {
-			userVote := ""
-			v, verr := q.GetUserVote(ctx, store.GetUserVoteParams{AnswerID: a.ID, UserID: rc.localID})
-			switch {
-			case verr == nil:
-				userVote = string(v.Value)
-			case errors.Is(verr, pgx.ErrNoRows):
-				// no vote cast yet — leave userVote empty
-			default:
-				return nil, fmt.Errorf("user vote: %w", verr)
-			}
-			ans.Vote = &VoteCellView{AnswerID: a.ID, Score: int(a.TotalScore), UserVote: userVote}
-		}
-
 		if a.CreatedAt.Valid {
 			ans.CreatedAt = a.CreatedAt.Time
 		}
@@ -328,6 +327,36 @@ func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswer
 			t := a.EditedAt.Time
 			ans.EditedAt = &t
 		}
+
+		// A soft-deleted answer (only admins ever see one) carries no
+		// interactive controls — just the muted body and a Restore button the
+		// template adds. Live answers get the full set, gated to match the
+		// write handlers so the UI never offers an action the POST rejects.
+		if !ans.Deleted {
+			ans.CanAccept = rc.canAccept
+			ans.CanEdit = s.canEditAs(rc.curr, rc.localID, a.AuthorUserID, ans.CreatedAt, !rc.open)
+			ans.CanDelete = s.canDeleteAnswer(rc.curr, rc.localID, a.AuthorUserID, rc.open)
+
+			// Interactive vote cell for a signed-in viewer on an open question
+			// — but never on their own answer, which the score trigger forbids
+			// them from voting. Anonymous viewers and self-answers fall through
+			// to the read-only score.
+			mine := a.AuthorUserID != nil && *a.AuthorUserID == rc.localID
+			if rc.authed && rc.open && !mine {
+				userVote := ""
+				v, verr := q.GetUserVote(ctx, store.GetUserVoteParams{AnswerID: a.ID, UserID: rc.localID})
+				switch {
+				case verr == nil:
+					userVote = string(v.Value)
+				case errors.Is(verr, pgx.ErrNoRows):
+					// no vote cast yet — leave userVote empty
+				default:
+					return nil, fmt.Errorf("user vote: %w", verr)
+				}
+				ans.Vote = &VoteCellView{AnswerID: a.ID, Score: int(a.TotalScore), UserVote: userVote}
+			}
+		}
+
 		out[i] = ans
 	}
 	return out, nil

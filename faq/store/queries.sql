@@ -231,6 +231,7 @@ SELECT * FROM faq_answers WHERE id = @id;
 SELECT *, (COALESCE(imported_score, 0) + local_score)::INTEGER AS total_score
 FROM faq_answers
 WHERE question_id = @question_id
+  AND (deleted_at IS NULL OR @include_deleted::BOOLEAN)
 ORDER BY total_score DESC, created_at ASC;
 
 -- ---------------------------------------------------------------------------
@@ -270,6 +271,18 @@ SET body_md             = @body_md,
     locally_modified    = TRUE,
     updated_at          = now()
 WHERE id = @id;
+
+-- name: SoftDeleteAnswer :execrows
+UPDATE faq_answers
+SET deleted_at = now(),
+    updated_at = now()
+WHERE id = @id AND deleted_at IS NULL;
+
+-- name: RestoreAnswer :execrows
+UPDATE faq_answers
+SET deleted_at = NULL,
+    updated_at = now()
+WHERE id = @id AND deleted_at IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Votes

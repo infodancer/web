@@ -1,5 +1,5 @@
 {{- /* Answer */ -}}
-<li class="faq-answer{{if .Accepted}} is-accepted{{end}}" id="faq-a-{{.ID}}">
+<li class="faq-answer{{if .Accepted}} is-accepted{{end}}{{if .Deleted}} is-deleted{{end}}" id="faq-a-{{.ID}}">
 <div class="faq-answer-stats" aria-label="Stats">
 {{- if .Vote -}}
 {{template "partials/vote_cell.gohtml" .Vote}}
@@ -18,6 +18,7 @@
 </form>
 {{- end -}}
 </div>
+<div class="faq-answer-main">
 <div class="faq-answer-body">
 {{.BodyHTML | safe}}
 </div>
@@ -28,10 +29,34 @@ answered by <strong>{{.Author}}</strong>
 · edited <time datetime="{{.EditedAt.Format "2006-01-02T15:04:05Z"}}">{{.EditedAt.Format "Jan 2, 2006"}}</time>
 {{- end -}}
 {{- if .LocallyModified}} · Modified after import.{{end -}}
+{{- if .Deleted}} · <span class="faq-deleted-note">deleted</span>{{end -}}
+{{- if or .CanEdit .CanDelete .Deleted -}}
+<span class="faq-answer-actions">
+{{- if .CanEdit -}}
+<button type="button" class="faq-link-btn"
+        hx-get="../../a/{{.ID}}/edit" hx-target="#faq-a-{{.ID}}" hx-swap="outerHTML">Edit</button>
+{{- end -}}
+{{- if .CanDelete -}}
+<form method="post" action="../../a/{{.ID}}/delete"
+      hx-post="../../a/{{.ID}}/delete" hx-confirm="Delete this answer?"
+      hx-target="closest .faq-q-detail" hx-swap="innerHTML">
+<button type="submit" class="faq-link-btn faq-link-danger">Delete</button>
+</form>
+{{- end -}}
+{{- if .Deleted -}}
+<form method="post" action="../../a/{{.ID}}/restore"
+      hx-post="../../a/{{.ID}}/restore"
+      hx-target="closest .faq-q-detail" hx-swap="innerHTML">
+<button type="submit" class="faq-link-btn">Restore</button>
+</form>
+{{- end -}}
+</span>
+{{- end -}}
 </footer>
 {{- with .Comments -}}
 <ol class="app-comment-list" role="list">
 {{range .}}{{template "partials/comment.gohtml" .}}{{end}}
 </ol>
 {{- end -}}
+</div>
 </li>

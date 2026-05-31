@@ -249,6 +249,16 @@ type Answer struct {
 	// CanAccept is true when the viewer may accept this answer (question owner
 	// or admin, on an open question); it renders the accept/unaccept toggle.
 	CanAccept bool
+
+	// CanEdit / CanDelete gate the author/admin controls in the answer footer:
+	// CanEdit per canEditAs (author within the grace window, or admin),
+	// CanDelete for the author on an open question or an admin.
+	CanEdit   bool
+	CanDelete bool
+
+	// Deleted marks a soft-deleted answer. Only admins ever see one (rendered
+	// muted with a Restore control); the list hides it from everyone else.
+	Deleted bool
 }
 
 // Comment is the rendered representation of one faq_comments row.

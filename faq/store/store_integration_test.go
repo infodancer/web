@@ -165,7 +165,7 @@ func TestListAnswersForQuestion_SortedByTotalScoreDesc(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	answers, err := s.ListAnswersForQuestion(ctx, q.ID)
+	answers, err := s.ListAnswersForQuestion(ctx, store.ListAnswersForQuestionParams{QuestionID: q.ID})
 	require.NoError(t, err)
 	require.Len(t, answers, 2)
 	require.Equal(t, highAns.ID, answers[0].ID, "highest score first")

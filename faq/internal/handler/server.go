@@ -175,6 +175,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("PATCH /a/{id}", s.editAnswerSubmit)
 	s.mux.HandleFunc("POST /a/{id}/vote", s.vote)
 	s.mux.HandleFunc("DELETE /a/{id}/vote", s.unvote)
+	s.mux.HandleFunc("POST /a/{id}/delete", s.deleteAnswer)
+	s.mux.HandleFunc("POST /a/{id}/restore", s.restoreAnswer)
 	s.mux.HandleFunc("POST /q/{id}/comments", s.postQuestionComment)
 	s.mux.HandleFunc("POST /a/{id}/comments", s.postAnswerComment)
 	s.mux.HandleFunc("PATCH /comments/{id}", s.editComment)

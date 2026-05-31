@@ -109,6 +109,22 @@ func (s *Server) canAccept(u *faquser.User, localUserID int64, q store.FaqQuesti
 	return true
 }
 
+// canDeleteAnswer reports whether u may soft-delete the answer authored by
+// authorID. Admins may delete any answer; the author may delete their own while
+// the question is open. Anyone else (and anonymous) is rejected.
+func (s *Server) canDeleteAnswer(u *faquser.User, localUserID int64, authorID *int64, questionOpen bool) bool {
+	if u == nil {
+		return false
+	}
+	if u.Admin {
+		return true
+	}
+	if !questionOpen {
+		return false
+	}
+	return authorID != nil && *authorID == localUserID
+}
+
 // canComment reports whether u may add a new comment under post.
 // Rules:
 //
