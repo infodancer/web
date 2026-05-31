@@ -56,6 +56,12 @@ empty entries are trimmed, so values pulled directly from env vars work.
 The `Reply-To:` header on the outgoing email is set to the visitor's
 address — you hit Reply in your email client and it goes to them.
 
+Optional `Cc`/`Bcc` recipients can be copied on the primary email (see
+[Customization](#customization)). They are configured by the operator and
+never read from the form, so the form can't be used to mail arbitrary
+third parties. `Bcc` addresses receive the message but never appear in any
+header. Confirmation emails to the visitor are never copied.
+
 ## Storage
 
 One table, applied via embedded
@@ -123,6 +129,12 @@ h := handler.New(store, mailer, "to@x", "from@x")
 
 h.HoneypotField = "honeypot"
 h.MaxMessageLen = 50_000
+
+// Operator-configured copy recipients on the primary email. Cc is visible in
+// the headers; Bcc is delivered but never appears in any header. These are set
+// by you, never read from the form, so the form can't mail arbitrary people.
+h.Cc  = handler.ParseAddrList("team@x")
+h.Bcc = handler.ParseAddrList("archive@x")
 
 h.MsgSuccess = `<p class="ok">Thanks!</p>`
 h.MsgInvalid = `<p class="err">Please complete all fields.</p>`
