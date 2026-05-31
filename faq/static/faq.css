@@ -117,3 +117,60 @@
 
 .faq-badge-archived { background: var(--faq-badge-archived-bg); color: var(--faq-badge-archived-fg); }
 .faq-badge-accepted { background: var(--faq-badge-accepted-bg); color: var(--faq-badge-accepted-fg); }
+
+/* ----- interactive controls (votes, accept, answer form) ----- */
+
+.faq-answer-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--app-space-xs);
+}
+
+.faq-vote-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--app-space-xs);
+}
+.faq-vote-up,
+.faq-vote-down,
+.faq-vote-clear,
+.faq-accept-btn {
+  background: none;
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius);
+  color: var(--app-color-fg-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: var(--app-space-xs) var(--app-space-sm);
+}
+.faq-vote-up:hover,
+.faq-vote-down:hover,
+.faq-vote-clear:hover { color: var(--app-color-fg); border-color: var(--app-color-accent, #c44); }
+.faq-vote-up.is-active { color: var(--app-color-success); border-color: var(--app-color-success); }
+.faq-vote-down.is-active { color: var(--app-color-danger, #c0392b); border-color: var(--app-color-danger, #c0392b); }
+.faq-vote-score { font-weight: 600; color: var(--app-color-fg); }
+.faq-vote-clear { font-size: 0.75rem; }
+
+.faq-accept-btn { font-size: 0.8rem; }
+.faq-accept-btn:hover,
+.faq-accept-btn.is-accepted { color: var(--app-color-success); border-color: var(--app-color-success); }
+
+.faq-form-answer {
+  margin-top: var(--app-space-lg);
+  display: grid;
+  gap: var(--app-space-sm);
+}
+.faq-form-answer textarea {
+  width: 100%;
+  font: inherit;
+  padding: var(--app-space-sm);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius);
+}
+
+.faq-signin-prompt {
+  margin-top: var(--app-space-lg);
+  color: var(--app-color-fg-muted);
+}

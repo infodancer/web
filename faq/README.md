@@ -58,11 +58,16 @@ deployment and the module renders a complete default page from
 (Tags / Search / Ask) as the left sidebar; it owns the FAQ content, not the
 surrounding chrome.
 
+The module owns no login flow, so set `Config.SignInURL` to the host's login
+URL: an anonymous visitor on an open question then gets a linked "sign in to
+post an answer" prompt (plain text when unset).
+
 ```go
 mod, err := faq.New(faq.Config{
-    DB:       pool,
-    Resolver: myUserResolver,
-    Chrome:   func(r *http.Request) ui.DocumentData { return host.PageChrome(r) },
+    DB:        pool,
+    Resolver:  myUserResolver,
+    SignInURL: "/login",
+    Chrome:    func(r *http.Request) ui.DocumentData { return host.PageChrome(r) },
 })
 ```
 

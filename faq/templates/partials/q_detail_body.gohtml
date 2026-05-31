@@ -95,4 +95,11 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
 <ol class="faq-answer-list" role="list">
 {{range .Answers}}{{template "partials/answer.gohtml" .}}{{end}}
 </ol>
+{{- if eq $q.Status "open" -}}
+{{- if .AnswerForm -}}
+{{template "partials/answer_form.gohtml" .AnswerForm}}
+{{- else -}}
+<p class="faq-signin-prompt">{{with .SignInURL}}<a href="{{.}}">Sign in</a>{{else}}Sign in{{end}} to post an answer.</p>
+{{- end -}}
+{{- end -}}
 </section>
