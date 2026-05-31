@@ -130,7 +130,20 @@ func (s *Server) loadDetail(ctx context.Context, id int64, curr *faquser.User, c
 			return fmt.Errorf("answers: %w", err)
 		}
 
-		answers, err := buildAnswers(ctx, q, ansRows, row.AcceptedAnswerID)
+		// Viewer state drives the interactive controls (answer form, vote
+		// cells, accept toggle). canAccept reuses the same gate the accept
+		// handler enforces, so the UI never offers an action the POST rejects.
+		authed := curr != nil
+		open := row.Status == store.FaqQuestionStatusOpen
+		canAccept := s.canAccept(curr, currLocalID, row)
+
+		answers, err := buildAnswers(ctx, q, ansRows, row.AcceptedAnswerID, answerRenderCtx{
+			questionID: row.ID,
+			localID:    currLocalID,
+			authed:     authed,
+			open:       open,
+			canAccept:  canAccept,
+		})
 		if err != nil {
 			return err
 		}
@@ -221,7 +234,14 @@ func (s *Server) loadDetail(ctx context.Context, id int64, curr *faquser.User, c
 			Source:               attr,
 			CanEdit:              s.canEditAs(curr, currLocalID, row.AuthorUserID, createdAt, row.Status == store.FaqQuestionStatusLocked),
 			IsAdmin:              curr != nil && curr.Admin,
+			Authed:               authed,
+			CanAnswer:            authed && open,
+			CanAccept:            canAccept,
+			SignInURL:            s.deps.SignInURL,
 			CanonicalSubsiteSlug: canonicalSubsiteSlug,
+		}
+		if view.CanAnswer {
+			view.AnswerForm = &AnswerFormView{QuestionID: row.ID}
 		}
 		return nil
 	})
@@ -241,7 +261,17 @@ func (s *Server) loadDetail(ctx context.Context, id int64, curr *faquser.User, c
 	return view, nil
 }
 
-func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswersForQuestionRow, accepted *int64) ([]Answer, error) {
+// answerRenderCtx carries the per-viewer state buildAnswers needs to decide
+// which interactive controls each answer renders.
+type answerRenderCtx struct {
+	questionID int64
+	localID    int64 // viewer's faq_users.id, 0 when anonymous
+	authed     bool
+	open       bool // question is open (not locked/deleted)
+	canAccept  bool // viewer may accept answers on this question
+}
+
+func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswersForQuestionRow, accepted *int64, rc answerRenderCtx) ([]Answer, error) {
 	out := make([]Answer, len(rows))
 	for i, a := range rows {
 		authorName, err := resolveAuthor(ctx, q, a.AuthorUserID, a.ImportedAuthorID)
@@ -260,6 +290,7 @@ func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswer
 
 		ans := Answer{
 			ID:              a.ID,
+			QuestionID:      rc.questionID,
 			BodyHTML:        a.BodyHtml,
 			Score:           int(a.TotalScore),
 			Accepted:        accepted != nil && *accepted == a.ID,
@@ -268,7 +299,28 @@ func buildAnswers(ctx context.Context, q *store.Queries, rows []store.ListAnswer
 			LocallyModified: a.LocallyModified,
 			NeedsReview:     a.NeedsReview,
 			Comments:        comments,
+			CanAccept:       rc.canAccept,
 		}
+
+		// Interactive vote cell for a signed-in viewer on an open question —
+		// but never on their own answer, which the score trigger forbids them
+		// from voting (rendering the buttons would just earn a 403). Anonymous
+		// viewers and self-answers fall through to the read-only score.
+		mine := a.AuthorUserID != nil && *a.AuthorUserID == rc.localID
+		if rc.authed && rc.open && !mine {
+			userVote := ""
+			v, verr := q.GetUserVote(ctx, store.GetUserVoteParams{AnswerID: a.ID, UserID: rc.localID})
+			switch {
+			case verr == nil:
+				userVote = string(v.Value)
+			case errors.Is(verr, pgx.ErrNoRows):
+				// no vote cast yet — leave userVote empty
+			default:
+				return nil, fmt.Errorf("user vote: %w", verr)
+			}
+			ans.Vote = &VoteCellView{AnswerID: a.ID, Score: int(a.TotalScore), UserVote: userVote}
+		}
+
 		if a.CreatedAt.Valid {
 			ans.CreatedAt = a.CreatedAt.Time
 		}

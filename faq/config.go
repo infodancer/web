@@ -43,6 +43,13 @@ type Config struct {
 	// nav alongside SiteName. Empty omits the image entirely.
 	LogoURL string
 
+	// SignInURL is the host's login URL. The module owns no login flow, so
+	// when an anonymous visitor lands on an open question the detail page
+	// shows a "sign in to post an answer" prompt that links here. Empty
+	// renders the prompt as plain text (the host nav still carries its own
+	// sign-in affordance), so a standalone faq stays usable.
+	SignInURL string
+
 	// Chrome, when set, supplies the full host page chrome (nav, footer, meta,
 	// theme, analytics, asset base, head tags) per request as a ui.DocumentData
 	// that pages render through ui/document. A host site sets this to inject its

@@ -44,6 +44,10 @@ type Deps struct {
 	HomeURL  string
 	LogoURL  string
 
+	// SignInURL is the host's login URL, used for the anonymous "sign in to
+	// post an answer" prompt on open questions. Empty renders plain text.
+	SignInURL string
+
 	// Chrome, when set, supplies the full host page chrome per request as a
 	// ui.DocumentData rendered through ui/document. nil falls back to the
 	// SiteName/HomeURL-derived default (see [Server.baseView]).

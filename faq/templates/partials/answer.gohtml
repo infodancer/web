@@ -1,9 +1,21 @@
 {{- /* Answer */ -}}
 <li class="faq-answer{{if .Accepted}} is-accepted{{end}}" id="faq-a-{{.ID}}">
 <div class="faq-answer-stats" aria-label="Stats">
+{{- if .Vote -}}
+{{template "partials/vote_cell.gohtml" .Vote}}
+{{- else -}}
 <span class="faq-answer-score">{{.Score}}<small> score</small></span>
+{{- end -}}
 {{- if .Accepted -}}
 <span class="app-badge faq-badge-accepted" title="Accepted answer">Accepted</span>
+{{- end -}}
+{{- if .CanAccept -}}
+<form class="faq-accept" method="post" action="../../q/{{.QuestionID}}/accept"
+      hx-post="../../q/{{.QuestionID}}/accept"
+      hx-target="closest .faq-q-detail" hx-swap="innerHTML">
+<input type="hidden" name="answer_id" value="{{.ID}}">
+<button type="submit" class="faq-accept-btn{{if .Accepted}} is-accepted{{end}}">{{if .Accepted}}Unaccept{{else}}Accept{{end}}</button>
+</form>
 {{- end -}}
 </div>
 <div class="faq-answer-body">

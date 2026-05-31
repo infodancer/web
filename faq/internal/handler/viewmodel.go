@@ -171,6 +171,22 @@ type QuestionDetailView struct {
 	CanEdit  bool
 	IsAdmin  bool
 
+	// Authed is true when a signed-in user is viewing. CanAnswer is true when
+	// that user may post an answer (signed in and the question is open);
+	// CanAccept is true when they may accept an answer (owner or admin, open).
+	Authed    bool
+	CanAnswer bool
+	CanAccept bool
+
+	// AnswerForm is the post-an-answer form model, non-nil exactly when
+	// CanAnswer. The detail body renders it under the answer list; when nil on
+	// an open question the body shows the sign-in prompt instead.
+	AnswerForm *AnswerFormView
+
+	// SignInURL is the host login URL for the anonymous sign-in prompt; empty
+	// renders the prompt as plain text.
+	SignInURL string
+
 	// CanonicalSubsiteSlug is the slug of the question's canonical subsite
 	// per D8.3, or empty when the global /q URL is canonical (the question
 	// matches zero or multiple subsites and has no native subsite_id).
@@ -213,6 +229,7 @@ type Question struct {
 // Answer is the rendered representation of one faq_answers row.
 type Answer struct {
 	ID              int64
+	QuestionID      int64
 	BodyHTML        string
 	Score           int
 	Accepted        bool
@@ -223,6 +240,15 @@ type Answer struct {
 	LocallyModified bool
 	NeedsReview     bool
 	Comments        []Comment
+
+	// Vote, when non-nil, renders the interactive up/down vote cell for the
+	// current viewer; nil shows the read-only score (anonymous viewers, or the
+	// viewer's own answer, which the DB trigger forbids them from voting on).
+	Vote *VoteCellView
+
+	// CanAccept is true when the viewer may accept this answer (question owner
+	// or admin, on an open question); it renders the accept/unaccept toggle.
+	CanAccept bool
 }
 
 // Comment is the rendered representation of one faq_comments row.

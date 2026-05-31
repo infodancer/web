@@ -80,6 +80,7 @@ func New(cfg Config) (*Module, error) {
 		SiteName:     cfg.SiteName,
 		HomeURL:      cfg.HomeURL,
 		LogoURL:      cfg.LogoURL,
+		SignInURL:    cfg.SignInURL,
 		Chrome:       cfg.Chrome,
 		PageSize:     cfg.PageSize,
 		Static:       overlayStatic(withUIAssets(staticFiles), cfg.Static),
