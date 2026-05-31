@@ -523,3 +523,38 @@ func TestM6c_DetailPage_AdminCurateBlock(t *testing.T) {
 	require.Contains(t, body, "Aphid")  // pinned
 	require.Contains(t, body, "Beaver") // available to pin
 }
+
+// An admin viewing an unpinned question sees no "Pinned into" heading or empty
+// placeholder — just the Pin form when subsites exist, and no block at all when
+// none do.
+func TestM6c_DetailPage_NotPinnedHidesHeading(t *testing.T) {
+	ctx := context.Background()
+	srv, st := freshServer(t, withResolver(adminUser("root")))
+	alice := mustHandlerUser(t, st, "alice")
+	q, err := st.CreateQuestion(ctx, store.CreateQuestionParams{
+		Title: "T", BodyMd: "b", BodyHtml: "<p>b</p>", AuthorUserID: &alice.ID,
+	})
+	require.NoError(t, err)
+
+	get := func() string {
+		rec := httptest.NewRecorder()
+		srv.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet,
+			"/q/"+strconv.FormatInt(q.ID, 10), nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		return rec.Body.String()
+	}
+
+	// No subsites at all → no curation block.
+	body := get()
+	require.NotContains(t, body, "Pinned into")
+	require.NotContains(t, body, "Not pinned to any subsite")
+	require.NotContains(t, body, "faq-admin-curate")
+
+	// A subsite exists but the question is not pinned → Pin form only, no heading.
+	_, err = st.CreateSubsite(ctx, store.CreateSubsiteParams{Slug: "x", DisplayName: "Xeno"})
+	require.NoError(t, err)
+	body = get()
+	require.NotContains(t, body, "Pinned into", "no heading when the question isn't pinned")
+	require.Contains(t, body, "Pin into subsite")
+	require.Contains(t, body, "Xeno")
+}
