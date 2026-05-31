@@ -355,11 +355,11 @@ func TestHeaderInjectionScrubbed(t *testing.T) {
 	if strings.Contains(msgs[0].Subject, "\n") || strings.Contains(msgs[0].Subject, "\r") {
 		t.Errorf("subject still contains line break: %q", msgs[0].Subject)
 	}
-	if strings.Contains(msgs[0].Body, "Bcc: leak") {
-		// Body templates render the name; ensure no header bleed-through happens.
-		// Header injection would only matter if the body string is reused as headers,
-		// but the From: header itself comes from h.From, not the template, so this
-		// is informational rather than a fail.
-		t.Logf("note: body contains user-provided string with what looks like a header — expected since body is plain text")
+	// The name is rendered into the body template. The handler strips CR/LF from
+	// it, so the injected "Bcc:" must not survive as its own line — it should be
+	// folded onto the From: line instead. (The SMTP layer scrubs headers too; see
+	// smtp.TestBuildRFC5322_HeaderInjectionScrubbed.)
+	if strings.Contains(msgs[0].Body, "\nBcc: leak") || strings.Contains(msgs[0].Body, "\rBcc: leak") {
+		t.Errorf("injected header survived as a body line: %q", msgs[0].Body)
 	}
 }
