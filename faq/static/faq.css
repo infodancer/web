@@ -174,3 +174,41 @@
   margin-top: var(--app-space-lg);
   color: var(--app-color-fg-muted);
 }
+
+/* ----- action bars + author controls ----- */
+
+/* Question Edit/Lock/Delete sit in one horizontal row. */
+.faq-mod-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-sm);
+  margin-top: var(--app-space);
+}
+.faq-mod-bar form { margin: 0; }
+
+/* The answer body, footer, and comments share the wide column. */
+.faq-answer-main { min-width: 0; }
+
+/* Author/admin actions in the answer footer: text-style buttons inline with
+   the "answered by …" line. */
+.faq-answer-actions {
+  display: inline-flex;
+  gap: var(--app-space-sm);
+  margin-left: var(--app-space-sm);
+}
+.faq-answer-actions form { display: inline; margin: 0; }
+.faq-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--app-color-accent, #c44);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.faq-link-danger { color: var(--app-color-danger, #c0392b); }
+
+/* A soft-deleted answer (admins only) renders muted. */
+.faq-answer.is-deleted { opacity: 0.6; border-style: dashed; }
+.faq-deleted-note { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }

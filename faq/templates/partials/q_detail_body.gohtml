@@ -29,8 +29,13 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
 {{- if $.Question.LocallyModified }} · Modified after import.{{end -}}
 </p>
 {{- end -}}
+{{- if or .CanEdit .IsAdmin -}}
+<div class="faq-mod-bar" role="group" aria-label="Actions">
+{{- if .CanEdit -}}
+<button type="button" class="faq-mod-btn faq-mod-edit"
+        hx-get="../../q/{{$q.ID}}/edit" hx-target="#faq-q-{{$q.ID}}" hx-swap="outerHTML">Edit</button>
+{{- end -}}
 {{- if .IsAdmin -}}
-<div class="faq-mod-bar" role="group" aria-label="Moderation">
 {{- if eq $q.Status "open" -}}
 <form method="post" action="../../q/{{$q.ID}}/lock"
       hx-post="../../q/{{$q.ID}}/lock"
@@ -49,7 +54,9 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
       hx-confirm="Delete this question? Admins can restore from /admin/deleted.">
 <button type="submit" class="faq-mod-btn faq-mod-delete">Delete</button>
 </form>
+{{- end -}}
 </div>
+{{- if .IsAdmin -}}
 {{- with .AdminCurate -}}
 <aside class="faq-admin-curate" aria-label="Subsite curation">
 <h2>Pinned into</h2>
@@ -78,6 +85,7 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
 </form>
 {{- end -}}
 </aside>
+{{- end -}}
 {{- end -}}
 {{- end -}}
 </article>
