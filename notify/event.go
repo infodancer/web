@@ -70,6 +70,15 @@ type Event struct {
 	Actor   *Identity // who caused the event; nil means system/anonymous
 	Subject *Identity // who or what the event concerns; optional
 
+	// Recipients fans the event out to specific users. Empty preserves the
+	// admin-firehose behaviour (the event is recorded once and read via the
+	// admin feed only); a non-empty slice additionally writes one
+	// notify_user_notifications row per recipient, each with its own
+	// read/dismiss state, queryable via [Store.UserFeed]. A recipient with an
+	// empty Subject is skipped. Recipients and Audience are orthogonal: an
+	// event may be user-targeted, admin-visible, or both.
+	Recipients []Identity
+
 	// Payload is free-form and stored as JSONB. It must be JSON-marshalable.
 	Payload map[string]any
 
