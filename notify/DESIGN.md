@@ -88,7 +88,11 @@ there is no import cycle; the root maps domain types to/from generated types.
 - Host calls `Migrate` once at startup and constructs an emitter, calling
   `Emit` at each event point and the returned `drain` on shutdown.
 - Phase 2 admin UI: the host gates access with its own auth and injects an
-  identity resolver; notify owns no authentication.
+  identity resolver; notify owns no authentication. The feed page renders
+  through infodancer/ui's `ui/document`, so the host supplies the page chrome
+  (nav/footer/meta/analytics) via `Config.Chrome` and the UI matches the rest
+  of the site; the unread bell is the `GET /bell` fragment the host embeds in
+  its own nav (notify draws no nav of its own).
 
 ## Risks (accepted)
 
