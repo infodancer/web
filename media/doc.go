@@ -13,19 +13,30 @@
 // and served with Content-Type, X-Content-Type-Options: nosniff, immutable
 // caching, and ETag.
 //
+// Images are partitioned by category — a server-side bucket like "campaign",
+// "creature", or "character", fixed per handler and never set by the client.
+// One configured store serves every category; a host registers one handler per
+// category, giving physical separation (<root>/<category>/ab/cd/<hash> on disk,
+// a composite key in the database) alongside the content address. An upload is
+// always tied to some owning record the user may write to (e.g. a campaign);
+// the host's authorize hook supplies that record's id (the subject) and the
+// permission check.
+//
 // The host integration surface follows the suite mount contract:
 //
 //   - [Process] is the pure validation/transform pipeline (no database).
 //   - [NewStore] wraps a pgx pool for object metadata; [NewPostgresBlobStore]
-//     stores the bytes (default backend) behind the [BlobStore] seam, so a
-//     filesystem/object-store backend can replace it later.
-//   - [NewHandler] returns the upload (POST) + serve (GET) routes to mount.
+//     stores the bytes (default backend) behind the [BlobStore] seam, with
+//     [NewFilesystemBlobStore] as a disk alternative.
+//   - [NewHandler] returns the upload (POST) + serve (GET) routes to mount; its
+//     [Config] fixes the category and the authorize hook.
 //   - [Migrate] installs the schema under a dedicated goose version table so it
 //     coexists with the host's own schema.
 //
 // Authentication, authorization, CSRF, and rate-limit policy belong to the
-// host, exposed as hooks on [Config]. Owner identity is recorded as an opaque
-// host-defined string, never a foreign key into a host table.
+// host, exposed as hooks on [Config]. The category and the owning record
+// (subject) are opaque host-defined strings, never foreign keys into a host
+// table.
 //
 // See DESIGN.md for architecture and rationale.
 package media

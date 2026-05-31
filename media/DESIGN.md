@@ -37,6 +37,28 @@ tables, sqlc + pgx/v5). It is *not* in `infodancer/ui` — that repo is the
 front-end visual layer; the store/serve service belongs with the other
 backend components.
 
+### Categories: server-side buckets, one handler each
+
+An image is never a free-floating upload. It is always tied to some owning
+record (a campaign, a creature, a character) the user may write to, and that
+record's *kind* is the **category**. Two rules follow:
+
+- **The category is server-side, never client-set.** It is `Config.Category`,
+  fixed when a handler is built — `NewHandler` rejects a missing or invalid one.
+  A host registers one handler per category over a single shared store
+  ("configure the store once, categories within it"). The category reaches the
+  URL only because the host mounts that handler at a category path and points
+  `PublicBaseURL` there; the wire never carries it.
+- **An upload must be authorized against an existing record.** `Config.Authorize`
+  returns the owning record's id (the *subject*, derived server-side from the
+  request) and whether the user may write to it; `ok=false` rejects the upload.
+  The subject is recorded in metadata, and `Store.ListBySubject` returns a
+  record's images.
+
+This gives a degree of logical separation that does not rely on a metadata
+column alone: campaign images and creature images are physically apart, on disk
+and in the key.
+
 ### Byte storage: Postgres `bytea` behind a `BlobStore` seam
 
 Bytes live in Postgres (`bytea`) by default — consistent with the suite's
@@ -45,29 +67,31 @@ metadata, and backed up with the database. At portfolio scale (personal sites,
 session-notes images capped at a few MB) this is fine, and content-addressed
 URLs with immutable caching keep origin reads rare.
 
-A `BlobStore` interface isolates byte storage so a filesystem or object-store
-backend can be added later without touching the pipeline or the metadata:
+A `BlobStore` interface isolates byte storage, keyed by `(category, hash)` so
+one configured store serves every category and a filesystem or object-store
+backend can be added without touching the pipeline or the metadata:
 
 ```go
 type BlobStore interface {
-    Put(ctx context.Context, hash string, contentType string, data []byte) error
-    Get(ctx context.Context, hash string) (data []byte, contentType string, err error)
-    Has(ctx context.Context, hash string) (bool, error)
+    Put(ctx context.Context, category, hash, contentType string, data []byte) error
+    Get(ctx context.Context, category, hash string) (data []byte, contentType string, err error)
+    Has(ctx context.Context, category, hash string) (bool, error)
 }
 ```
 
-Metadata (`media_objects`: hash, content_type, width, height, byte_size, owner,
-created_at) is always in Postgres; only the bytes move when the backend is
-swapped. Shipped backends:
+Metadata (`media_objects`, keyed `(category, hash)`: content_type, width,
+height, byte_size, subject, created_at) is always in Postgres; only the bytes
+move when the backend is swapped. Shipped backends:
 
-- `PostgresBlobStore` — bytes in `media_blobs` (default).
-- `FilesystemBlobStore` — bytes on disk under a root dir, content-addressed and
-  sharded `<root>/ab/cd/<hash>` with a content-type sidecar and atomic
+- `PostgresBlobStore` — bytes in `media_blobs` (default), keyed `(category, hash)`.
+- `FilesystemBlobStore` — bytes on disk, content-addressed and category-sharded
+  `<root>/<category>/ab/cd/<hash>` with a content-type sidecar and atomic
   (temp-file + rename) writes. This is the same "image files under a root"
   posture osg uses for chronicle images, adapted to the content-addressed
-  model; the hash is validated (`looksLikeHash`) before any path is built, so
-  traversal is impossible, and bytes are still served through the handler
-  (Content-Type + nosniff), never via a bare directory listing.
+  model; the category (`ValidCategory`) and hash (`looksLikeHash`) are validated
+  before any path is built, so traversal is impossible, and bytes are still
+  served through the handler (Content-Type + nosniff), never via a bare
+  directory listing. An empty category drops the prefix (`<root>/ab/cd/<hash>`).
 - `MemoryBlobStore` — in-memory, for tests and no-database dev mounts.
 
 ### Transform policy: re-encode raster; reject SVG and animated
@@ -125,25 +149,33 @@ HTTP ⇆ pipeline.
 ## Host integration surface
 
 ```go
-store := media.NewStore(pool)               // metadata, Postgres
-blobs := media.NewPostgresBlobStore(pool)    // bytes, Postgres (default)
-h := media.NewHandler(store, blobs, media.Config{
+media.Migrate(ctx, pool)
+store := media.NewStore(pool)               // metadata, shared
+blobs := media.NewPostgresBlobStore(pool)    // bytes, shared (default)
+
+// One handler per category over the shared store.
+h, err := media.NewHandler(store, blobs, media.Config{
+    Category:       "campaign",             // fixed, server-side
     MaxUploadBytes: 10 << 20,
     MaxPixels:      25_000_000,
-    PublicBaseURL:  "/media",                // or "https://cdn.example.com"
-    Authorize:      func(r *http.Request) (owner string, ok bool) { ... },
+    PublicBaseURL:  "/media/campaign",      // where THIS handler's GET is mounted
+    Authorize: func(r *http.Request) (subject string, ok bool) {
+        id := r.PathValue("campaign")       // the owning record, from the host route
+        return id, host.MayEditCampaign(r, id)
+    },
 })
-mux.Handle("/media/", http.StripPrefix("/media", h.Routes()))
-media.Migrate(ctx, pool)
+mux.Handle("/media/campaign/", http.StripPrefix("/media/campaign", h.Routes()))
 ```
 
 - `POST {mount}` — multipart field `image`. Runs the pipeline; on success
-  `201` + JSON `{ "url": "...", "width": N, "height": N }`. mdedit's adapter
-  inserts `![](url)`.
-- `GET {mount}/{hash}` — serves the bytes with the headers above.
-- `Authorize` gates uploads (host auth); a rate-limit hook guards public
-  intake. CSRF on the upload POST is the host's responsibility, per the suite
-  conventions (the handler verifies `Origin`/`Referer` when configured).
+  `201` + JSON `{ "url": "...", "width": N, "height": N }` (the `url` under this
+  handler's `PublicBaseURL`). mdedit's adapter inserts `![](url)`.
+- `GET {mount}/{hash}` — serves the bytes (scoped to this handler's category)
+  with the headers above.
+- `Authorize` gates uploads and names the owning record (host auth); a
+  rate-limit hook guards public intake. CSRF on the upload POST is the host's
+  responsibility, per the suite conventions (the handler also enforces a
+  same-origin guard).
 
 ## Testing
 

@@ -36,11 +36,19 @@ contained.
   content-addressed `ETag` with immutable caching. A configurable public base
   URL lets a host serve from a separate origin or CDN for defense in depth.
 
+- **Category is server-side; uploads are tied to a record.** The category
+  (`Config.Category`) is fixed per handler and never read from client input, so
+  a client cannot direct bytes into another bucket. An upload is always tied to
+  an owning record the user may write to: `Config.Authorize` returns that
+  record's id and the permission decision, and `ok=false` rejects the upload —
+  there are no free-floating uploads. The category and subject are opaque
+  host-defined strings (`ValidCategory` constrains the category to a safe path
+  segment), never foreign keys into a host table.
+
 - **Boundaries the host owns.** Authentication, authorization, CSRF, and the
   rate-limit policy on the public intake are the host's responsibility, exposed
   as hooks on `Config`. The handler enforces a same-origin guard and the
-  `Authorize` gate, but does not decide who may upload. Owner identity is an
-  opaque host-defined string, never a foreign key into a host table.
+  `Authorize` gate, but does not decide who may upload.
 
 - **The corpus is the contract.** `image_test.go` carries a malicious-upload
   corpus (polyglots, SVG, animated, decompression bomb, oversize, garbage,

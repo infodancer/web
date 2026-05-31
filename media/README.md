@@ -35,40 +35,63 @@ bomb. `media` concentrates that risk in one audited, tested place, the way
    static GIF; q85 JPEG for JPEG and WebP) — strips EXIF, kills polyglots.
 7. Content-address by SHA-256; identical uploads dedupe.
 
-## Mount it
+## Categories — server-side, one handler each
+
+An image is never a free-floating upload: it is tied to some owning record (a
+campaign, a creature, a character) that the user may write to, and that
+record's *kind* is the **category**. The category is a property of the mount,
+not the request — the client never sets it. You configure the store once and
+register one handler per category over it:
 
 ```go
 pool := /* the host's *pgxpool.Pool */
 if err := media.Migrate(ctx, pool); err != nil { /* ... */ }
 
-h := media.NewHandler(
-    media.NewStore(pool),            // metadata
-    media.NewPostgresBlobStore(pool), // bytes (default backend)
-    media.Config{
-        MaxUploadBytes: 10 << 20,
-        MaxPixels:      25_000_000,
-        PublicBaseURL:  "/media",     // or "https://cdn.example.com/media"
-        Authorize:      func(r *http.Request) (owner string, ok bool) { /* host auth */ },
+store := media.NewStore(pool)             // metadata, shared
+blobs := media.NewPostgresBlobStore(pool) // bytes, shared (default backend)
+
+campaignImages, err := media.NewHandler(store, blobs, media.Config{
+    Category:       "campaign",            // fixed, server-side
+    MaxUploadBytes: 10 << 20,
+    MaxPixels:      25_000_000,
+    PublicBaseURL:  "/media/campaign",     // where THIS handler's GET is mounted
+    // Authorize gates the upload and names the owning record (subject). The
+    // host derives the campaign id from its own route/session and checks write
+    // permission; ok=false rejects the upload.
+    Authorize: func(r *http.Request) (subject string, ok bool) {
+        id := r.PathValue("campaign")      // from the host's route
+        return id, host.MayEditCampaign(r, id)
     },
-)
-mux.Handle("/media/", http.StripPrefix("/media", h.Routes()))
+})
+mux.Handle("/media/campaign/", http.StripPrefix("/media/campaign", campaignImages.Routes()))
+// ...and likewise a "creature" handler, a "character" handler, etc.
 ```
+
+Bytes land at `<root>/campaign/ab/cd/<hash>` (or the `media_*` tables keyed by
+`(category, hash)`), physically separating campaign images from creature images
+rather than relying on a metadata column alone.
 
 - `POST {mount}/` — multipart field `image`. On success: `201` + JSON
   `{ "url": "...", "width": N, "height": N }`. mdedit's adapter inserts
-  `![](url)`.
-- `GET {mount}/{hash}[.ext]` — serves the bytes with `Content-Type`,
-  `X-Content-Type-Options: nosniff`, immutable `Cache-Control`, and `ETag`.
+  `![](url)`. The `url` sits under this handler's `PublicBaseURL`, so the
+  category is in the URL because the host mounted the handler there.
+- `GET {mount}/{hash}[.ext]` — serves the bytes (scoped to this handler's
+  category) with `Content-Type`, `X-Content-Type-Options: nosniff`, immutable
+  `Cache-Control`, and `ETag`.
+
+`media.Store.ListBySubject(ctx, category, subject)` returns every image tied to
+one record (e.g. all images for one campaign).
 
 ## Storage
 
-Bytes default to Postgres `bytea`, behind the `BlobStore` seam:
+Bytes default to Postgres `bytea`, behind the `BlobStore` seam (every method
+takes the category, so one store serves them all):
 
 ```go
 type BlobStore interface {
-    Put(ctx, hash, contentType string, data []byte) error
-    Get(ctx, hash string) (data []byte, contentType string, err error)
-    Has(ctx, hash string) (bool, error)
+    Put(ctx, category, hash, contentType string, data []byte) error
+    Get(ctx, category, hash string) (data []byte, contentType string, err error)
+    Has(ctx, category, hash string) (bool, error)
 }
 ```
 
@@ -76,10 +99,10 @@ Backends, all behind the same seam (swap one for another with no other change):
 
 - `PostgresBlobStore` — bytes in Postgres `bytea` (default).
 - `FilesystemBlobStore` — bytes on disk under a root dir, content-addressed and
-  sharded (`<root>/ab/cd/<hash>`) with a content-type sidecar; the same
-  filesystem-image posture osg uses, with atomic writes. Bytes are still served
-  through the handler (so `nosniff` + headers apply), never a bare directory
-  listing.
+  category-sharded (`<root>/<category>/ab/cd/<hash>`) with a content-type
+  sidecar; the same filesystem-image posture osg uses, with atomic writes. Bytes
+  are still served through the handler (so `nosniff` + headers apply), never a
+  bare directory listing.
 - `MemoryBlobStore` — in-memory, for tests and no-database dev mounts.
 
 ```go

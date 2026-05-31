@@ -25,8 +25,13 @@ the mount contract are in the root [`CONVENTIONS.md`](../CONVENTIONS.md).
   content-addressed `ETag`/immutable cache depend on bytes never changing for a
   hash.
 - **The host owns auth/authz/CSRF/rate-limit.** They are `Config` hooks, not
-  module policy. Owner identity is an opaque string — never a foreign key into a
-  host table.
+  module policy. The subject (owning record id) is an opaque string — never a
+  foreign key into a host table.
+- **Category is server-side, never client-set.** It is `Config.Category`, fixed
+  per handler and validated by `NewHandler`; one handler per category over a
+  shared store. The client never names a category, and uploads are always tied
+  to an owning record via `Authorize` (no free-floating uploads). Keep it that
+  way — do not add a client-supplied category path/param.
 - **The `BlobStore` seam stays clean.** Byte storage is swappable; keep the
   pipeline, metadata store, and handler independent of the concrete backend.
 - **Migrations are append-only and namespaced.** New schema goes in a new
