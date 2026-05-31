@@ -58,9 +58,10 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
 </div>
 {{- if .IsAdmin -}}
 {{- with .AdminCurate -}}
+{{- if or .Pinned .Available -}}
 <aside class="faq-admin-curate" aria-label="Subsite curation">
-<h2>Pinned into</h2>
 {{- if .Pinned -}}
+<h2>Pinned into</h2>
 <ul class="faq-admin-curate-list" role="list">
 {{range .Pinned}}
 <li>
@@ -71,8 +72,6 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
 </li>
 {{end}}
 </ul>
-{{- else -}}
-<p class="faq-empty">Not pinned to any subsite.</p>
 {{- end -}}
 {{- if .Available -}}
 <form method="post" action="../../admin/q/{{$q.ID}}/subsites" class="faq-form">
@@ -85,6 +84,7 @@ From <a href="{{.URL}}" rel="nofollow ugc">{{.DisplayName}}</a> · {{.License}}
 </form>
 {{- end -}}
 </aside>
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
