@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -12,14 +11,11 @@ import (
 	"github.com/infodancer/web/notify"
 )
 
-// pageData is the view model shared by the feed page and its fragments.
-type pageData struct {
-	BasePath    string
-	SiteName    string
-	HomeURL     string
-	PageTitle   string
-	HTMXHead    template.HTML
-	PollSeconds int
+// feedData is the feed view model. The full page wraps it in a [view]; the bell
+// and feed-list fragments render it directly, so a poll never builds the page
+// chrome.
+type feedData struct {
+	BasePath string
 
 	Unread int
 	Filter filterVM
@@ -34,6 +30,17 @@ type pageData struct {
 	// page, posted to /seen so "mark all read" advances the cursor exactly to
 	// what the admin saw.
 	NewestCreatedAt string
+}
+
+// view is the full-page envelope. The embedded [ui.DocumentData] carries the
+// host chrome (nav, footer, meta, CSS, analytics, theme, sidebars) that
+// base.gohtml renders through ui/document; Page carries the feed data the
+// content block — and the fragments it includes — reference.
+type view struct {
+	uiassets.DocumentData
+	BasePath  string
+	PageTitle string
+	Page      feedData
 }
 
 type filterVM struct {
@@ -58,8 +65,9 @@ type eventVM struct {
 // feed serves GET / — the admin event feed. Direct navigation gets the full
 // page; an htmx request gets the feed-list fragment.
 func (h *Handler) feed(w http.ResponseWriter, r *http.Request) {
-	id, ok := h.resolve(w, r)
-	if !ok {
+	// Auth gate; the feed page needs no admin identity (the bell, which does,
+	// is the separate GET /bell fragment).
+	if _, ok := h.resolve(w, r); !ok {
 		return
 	}
 	ctx := r.Context()
@@ -72,14 +80,7 @@ func (h *Handler) feed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	unread, err := h.store.AdminUnreadCount(ctx, id)
-	if err != nil {
-		h.log.Error("admin: unread count", "err", err)
-		unread = 0
-	}
-
-	data := h.basePageData()
-	data.Unread = unread
+	data := h.baseFeedData()
 	data.Filter = fvm
 	data.Events = h.toEventVMs(events)
 	if len(events) > 0 {
@@ -94,8 +95,7 @@ func (h *Handler) feed(w http.ResponseWriter, r *http.Request) {
 		h.tpl.render(w, "partials/feed_list.gohtml", data)
 		return
 	}
-	data.PageTitle = "Notifications"
-	h.tpl.render(w, "pages/feed.gohtml", data)
+	h.tpl.render(w, "pages/feed.gohtml", h.buildView(r, "Notifications", data))
 }
 
 // bell serves GET /bell — the unread-count fragment the nav polls.
@@ -109,7 +109,7 @@ func (h *Handler) bell(w http.ResponseWriter, r *http.Request) {
 		h.log.Error("admin: unread count", "err", err)
 		unread = 0
 	}
-	data := h.basePageData()
+	data := h.baseFeedData()
 	data.Unread = unread
 	h.tpl.render(w, "partials/bell.gohtml", data)
 }
@@ -141,7 +141,7 @@ func (h *Handler) seen(w http.ResponseWriter, r *http.Request) {
 		unread = 0
 	}
 	uiassets.Trigger(w, "notify:read")
-	data := h.basePageData()
+	data := h.baseFeedData()
 	data.Unread = unread
 	h.tpl.render(w, "partials/bell.gohtml", data)
 }
@@ -156,13 +156,41 @@ func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) (notify.Identi
 	return id, true
 }
 
-func (h *Handler) basePageData() pageData {
-	return pageData{
-		BasePath:    h.basePath,
-		SiteName:    h.siteName,
-		HomeURL:     h.homeURL,
-		HTMXHead:    template.HTML(h.htmxHead), //nolint:gosec // produced by ui.HeadTags
-		PollSeconds: h.pollSeconds,
+func (h *Handler) baseFeedData() feedData {
+	return feedData{BasePath: h.basePath}
+}
+
+// buildView wraps feed data in the full-page envelope, resolving the host
+// chrome (Config.Chrome) or the module default and tagging it with the page title.
+func (h *Handler) buildView(r *http.Request, title string, data feedData) view {
+	var doc uiassets.DocumentData
+	if h.chrome != nil {
+		doc = h.chrome(r)
+	} else {
+		doc = h.defaultChrome()
+	}
+	if doc.Meta.SiteName == "" {
+		doc.Meta.SiteName = h.siteName
+	}
+	return view{
+		DocumentData: doc,
+		BasePath:     h.basePath,
+		PageTitle:    title,
+		Page:         data,
+	}
+}
+
+// defaultChrome is the standalone chrome used when no host Chrome hook is set:
+// the ui CSS + htmx served from the module's own /static/ui mount, and a brand
+// nav/footer from SiteName/HomeURL.
+func (h *Handler) defaultChrome() uiassets.DocumentData {
+	assetBase := h.basePath + "/static/ui"
+	return uiassets.DocumentData{
+		AssetBase: assetBase,
+		HeadTags:  uiassets.HeadTags(assetBase),
+		Meta:      uiassets.Meta{SiteName: h.siteName},
+		Nav:       uiassets.NavData{BrandText: h.siteName, BrandURL: h.homeURL},
+		Footer:    uiassets.FooterData{BrandText: h.siteName, BrandURL: h.homeURL},
 	}
 }
 

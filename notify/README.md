@@ -72,16 +72,30 @@ h, err := admin.New(admin.Config{
         if !ok { return notify.Identity{}, false }
         return notify.Identity{Issuer: id.Issuer, Subject: id.Subject, Label: id.Email}, true
     }),
+    // Chrome (optional) injects the host's own nav/footer/meta/analytics per
+    // request as a ui.DocumentData; the feed page renders through ui/document
+    // so it matches the rest of the site. nil falls back to a brand chrome
+    // derived from SiteName/HomeURL, so a standalone mount still renders.
+    Chrome: func(r *http.Request) ui.DocumentData { return site.Chrome(r) },
 })
 if err != nil { /* ... */ }
 mux.Handle("/admin/notifications/", http.StripPrefix("/admin/notifications", h.Routes()))
 ```
 
 Routes (relative to `BasePath`): `GET /` (feed page, or a fragment for htmx
-requests), `GET /bell` (unread-count fragment the nav polls), `POST /seen`
-(advance the read cursor), and `GET /static/...` (bundled CSS + vendored htmx,
-served self-contained via infodancer/ui). Embed the bell in your nav with
-`<span hx-get="/admin/notifications/bell" hx-trigger="load, every 30s"></span>`.
+requests), `GET /bell` (unread-count fragment), `POST /seen` (advance the read
+cursor), and `GET /static/...` (bundled CSS + vendored htmx).
+
+**The bell is the host's to place.** The feed page renders through `ui/document`,
+where the host owns the nav — so notify no longer draws the bell itself. Embed
+the `GET /bell` fragment wherever your menu bar lives, and have it refresh on the
+`notify:read` event that `POST /seen` fires (so "Mark all read" updates it live):
+
+```html
+<span id="notify-bell"
+      hx-get="/admin/notifications/bell"
+      hx-trigger="load, every 30s, notify:read from:body"></span>
+```
 
 For a quick local look, `notifyctl serve` mounts the UI with auth stubbed
 (**dev only** — every visitor is admin).

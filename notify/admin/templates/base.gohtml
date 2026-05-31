@@ -1,27 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>{{with .PageTitle}}{{.}} — {{end}}{{.SiteName}}</title>
-<link rel="stylesheet" href="{{.BasePath}}/static/ui/css/tokens.css">
-<link rel="stylesheet" href="{{.BasePath}}/static/ui/css/base.css">
-<link rel="stylesheet" href="{{.BasePath}}/static/notify.css">
-{{.HTMXHead}}
-</head>
-<body class="notify">
-<header class="app-nav notify-header">
-  <a class="app-nav-brand" href="{{.HomeURL}}">{{.SiteName}}</a>
-  <span class="app-nav-sep" aria-hidden="true">/</span>
-  <a class="app-nav-section" href="{{.BasePath}}/">Notifications</a>
-  <span id="notify-bell" class="notify-bell-slot"
-        hx-get="{{.BasePath}}/bell" hx-trigger="load, every {{.PollSeconds}}s">
-    {{template "partials/bell.gohtml" .}}
-  </span>
-</header>
-<main class="app-container notify-main">
-{{template "content" .}}
-</main>
-</body>
-</html>
+{{- /*
+  base.gohtml renders every full notify admin page through infodancer/ui's
+  Layer 2 ui/document, so the chrome (nav, footer, meta, CSS, analytics, theme,
+  sidebars) is owned by ui and skinned per request by the host via Config.Chrome.
+  The page supplies the {{define "content"}} block; the notify chrome partial
+  supplies the title/head blocks; the embedded ui.DocumentData on the view
+  supplies ui/document's chrome fields.
+*/ -}}
+{{ template "ui/document" . }}

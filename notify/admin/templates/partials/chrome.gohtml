@@ -1,0 +1,11 @@
+{{- /*
+  notify's overrides of ui/document's title/head blocks. Parsed after the ui
+  partials (so these win over ui/document's defaults) and before the page.
+  Single-sourced here rather than repeated per page.
+*/ -}}
+{{ define "title" }}{{ with .PageTitle }}{{ . }} — {{ end }}{{ with .Meta.SiteName }}{{ . }}{{ else }}Notifications{{ end }}{{ end }}
+
+{{ define "head" }}
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="{{ .BasePath }}/static/notify.css">
+{{- end }}

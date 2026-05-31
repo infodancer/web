@@ -22,9 +22,12 @@ type templates struct {
 }
 
 // newTemplates parses the embedded template set, overlaying any same-named file
-// found in override (which may be nil). Pages render through base; partials
-// render plain and are looked up by their "partials/<name>.gohtml" logical name.
-func newTemplates(embedded, override fs.FS, log *slog.Logger) (*templates, error) {
+// found in override (which may be nil). uiPartials (also nilable) supplies the
+// infodancer/ui partials — ui/document, ui/nav, ui/footer, ui/meta, ui/sidebar,
+// ui/analytics — parsed into every page tree so base.gohtml can render through
+// ui/document. Pages render through base; partials render plain and are looked
+// up by their "partials/<name>.gohtml" logical name.
+func newTemplates(embedded, override, uiPartials fs.FS, log *slog.Logger) (*templates, error) {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -59,9 +62,19 @@ func newTemplates(embedded, override fs.FS, log *slog.Logger) (*templates, error
 	}
 	sort.Strings(partialNames)
 
+	uiSources, err := readUIPartials(uiPartials)
+	if err != nil {
+		return nil, fmt.Errorf("admin: ui partials: %w", err)
+	}
+
 	t := &templates{pages: map[string]*template.Template{}, log: log}
 	funcs := defaultFuncs()
 
+	// Parse order per page tree: base, then the ui partials (ui/document and
+	// friends register their block defaults), then notify's own partials (the
+	// chrome partial overrides ui/document's title/head defaults), then the
+	// page LAST so its {{define "content"}} wins over ui/document's empty
+	// default. Get this order wrong and ui/document's empty content blanks the page.
 	for n, src := range sources {
 		if n == "base.gohtml" || strings.HasPrefix(n, "partials/") {
 			continue
@@ -70,13 +83,18 @@ func newTemplates(embedded, override fs.FS, log *slog.Logger) (*templates, error
 		if _, err := tpl.Parse(baseSrc); err != nil {
 			return nil, fmt.Errorf("admin: parse base for %s: %w", n, err)
 		}
-		if _, err := tpl.New(n).Parse(src); err != nil {
-			return nil, fmt.Errorf("admin: parse %s: %w", n, err)
+		for uiName, uiSrc := range uiSources {
+			if _, err := tpl.New("__ui__/" + uiName).Parse(uiSrc); err != nil {
+				return nil, fmt.Errorf("admin: parse ui partial %s for %s: %w", uiName, n, err)
+			}
 		}
 		for _, pn := range partialNames {
 			if _, err := tpl.New(pn).Parse(sources[pn]); err != nil {
 				return nil, fmt.Errorf("admin: parse partial %s for %s: %w", pn, n, err)
 			}
+		}
+		if _, err := tpl.New(n).Parse(src); err != nil {
+			return nil, fmt.Errorf("admin: parse %s: %w", n, err)
 		}
 		t.pages[n] = tpl
 		t.partialIndex = tpl
@@ -152,6 +170,28 @@ func walkTemplates(root fs.FS) ([]string, error) {
 		return nil, err
 	}
 	sort.Strings(out)
+	return out, nil
+}
+
+// readUIPartials reads the infodancer/ui partial sources (*.gohtml at the root
+// of the ui PartialsFS). nil yields an empty map, so a caller without ui
+// partials still parses (base.gohtml must then not reference ui/document).
+func readUIPartials(uiPartials fs.FS) (map[string]string, error) {
+	out := map[string]string{}
+	if uiPartials == nil {
+		return out, nil
+	}
+	entries, err := fs.Glob(uiPartials, "*.gohtml")
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range entries {
+		b, err := fs.ReadFile(uiPartials, name)
+		if err != nil {
+			return nil, err
+		}
+		out[name] = string(b)
+	}
 	return out, nil
 }
 
