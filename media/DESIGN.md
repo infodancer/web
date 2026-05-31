@@ -97,18 +97,28 @@ move when the backend is swapped. Shipped backends:
 ### Transform policy: re-encode raster; reject SVG and animated
 
 Allowed input formats: **PNG, JPEG, GIF, WebP**. Every upload is decoded and
-**re-encoded** to a canonical form — lossless PNG for PNG and static GIF, q85
-JPEG for JPEG and WebP. Re-encoding is the strongest available guarantee: it
-strips EXIF (including GPS), discards trailing/leading bytes, and neutralizes
-polyglots (a file that is both a valid GIF and valid HTML/JS does not survive a
-decode→encode round trip).
+**re-encoded** to a canonical form — **lossless WebP (VP8L) for PNG, static GIF,
+and WebP**, and **q85 JPEG for JPEG**. Re-encoding is the strongest available
+guarantee: it strips EXIF (including GPS), discards trailing/leading bytes, and
+neutralizes polyglots (a file that is both a valid GIF and valid HTML/JS does
+not survive a decode→encode round trip).
+
+Why this format split: lossless WebP preserves PNG/GIF/WebP sources (including
+alpha) with no generation loss and is smaller than PNG; encoding a *photographic*
+JPEG losslessly would only bloat it, so JPEG stays JPEG. WebP encoding is pure Go
+([nativewebp](https://github.com/HugoSmits86/nativewebp), VP8L only). A *lossy*
+WebP encoder would need cgo + libwebp — a C image library on the untrusted-image
+path and a break from the single-static-binary / `FROM scratch` posture — and is
+deliberately not used. Consequence: re-encoding an already-lossy WebP losslessly
+yields a somewhat larger file, but adds no further loss. Each WebP side is capped
+at 16383px (the VP8L bitstream limit), checked from the header before decode.
 
 - **SVG is rejected.** It is XML, not a raster format, so it fails the decode
   gate; there is no safe-by-construction SVG, and a sanitized-SVG path is
   deferred until something needs vector images.
 - **Animated GIF is rejected** (detected via multi-frame decode). Static GIF
-  re-encodes to PNG. WebP animation is not preserved (decoded to its first
-  frame) — a documented limitation, not a guarantee.
+  re-encodes to lossless WebP. **Animated WebP is rejected** too — the decoder
+  does not implement the animated VP8X container, so it fails the decode gate.
 
 ### Serving: the module owns the GET handler
 

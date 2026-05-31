@@ -213,7 +213,7 @@ func TestEndToEnd_UploadServe(t *testing.T) {
 	get := httptest.NewRecorder()
 	h.Routes().ServeHTTP(get, httptest.NewRequest(http.MethodGet, path, nil))
 	require.Equal(t, http.StatusOK, get.Code)
-	require.Equal(t, "image/png", get.Header().Get("Content-Type"))
+	require.Equal(t, "image/webp", get.Header().Get("Content-Type")) // PNG re-encodes to WebP
 	require.Equal(t, "nosniff", get.Header().Get("X-Content-Type-Options"))
 	require.NotEmpty(t, get.Body.Bytes())
 }

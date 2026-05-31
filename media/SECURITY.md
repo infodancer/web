@@ -57,7 +57,10 @@ contained.
 
 ## Known limitations (v0.1)
 
-- WebP animation is not preserved (decoded to its first frame) — a limitation,
-  not a guarantee.
-- Re-encoding is lossy for JPEG/WebP sources (q85) by design; the safety win is
-  the deliberate trade.
+- Animated WebP and animated GIF are rejected (animation is not supported), as
+  is SVG.
+- Re-encoding is lossy for JPEG sources (q85) by design; PNG/GIF/WebP re-encode
+  to lossless WebP. The safety win (EXIF/polyglot stripping) is the deliberate
+  trade.
+- A WebP image side may not exceed 16383px (the VP8L bitstream limit); larger
+  sources are refused.

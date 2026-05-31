@@ -12,6 +12,8 @@ import (
 	"image/png"
 	"strings"
 	"testing"
+
+	"github.com/HugoSmits86/nativewebp"
 )
 
 // --- fixtures ---------------------------------------------------------------
@@ -74,6 +76,56 @@ func animatedGIFBytes(t *testing.T) []byte {
 	return b.Bytes()
 }
 
+// webpBytes returns a lossless-WebP-encoded solid image. nativewebp is the same
+// encoder Process uses, so this exercises the WebP→WebP path with valid input.
+func webpBytes(t *testing.T, w, h int) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	if err := nativewebp.Encode(&b, solidImage(w, h), nil); err != nil {
+		t.Fatalf("encode webp: %v", err)
+	}
+	return b.Bytes()
+}
+
+// alphaPNGBytes returns a PNG with a genuinely transparent region so the WebP
+// re-encode can be checked for alpha preservation.
+func alphaPNGBytes(t *testing.T, w, h int) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			a := uint8(0xff)
+			if x < w/2 {
+				a = 0x00 // left half fully transparent
+			}
+			img.Set(x, y, color.NRGBA{R: uint8(x), G: uint8(y), B: 0x40, A: a})
+		}
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatalf("encode alpha png: %v", err)
+	}
+	return b.Bytes()
+}
+
+// animatedWebPBytes returns a two-frame animated WebP (VP8X container). Animation
+// must be rejected, mirroring the animated-GIF guard.
+func animatedWebPBytes(t *testing.T) []byte {
+	t.Helper()
+	frame := solidImage(4, 4)
+	ani := &nativewebp.Animation{
+		Images:    []image.Image{frame, frame},
+		Durations: []uint{100, 100},
+		Disposals: []uint{0, 0},
+		LoopCount: 0,
+	}
+	var b bytes.Buffer
+	if err := nativewebp.EncodeAll(&b, ani, nil); err != nil {
+		t.Fatalf("encode animated webp: %v", err)
+	}
+	return b.Bytes()
+}
+
 // bombPNG forges a PNG with only a valid signature + IHDR declaring w×h. It has
 // no IDAT, so a full Decode would fail — but DecodeConfig reads the dimensions
 // from IHDR alone, which is exactly where the decompression-bomb guard fires.
@@ -107,14 +159,15 @@ const svgWithScript = `<?xml version="1.0"?>
 
 // --- tests ------------------------------------------------------------------
 
-func TestProcess_AcceptsPNG(t *testing.T) {
+// A PNG is re-encoded to lossless WebP (the canonical raster for non-JPEG).
+func TestProcess_PNGBecomesWebP(t *testing.T) {
 	in := pngBytes(t, 20, 12)
 	got, err := Process(bytes.NewReader(in), Config{})
 	if err != nil {
 		t.Fatalf("Process png: %v", err)
 	}
-	if got.ContentType != "image/png" {
-		t.Errorf("content type = %q, want image/png", got.ContentType)
+	if got.ContentType != "image/webp" {
+		t.Errorf("content type = %q, want image/webp", got.ContentType)
 	}
 	if got.Width != 20 || got.Height != 12 {
 		t.Errorf("dims = %dx%d, want 20x12", got.Width, got.Height)
@@ -122,9 +175,56 @@ func TestProcess_AcceptsPNG(t *testing.T) {
 	if got.SHA256 == "" || len(got.SHA256) != 64 {
 		t.Errorf("sha256 = %q, want 64 hex chars", got.SHA256)
 	}
-	if _, _, err := image.Decode(bytes.NewReader(got.Bytes)); err != nil {
-		t.Errorf("output does not decode: %v", err)
+	if format := sniffFormat(t, got.Bytes); format != "webp" {
+		t.Errorf("output format = %q, want webp", format)
 	}
+}
+
+// A WebP upload stays WebP — no conversion to JPEG, no generation loss.
+func TestProcess_WebPStaysWebP(t *testing.T) {
+	got, err := Process(bytes.NewReader(webpBytes(t, 18, 10)), Config{})
+	if err != nil {
+		t.Fatalf("Process webp: %v", err)
+	}
+	if got.ContentType != "image/webp" {
+		t.Errorf("content type = %q, want image/webp", got.ContentType)
+	}
+	if got.Width != 18 || got.Height != 10 {
+		t.Errorf("dims = %dx%d, want 18x10", got.Width, got.Height)
+	}
+	if format := sniffFormat(t, got.Bytes); format != "webp" {
+		t.Errorf("output format = %q, want webp", format)
+	}
+}
+
+// PNG transparency must survive the WebP re-encode (VP8L carries alpha).
+func TestProcess_PNGAlphaSurvivesWebP(t *testing.T) {
+	got, err := Process(bytes.NewReader(alphaPNGBytes(t, 16, 16)), Config{})
+	if err != nil {
+		t.Fatalf("Process alpha png: %v", err)
+	}
+	img, _, err := image.Decode(bytes.NewReader(got.Bytes))
+	if err != nil {
+		t.Fatalf("decode webp output: %v", err)
+	}
+	// The left-half pixels were fully transparent; they must decode as such.
+	_, _, _, a := img.At(0, 0).RGBA()
+	if a != 0 {
+		t.Errorf("top-left alpha = %d, want 0 (transparent preserved)", a>>8)
+	}
+	if op, ok := img.(interface{ Opaque() bool }); ok && op.Opaque() {
+		t.Errorf("re-encoded image reports opaque; alpha channel was dropped")
+	}
+}
+
+// sniffFormat returns the format name image.DecodeConfig detects for b.
+func sniffFormat(t *testing.T, b []byte) string {
+	t.Helper()
+	_, format, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+	return format
 }
 
 func TestProcess_AcceptsJPEG(t *testing.T) {
@@ -137,14 +237,17 @@ func TestProcess_AcceptsJPEG(t *testing.T) {
 	}
 }
 
-// A static GIF is re-encoded to PNG (canonical lossless raster).
-func TestProcess_StaticGIFBecomesPNG(t *testing.T) {
+// A static GIF is re-encoded to lossless WebP (canonical lossless raster).
+func TestProcess_StaticGIFBecomesWebP(t *testing.T) {
 	got, err := Process(bytes.NewReader(staticGIFBytes(t, 8, 8)), Config{})
 	if err != nil {
 		t.Fatalf("Process gif: %v", err)
 	}
-	if got.ContentType != "image/png" {
-		t.Errorf("content type = %q, want image/png", got.ContentType)
+	if got.ContentType != "image/webp" {
+		t.Errorf("content type = %q, want image/webp", got.ContentType)
+	}
+	if format := sniffFormat(t, got.Bytes); format != "webp" {
+		t.Errorf("output format = %q, want webp", format)
 	}
 }
 
@@ -152,6 +255,28 @@ func TestProcess_RejectsAnimatedGIF(t *testing.T) {
 	_, err := Process(bytes.NewReader(animatedGIFBytes(t)), Config{})
 	if !errors.Is(err, ErrAnimated) {
 		t.Fatalf("err = %v, want ErrAnimated", err)
+	}
+}
+
+// Animated WebP must be rejected, mirroring the animated-GIF guard. The WebP
+// decoder does not implement the animated VP8X container, so the upload is
+// refused at format detection.
+func TestProcess_RejectsAnimatedWebP(t *testing.T) {
+	_, err := Process(bytes.NewReader(animatedWebPBytes(t)), Config{})
+	if err == nil {
+		t.Fatal("animated WebP accepted, want rejection")
+	}
+	if !errors.Is(err, ErrUnsupportedFormat) && !errors.Is(err, ErrDecode) && !errors.Is(err, ErrAnimated) {
+		t.Fatalf("err = %v, want a rejection (unsupported/decode/animated)", err)
+	}
+}
+
+// A long thin strip slips under the pixel cap but exceeds the WebP per-side
+// limit; it must be refused before a full decode.
+func TestProcess_RejectsOverWideForWebP(t *testing.T) {
+	_, err := Process(bytes.NewReader(bombPNG(t, uint32(webpMaxDimension+1), 1)), Config{})
+	if !errors.Is(err, ErrDimensionsTooLarge) {
+		t.Fatalf("err = %v, want ErrDimensionsTooLarge", err)
 	}
 }
 
