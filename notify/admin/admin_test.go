@@ -162,6 +162,48 @@ func TestBellShowsUnread(t *testing.T) {
 	}
 }
 
+func TestBellCountIsBareNumber(t *testing.T) {
+	t.Parallel()
+	h := newHandler(t, &fakeStore{unread: 7}, allow)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/bell/count", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	// The nav badge swaps this into .app-nav-badge's innerHTML, so it must be the
+	// bare count with no anchor markup.
+	body := strings.TrimSpace(rr.Body.String())
+	if body != "7" {
+		t.Errorf("count body = %q, want \"7\"", body)
+	}
+	if strings.Contains(body, "<") {
+		t.Errorf("count body should carry no markup: %q", body)
+	}
+}
+
+func TestBellCountEmptyWhenZero(t *testing.T) {
+	t.Parallel()
+	h := newHandler(t, &fakeStore{unread: 0}, allow)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/bell/count", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	if got := strings.TrimSpace(rr.Body.String()); got != "" {
+		t.Errorf("zero count body = %q, want empty", got)
+	}
+}
+
+func TestBellCountForbiddenWhenResolverDenies(t *testing.T) {
+	t.Parallel()
+	h := newHandler(t, &fakeStore{unread: 3}, deny)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/bell/count", nil))
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rr.Code)
+	}
+}
+
 func TestSeenAdvancesCursorAndTriggers(t *testing.T) {
 	t.Parallel()
 	store := &fakeStore{unread: 5}

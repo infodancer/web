@@ -182,6 +182,7 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", h.feed)
 	mux.HandleFunc("GET /bell", h.bell)
+	mux.HandleFunc("GET /bell/count", h.bellCount)
 	mux.HandleFunc("POST /seen", h.seen)
 	mux.Handle("GET /static/", h.static)
 	return mux

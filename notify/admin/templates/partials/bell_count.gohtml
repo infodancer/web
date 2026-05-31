@@ -1,0 +1,6 @@
+{{- /*
+  Bare unread count for a host nav badge. Returned by GET /bell/count and swapped
+  into the innerHTML of infodancer/ui's .app-nav-badge (whose ui.Badge.PollURL
+  points here). Empty when zero so the badge collapses via .app-nav-badge:empty.
+*/ -}}
+{{- if gt .Unread 0 }}{{ .Unread }}{{ end -}}

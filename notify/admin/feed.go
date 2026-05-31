@@ -114,6 +114,25 @@ func (h *Handler) bell(w http.ResponseWriter, r *http.Request) {
 	h.tpl.render(w, "partials/bell.gohtml", data)
 }
 
+// bellCount serves GET /bell/count — the bare unread number a host's nav badge
+// polls. Unlike GET /bell (the whole anchor), this returns just the count text
+// (empty when zero), so it drops into the innerHTML of infodancer/ui's
+// .app-nav-badge span, whose ui.Badge.PollURL points here.
+func (h *Handler) bellCount(w http.ResponseWriter, r *http.Request) {
+	id, ok := h.resolve(w, r)
+	if !ok {
+		return
+	}
+	unread, err := h.store.AdminUnreadCount(r.Context(), id)
+	if err != nil {
+		h.log.Error("admin: unread count", "err", err)
+		unread = 0
+	}
+	data := h.baseFeedData()
+	data.Unread = unread
+	h.tpl.render(w, "partials/bell_count.gohtml", data)
+}
+
 // seen serves POST /seen — advances the admin's read cursor to up_to (the
 // newest rendered event), then returns the refreshed bell fragment.
 func (h *Handler) seen(w http.ResponseWriter, r *http.Request) {
