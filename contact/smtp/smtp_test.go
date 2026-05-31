@@ -89,3 +89,41 @@ func TestBuildRFC5322_NoCcHeaderWhenEmpty(t *testing.T) {
 		t.Errorf("Cc header emitted for empty Cc:\n%s", out)
 	}
 }
+
+// CR/LF embedded in any header value must not be able to inject extra header
+// lines. scrubHeader folds them to spaces, so the smuggled "header" stays on
+// the value's own line and never becomes a line of its own.
+func TestBuildRFC5322_HeaderInjectionScrubbed(t *testing.T) {
+	msg := handler.Message{
+		From:    "from@x\r\nX-From-Inject: yes",
+		To:      []string{"to@x\r\nBcc: leak@evil.example"},
+		Cc:      []string{"cc@x\r\nX-Cc-Inject: yes"},
+		ReplyTo: "visitor@x\r\nX-Reply-Inject: yes",
+		Subject: "hi\r\nX-Subject-Inject: yes",
+		Body:    "hello",
+	}
+	out := buildRFC5322(msg)
+	header, _, ok := strings.Cut(out, "\r\n\r\n")
+	if !ok {
+		t.Fatalf("no header/body separator in:\n%s", out)
+	}
+
+	// No line in the header block may be one of the injected headers.
+	for _, line := range strings.Split(header, "\r\n") {
+		switch {
+		case strings.HasPrefix(line, "X-From-Inject"),
+			strings.HasPrefix(line, "Bcc:"),
+			strings.HasPrefix(line, "X-Cc-Inject"),
+			strings.HasPrefix(line, "X-Reply-Inject"),
+			strings.HasPrefix(line, "X-Subject-Inject"):
+			t.Errorf("injected header survived as its own line: %q", line)
+		}
+	}
+	// And no bare CR/LF should remain inside the header block at all beyond the
+	// CRLF line terminators handled above.
+	for _, line := range strings.Split(header, "\r\n") {
+		if strings.ContainsAny(line, "\r\n") {
+			t.Errorf("header line still contains a bare CR/LF: %q", line)
+		}
+	}
+}
