@@ -1,9 +1,22 @@
 {{define "content"}}
 {{- $base := .BasePath -}}
 {{- $view := .Page -}}
+<nav class="notify-scope" aria-label="Feed scope">
+  {{- /* Two views: the curated admin-audience stream (default) and the full
+         activity firehose across every audience. */ -}}
+  <a href="{{$base}}/"
+     hx-get="{{$base}}/" hx-target="#notify-list" hx-swap="innerHTML" hx-push-url="true"
+     class="notify-scope-tab{{if ne $view.Filter.Scope "all"}} is-active{{end}}"
+     {{if ne $view.Filter.Scope "all"}}aria-current="page"{{end}}>Admin</a>
+  <a href="{{$base}}/?scope=all"
+     hx-get="{{$base}}/?scope=all" hx-target="#notify-list" hx-swap="innerHTML" hx-push-url="true"
+     class="notify-scope-tab{{if eq $view.Filter.Scope "all"}} is-active{{end}}"
+     {{if eq $view.Filter.Scope "all"}}aria-current="page"{{end}}>All activity</a>
+</nav>
 <div class="notify-toolbar">
   <form class="notify-filter" hx-get="{{$base}}/" hx-target="#notify-list"
         hx-swap="innerHTML" hx-push-url="true">
+    <input type="hidden" name="scope" value="{{$view.Filter.Scope}}">
     <input type="search" name="type" value="{{$view.Filter.Type}}" placeholder="type, e.g. user.created">
     <input type="search" name="source" value="{{$view.Filter.Source}}" placeholder="source">
     <select name="severity" aria-label="Severity">

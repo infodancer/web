@@ -12,8 +12,10 @@ INSERT INTO notify_events (
 )
 RETURNING id, created_at;
 
--- AdminFeed returns admin-audience events newest-first, with optional filters
--- and keyset pagination. A NULL filter argument means "no constraint"; pass a
+-- AdminFeed returns events newest-first, with optional filters and keyset
+-- pagination. By default it returns only admin-audience events (the curated
+-- admin stream); pass all_audiences = true for the full activity firehose
+-- across every audience. A NULL filter argument means "no constraint"; pass a
 -- non-zero before_id to fetch the page strictly older than that id.
 -- name: AdminFeed :many
 SELECT
@@ -21,7 +23,7 @@ SELECT
     actor_issuer, actor_subject, actor_label,
     subject_issuer, subject_subject, payload, created_at
 FROM notify_events
-WHERE audience = 'admin'
+WHERE (sqlc.arg('all_audiences')::bool OR audience = 'admin')
   AND (sqlc.narg('source')::text   IS NULL OR source   = sqlc.narg('source'))
   AND (sqlc.narg('type')::text     IS NULL OR type     = sqlc.narg('type'))
   AND (sqlc.narg('severity')::text IS NULL OR severity = sqlc.narg('severity'))

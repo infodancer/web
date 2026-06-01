@@ -50,9 +50,16 @@ you want the write in your own request path or transaction.
 
 ```go
 feed, _ := store.AdminFeed(ctx, notify.Filter{Type: "user.created", Limit: 25})
+all, _ := store.AdminFeed(ctx, notify.Filter{AllAudiences: true})  // full activity firehose
 unread, _ := store.AdminUnreadCount(ctx, admin)        // count since the admin's cursor
 _ = store.AdminMarkSeen(ctx, admin, feed[0].CreatedAt) // advance the cursor (monotonic)
 ```
+
+`AdminFeed` returns the curated **admin-audience** stream by default. Set
+`Filter.AllAudiences` for the **full activity** view across every audience — the
+admin feed page exposes both as a scope toggle. The unread count stays scoped to
+the admin-audience stream, so the bell badge tracks the curated events, not every
+user event.
 
 ## Mounting the admin UI
 

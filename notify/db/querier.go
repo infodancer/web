@@ -12,8 +12,10 @@ import (
 type Querier interface {
 	// AdminCursor returns the admin's last_seen_at, or no rows if never seen.
 	AdminCursor(ctx context.Context, arg AdminCursorParams) (time.Time, error)
-	// AdminFeed returns admin-audience events newest-first, with optional filters
-	// and keyset pagination. A NULL filter argument means "no constraint"; pass a
+	// AdminFeed returns events newest-first, with optional filters and keyset
+	// pagination. By default it returns only admin-audience events (the curated
+	// admin stream); pass all_audiences = true for the full activity firehose
+	// across every audience. A NULL filter argument means "no constraint"; pass a
 	// non-zero before_id to fetch the page strictly older than that id.
 	AdminFeed(ctx context.Context, arg AdminFeedParams) ([]NotifyEvents, error)
 	// AdminMarkSeen advances the admin's cursor monotonically; it never moves

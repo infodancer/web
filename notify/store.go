@@ -134,9 +134,14 @@ type Filter struct {
 	Until    time.Time
 	Limit    int
 	BeforeID int64
+	// AllAudiences widens the feed from the curated admin-audience stream
+	// (false, the default) to every event regardless of audience (true) — the
+	// full activity view for admins tracking all site activity.
+	AllAudiences bool
 }
 
-// AdminFeed returns admin-audience events newest-first for the given filter.
+// AdminFeed returns events newest-first for the given filter: the curated
+// admin-audience stream by default, or every event when f.AllAudiences is set.
 func (s *Store) AdminFeed(ctx context.Context, f Filter) ([]Event, error) {
 	lim := f.Limit
 	switch {
@@ -146,7 +151,7 @@ func (s *Store) AdminFeed(ctx context.Context, f Filter) ([]Event, error) {
 		lim = maxFeedLimit
 	}
 
-	params := db.AdminFeedParams{Lim: int32(lim)}
+	params := db.AdminFeedParams{Lim: int32(lim), AllAudiences: f.AllAudiences}
 	if f.Source != "" {
 		params.Source = &f.Source
 	}

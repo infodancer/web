@@ -48,6 +48,9 @@ type filterVM struct {
 	Source   string
 	Severity string
 	Since    string
+	// Scope is "all" for the full activity firehose, "" for the curated
+	// admin-audience stream. Drives the feed's scope toggle.
+	Scope string
 }
 
 type eventVM struct {
@@ -215,11 +218,13 @@ func (h *Handler) defaultChrome() uiassets.DocumentData {
 
 func (h *Handler) parseFilter(r *http.Request) (notify.Filter, filterVM) {
 	q := r.URL.Query()
+	scope := q.Get("scope")
 	f := notify.Filter{
-		Source:   q.Get("source"),
-		Type:     q.Get("type"),
-		Severity: notify.Severity(q.Get("severity")),
-		Limit:    h.pageSize,
+		Source:       q.Get("source"),
+		Type:         q.Get("type"),
+		Severity:     notify.Severity(q.Get("severity")),
+		Limit:        h.pageSize,
+		AllAudiences: scope == "all",
 	}
 	if b := q.Get("before"); b != "" {
 		if n, err := strconv.ParseInt(b, 10, 64); err == nil && n > 0 {
@@ -237,6 +242,7 @@ func (h *Handler) parseFilter(r *http.Request) (notify.Filter, filterVM) {
 		Source:   f.Source,
 		Severity: string(f.Severity),
 		Since:    since,
+		Scope:    scope,
 	}
 }
 
@@ -277,6 +283,9 @@ func moreQuery(f filterVM, before int64) string {
 	}
 	if f.Since != "" {
 		v.Set("since", f.Since)
+	}
+	if f.Scope != "" {
+		v.Set("scope", f.Scope)
 	}
 	v.Set("before", strconv.FormatInt(before, 10))
 	return v.Encode()
