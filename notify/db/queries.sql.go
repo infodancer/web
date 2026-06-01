@@ -35,32 +35,36 @@ SELECT
     actor_issuer, actor_subject, actor_label,
     subject_issuer, subject_subject, payload, created_at
 FROM notify_events
-WHERE audience = 'admin'
-  AND ($1::text   IS NULL OR source   = $1)
-  AND ($2::text     IS NULL OR type     = $2)
-  AND ($3::text IS NULL OR severity = $3)
-  AND ($4::timestamptz IS NULL OR created_at >= $4)
-  AND ($5::timestamptz IS NULL OR created_at <= $5)
-  AND ($6::bigint  IS NULL OR id < $6)
+WHERE ($1::bool OR audience = 'admin')
+  AND ($2::text   IS NULL OR source   = $2)
+  AND ($3::text     IS NULL OR type     = $3)
+  AND ($4::text IS NULL OR severity = $4)
+  AND ($5::timestamptz IS NULL OR created_at >= $5)
+  AND ($6::timestamptz IS NULL OR created_at <= $6)
+  AND ($7::bigint  IS NULL OR id < $7)
 ORDER BY created_at DESC, id DESC
-LIMIT $7
+LIMIT $8
 `
 
 type AdminFeedParams struct {
-	Source   *string
-	Type     *string
-	Severity *string
-	Since    *time.Time
-	Until    *time.Time
-	BeforeID *int64
-	Lim      int32
+	AllAudiences bool
+	Source       *string
+	Type         *string
+	Severity     *string
+	Since        *time.Time
+	Until        *time.Time
+	BeforeID     *int64
+	Lim          int32
 }
 
-// AdminFeed returns admin-audience events newest-first, with optional filters
-// and keyset pagination. A NULL filter argument means "no constraint"; pass a
+// AdminFeed returns events newest-first, with optional filters and keyset
+// pagination. By default it returns only admin-audience events (the curated
+// admin stream); pass all_audiences = true for the full activity firehose
+// across every audience. A NULL filter argument means "no constraint"; pass a
 // non-zero before_id to fetch the page strictly older than that id.
 func (q *Queries) AdminFeed(ctx context.Context, arg AdminFeedParams) ([]NotifyEvents, error) {
 	rows, err := q.db.Query(ctx, adminFeed,
+		arg.AllAudiences,
 		arg.Source,
 		arg.Type,
 		arg.Severity,

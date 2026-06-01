@@ -145,6 +145,43 @@ func TestFeedParsesFilters(t *testing.T) {
 	}
 }
 
+func TestFeedScopeAllAudiences(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{}
+	h := newHandler(t, store, allow)
+
+	// Default scope → curated admin stream.
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	if store.lastFilter.AllAudiences {
+		t.Errorf("default scope should not widen audiences")
+	}
+
+	// scope=all → full activity firehose.
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?scope=all", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	if !store.lastFilter.AllAudiences {
+		t.Errorf("scope=all should set Filter.AllAudiences")
+	}
+}
+
+func TestFeedRendersScopeToggle(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{}
+	h := newHandler(t, store, allow)
+
+	rr := httptest.NewRecorder()
+	// Full-page request (boosted/false) so the page chrome, not just the
+	// fragment, renders.
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+	body := rr.Body.String()
+	if !strings.Contains(body, "All activity") || !strings.Contains(body, "?scope=all") {
+		t.Errorf("feed page should render the scope toggle, got:\n%s", body)
+	}
+}
+
 func TestBellShowsUnread(t *testing.T) {
 	t.Parallel()
 	h := newHandler(t, &fakeStore{unread: 3}, allow)

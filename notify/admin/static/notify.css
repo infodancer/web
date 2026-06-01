@@ -34,6 +34,26 @@
 }
 
 /* Toolbar */
+/* Scope toggle: curated "Admin" stream vs the full "All activity" firehose. */
+.notify-scope {
+  display: flex;
+  gap: var(--app-space-sm);
+  margin-bottom: var(--app-space);
+  border-bottom: 1px solid var(--app-color-border);
+}
+.notify-scope-tab {
+  padding: var(--app-space-sm) var(--app-space);
+  text-decoration: none;
+  color: var(--app-color-fg-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.notify-scope-tab.is-active {
+  color: var(--app-color-fg);
+  border-bottom-color: var(--app-color-accent);
+  font-weight: 600;
+}
+
 .notify-toolbar {
   display: flex;
   flex-wrap: wrap;

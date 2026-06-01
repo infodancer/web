@@ -152,6 +152,26 @@ func TestAdminFeedExcludesUserAudience(t *testing.T) {
 	require.Equal(t, "admin one", feed[0].Title)
 }
 
+func TestAdminFeedAllAudiencesIncludesEverything(t *testing.T) {
+	s := freshStore(t)
+	ctx := context.Background()
+
+	insertSpaced(t, s,
+		Event{Type: "x", Source: "osg", Title: "admin one", Audience: AudienceAdmin},
+		Event{Type: "x", Source: "osg", Title: "user one", Audience: AudienceUser},
+	)
+
+	// AllAudiences widens the curated admin stream to the full firehose.
+	feed, err := s.AdminFeed(ctx, Filter{AllAudiences: true})
+	require.NoError(t, err)
+	require.Len(t, feed, 2)
+
+	// Per-field filters still apply alongside the widened audience.
+	byType, err := s.AdminFeed(ctx, Filter{AllAudiences: true, Source: "osg", Type: "x"})
+	require.NoError(t, err)
+	require.Len(t, byType, 2)
+}
+
 func TestAdminFeedKeysetPagination(t *testing.T) {
 	s := freshStore(t)
 	ctx := context.Background()
