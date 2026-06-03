@@ -1,0 +1,17 @@
+# Binaries
+/timeline
+*.exe
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+.claude/settings.local.json
+*.swp
+*~
+
+# OS
+.DS_Store

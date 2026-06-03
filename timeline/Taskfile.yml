@@ -1,0 +1,50 @@
+version: "3"
+
+dotenv: [".env.local"]
+
+tasks:
+  dev:
+    desc: Run the dev server
+    cmd: go run ./cmd/timeline
+
+  test:
+    desc: Run all tests
+    cmd: go test ./...
+
+  build:
+    desc: Build the binary
+    cmd: go build -o timeline ./cmd/timeline
+
+  migrate:
+    desc: Run database migrations
+    cmd: goose -dir db/migrations postgres "{{.DATABASE_URL}}" up
+
+  migrate:status:
+    desc: Show migration status
+    cmd: goose -dir db/migrations postgres "{{.DATABASE_URL}}" status
+
+  migrate:down:
+    desc: Roll back the last migration
+    cmd: goose -dir db/migrations postgres "{{.DATABASE_URL}}" down
+
+  sqlc:
+    desc: Regenerate sqlc Go code
+    cmd: sqlc generate
+
+  sync:
+    desc: Sync timeline data from a CUE directory tree
+    cmd: go run ./cmd/timeline --sync {{.DIR}}
+    requires:
+      vars: [DIR]
+
+  seed:
+    desc: Load sample data into the dev database
+    cmd: psql "{{.DATABASE_URL}}" -f db/seed/sample_data.sql
+
+  reset:
+    desc: Drop and recreate the dev database, run migrations, seed
+    cmds:
+      - psql "postgres:///postgres?host=/var/run/postgresql" -c "DROP DATABASE IF EXISTS timeline_dev;"
+      - psql "postgres:///postgres?host=/var/run/postgresql" -c "CREATE DATABASE timeline_dev;"
+      - task: migrate
+      - task: seed

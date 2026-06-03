@@ -1,0 +1,39 @@
+{{define "title"}}People - {{.Timeline.Name}}{{end}}
+
+{{define "content"}}
+<div class="page-people-list">
+    <nav class="breadcrumb">
+        <a href="/">Timelines</a> /
+        <a href="/t/{{.Timeline.Slug}}">{{.Timeline.Name}}</a> /
+        <span>People</span>
+    </nav>
+
+    <h1>People</h1>
+
+    {{if .People}}
+    <div class="people-grid">
+        {{range .People}}
+        <a href="/t/{{$.Timeline.Slug}}/person/{{.Slug}}" class="people-card">
+            {{if .PhotoUrl}}<img class="people-card-thumb" src="{{.PhotoUrl}}" alt="{{.Name}}" loading="lazy">
+            {{else}}<div class="people-card-thumb people-card-placeholder">{{slice .Name 0 1}}</div>
+            {{end}}
+            <div class="people-card-info">
+                <h2>{{.Name}}</h2>
+                {{if or .BornDate.Valid .DiedDate.Valid}}
+                <div class="people-card-dates">
+                    {{if .BornDate.Valid}}{{.BornDate.Time.Format "2006"}}{{end}}
+                    {{if and .BornDate.Valid .DiedDate.Valid}}&ndash;{{end}}
+                    {{if .DiedDate.Valid}}{{.DiedDate.Time.Format "2006"}}{{end}}
+                </div>
+                {{end}}
+            </div>
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-state">No people recorded for this timeline.</p>
+    {{end}}
+
+    <a href="/t/{{.Timeline.Slug}}" class="back-link">Back to timeline</a>
+</div>
+{{end}}

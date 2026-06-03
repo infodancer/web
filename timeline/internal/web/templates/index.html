@@ -1,0 +1,19 @@
+{{define "title"}}Timelines{{end}}
+
+{{define "content"}}
+<div class="page-index">
+    <h1>Timelines</h1>
+    {{if .Timelines}}
+    <div class="timeline-list">
+        {{range .Timelines}}
+        <a href="/t/{{.Slug}}" class="timeline-card">
+            <h2>{{.Name}}</h2>
+            {{if .Description}}<p>{{.Description}}</p>{{end}}
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-state">No timelines yet.</p>
+    {{end}}
+</div>
+{{end}}
