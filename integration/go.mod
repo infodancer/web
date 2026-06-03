@@ -1,6 +1,6 @@
 module github.com/infodancer/web/integration
 
-go 1.26.3
+go 1.26.4
 
 replace github.com/infodancer/web/contact => ../contact
 

@@ -1,6 +1,6 @@
 module github.com/infodancer/web/media
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/HugoSmits86/nativewebp v1.3.0
