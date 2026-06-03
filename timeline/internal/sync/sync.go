@@ -93,14 +93,14 @@ type timelineCUE struct {
 	IsPublic    *bool  `json:"is_public"`
 }
 
-func (r *Runner) syncTimeline(cctx *cue.Context) (db.Timeline, error) {
+func (r *Runner) syncTimeline(cctx *cue.Context) (db.TimelineTimeline, error) {
 	data, err := readCUEFile(cctx, filepath.Join(r.dir, "timeline.cue"))
 	if err != nil {
-		return db.Timeline{}, err
+		return db.TimelineTimeline{}, err
 	}
 	var t timelineCUE
 	if err := json.Unmarshal(data, &t); err != nil {
-		return db.Timeline{}, fmt.Errorf("decode timeline.cue: %w", err)
+		return db.TimelineTimeline{}, fmt.Errorf("decode timeline.cue: %w", err)
 	}
 	isPublic := true
 	if t.IsPublic != nil {

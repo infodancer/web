@@ -1,5 +1,5 @@
 -- name: UpsertTimeline :one
-INSERT INTO timelines (slug, name, description, is_public)
+INSERT INTO timeline_timelines (slug, name, description, is_public)
 VALUES (@slug, @name, @description, @is_public)
 ON CONFLICT (slug) DO UPDATE SET
     name = EXCLUDED.name,
@@ -9,7 +9,7 @@ ON CONFLICT (slug) DO UPDATE SET
 RETURNING *;
 
 -- name: UpsertCategory :one
-INSERT INTO categories (timeline_id, slug, name, color, sort_order)
+INSERT INTO timeline_categories (timeline_id, slug, name, color, sort_order)
 VALUES (@timeline_id, @slug, @name, @color, @sort_order)
 ON CONFLICT (timeline_id, slug) DO UPDATE SET
     name = EXCLUDED.name,
@@ -18,7 +18,7 @@ ON CONFLICT (timeline_id, slug) DO UPDATE SET
 RETURNING *;
 
 -- name: UpsertPerson :one
-INSERT INTO people (timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url)
+INSERT INTO timeline_people (timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url)
 VALUES (@timeline_id, @slug, @name, @sort_name, @bio, @born_date, @died_date, @photo_url)
 ON CONFLICT (timeline_id, slug) DO UPDATE SET
     name = EXCLUDED.name,
@@ -31,7 +31,7 @@ ON CONFLICT (timeline_id, slug) DO UPDATE SET
 RETURNING *;
 
 -- name: UpsertEvent :one
-INSERT INTO events (timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id)
+INSERT INTO timeline_events (timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id)
 VALUES (@timeline_id, @slug, @title, @summary, @article, @event_date, @event_end_date, @date_precision, @sort_order, @category_id)
 ON CONFLICT (timeline_id, slug) DO UPDATE SET
     title = EXCLUDED.title,

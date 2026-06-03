@@ -10,7 +10,7 @@ import (
 )
 
 const createCategory = `-- name: CreateCategory :one
-INSERT INTO categories (timeline_id, slug, name, color, sort_order)
+INSERT INTO timeline_categories (timeline_id, slug, name, color, sort_order)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING id, timeline_id, slug, name, color, sort_order
 `
@@ -23,7 +23,7 @@ type CreateCategoryParams struct {
 	SortOrder  int32  `json:"sort_order"`
 }
 
-func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error) {
+func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) (TimelineCategory, error) {
 	row := q.db.QueryRow(ctx, createCategory,
 		arg.TimelineID,
 		arg.Slug,
@@ -31,7 +31,7 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 		arg.Color,
 		arg.SortOrder,
 	)
-	var i Category
+	var i TimelineCategory
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -44,7 +44,7 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 }
 
 const deleteCategory = `-- name: DeleteCategory :exec
-DELETE FROM categories WHERE id = $1 AND timeline_id = $2
+DELETE FROM timeline_categories WHERE id = $1 AND timeline_id = $2
 `
 
 type DeleteCategoryParams struct {
@@ -58,7 +58,7 @@ func (q *Queries) DeleteCategory(ctx context.Context, arg DeleteCategoryParams) 
 }
 
 const getCategory = `-- name: GetCategory :one
-SELECT id, timeline_id, slug, name, color, sort_order FROM categories
+SELECT id, timeline_id, slug, name, color, sort_order FROM timeline_categories
 WHERE timeline_id = $1 AND slug = $2
 `
 
@@ -67,9 +67,9 @@ type GetCategoryParams struct {
 	Slug       string `json:"slug"`
 }
 
-func (q *Queries) GetCategory(ctx context.Context, arg GetCategoryParams) (Category, error) {
+func (q *Queries) GetCategory(ctx context.Context, arg GetCategoryParams) (TimelineCategory, error) {
 	row := q.db.QueryRow(ctx, getCategory, arg.TimelineID, arg.Slug)
-	var i Category
+	var i TimelineCategory
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -82,20 +82,20 @@ func (q *Queries) GetCategory(ctx context.Context, arg GetCategoryParams) (Categ
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT id, timeline_id, slug, name, color, sort_order FROM categories
+SELECT id, timeline_id, slug, name, color, sort_order FROM timeline_categories
 WHERE timeline_id = $1
 ORDER BY sort_order ASC, name ASC
 `
 
-func (q *Queries) ListCategories(ctx context.Context, timelineID int64) ([]Category, error) {
+func (q *Queries) ListCategories(ctx context.Context, timelineID int64) ([]TimelineCategory, error) {
 	rows, err := q.db.Query(ctx, listCategories, timelineID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Category{}
+	items := []TimelineCategory{}
 	for rows.Next() {
-		var i Category
+		var i TimelineCategory
 		if err := rows.Scan(
 			&i.ID,
 			&i.TimelineID,
@@ -115,7 +115,7 @@ func (q *Queries) ListCategories(ctx context.Context, timelineID int64) ([]Categ
 }
 
 const updateCategory = `-- name: UpdateCategory :one
-UPDATE categories SET
+UPDATE timeline_categories SET
     name = $1,
     color = $2,
     sort_order = $3
@@ -131,7 +131,7 @@ type UpdateCategoryParams struct {
 	TimelineID int64  `json:"timeline_id"`
 }
 
-func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error) {
+func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TimelineCategory, error) {
 	row := q.db.QueryRow(ctx, updateCategory,
 		arg.Name,
 		arg.Color,
@@ -139,7 +139,7 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 		arg.ID,
 		arg.TimelineID,
 	)
-	var i Category
+	var i TimelineCategory
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,

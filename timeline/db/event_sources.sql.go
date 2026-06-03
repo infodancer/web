@@ -12,7 +12,7 @@ import (
 )
 
 const addEventSource = `-- name: AddEventSource :one
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, event_id, url, title, author, citation, sort_order
 `
@@ -26,7 +26,7 @@ type AddEventSourceParams struct {
 	SortOrder int32  `json:"sort_order"`
 }
 
-func (q *Queries) AddEventSource(ctx context.Context, arg AddEventSourceParams) (EventSource, error) {
+func (q *Queries) AddEventSource(ctx context.Context, arg AddEventSourceParams) (TimelineEventSource, error) {
 	row := q.db.QueryRow(ctx, addEventSource,
 		arg.EventID,
 		arg.Url,
@@ -35,7 +35,7 @@ func (q *Queries) AddEventSource(ctx context.Context, arg AddEventSourceParams) 
 		arg.Citation,
 		arg.SortOrder,
 	)
-	var i EventSource
+	var i TimelineEventSource
 	err := row.Scan(
 		&i.ID,
 		&i.EventID,
@@ -49,7 +49,7 @@ func (q *Queries) AddEventSource(ctx context.Context, arg AddEventSourceParams) 
 }
 
 const deleteEventSource = `-- name: DeleteEventSource :exec
-DELETE FROM event_sources WHERE id = $1
+DELETE FROM timeline_event_sources WHERE id = $1
 `
 
 func (q *Queries) DeleteEventSource(ctx context.Context, id int64) error {
@@ -58,12 +58,12 @@ func (q *Queries) DeleteEventSource(ctx context.Context, id int64) error {
 }
 
 const getEventSource = `-- name: GetEventSource :one
-SELECT id, event_id, url, title, author, citation, sort_order FROM event_sources WHERE id = $1
+SELECT id, event_id, url, title, author, citation, sort_order FROM timeline_event_sources WHERE id = $1
 `
 
-func (q *Queries) GetEventSource(ctx context.Context, id int64) (EventSource, error) {
+func (q *Queries) GetEventSource(ctx context.Context, id int64) (TimelineEventSource, error) {
 	row := q.db.QueryRow(ctx, getEventSource, id)
-	var i EventSource
+	var i TimelineEventSource
 	err := row.Scan(
 		&i.ID,
 		&i.EventID,
@@ -77,20 +77,20 @@ func (q *Queries) GetEventSource(ctx context.Context, id int64) (EventSource, er
 }
 
 const listEventSources = `-- name: ListEventSources :many
-SELECT id, event_id, url, title, author, citation, sort_order FROM event_sources
+SELECT id, event_id, url, title, author, citation, sort_order FROM timeline_event_sources
 WHERE event_id = $1
 ORDER BY sort_order ASC
 `
 
-func (q *Queries) ListEventSources(ctx context.Context, eventID int64) ([]EventSource, error) {
+func (q *Queries) ListEventSources(ctx context.Context, eventID int64) ([]TimelineEventSource, error) {
 	rows, err := q.db.Query(ctx, listEventSources, eventID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []EventSource{}
+	items := []TimelineEventSource{}
 	for rows.Next() {
-		var i EventSource
+		var i TimelineEventSource
 		if err := rows.Scan(
 			&i.ID,
 			&i.EventID,
@@ -111,8 +111,8 @@ func (q *Queries) ListEventSources(ctx context.Context, eventID int64) ([]EventS
 }
 
 const searchEventSourcesByURL = `-- name: SearchEventSourcesByURL :many
-SELECT id, event_id, url, title, author, citation, sort_order FROM event_sources
-WHERE event_id IN (SELECT id FROM events WHERE timeline_id = $1)
+SELECT id, event_id, url, title, author, citation, sort_order FROM timeline_event_sources
+WHERE event_id IN (SELECT id FROM timeline_events WHERE timeline_id = $1)
   AND url ILIKE '%' || $2 || '%'
 ORDER BY url ASC
 LIMIT $3
@@ -124,15 +124,15 @@ type SearchEventSourcesByURLParams struct {
 	MaxResults int32       `json:"max_results"`
 }
 
-func (q *Queries) SearchEventSourcesByURL(ctx context.Context, arg SearchEventSourcesByURLParams) ([]EventSource, error) {
+func (q *Queries) SearchEventSourcesByURL(ctx context.Context, arg SearchEventSourcesByURLParams) ([]TimelineEventSource, error) {
 	rows, err := q.db.Query(ctx, searchEventSourcesByURL, arg.TimelineID, arg.Query, arg.MaxResults)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []EventSource{}
+	items := []TimelineEventSource{}
 	for rows.Next() {
-		var i EventSource
+		var i TimelineEventSource
 		if err := rows.Scan(
 			&i.ID,
 			&i.EventID,
@@ -153,7 +153,7 @@ func (q *Queries) SearchEventSourcesByURL(ctx context.Context, arg SearchEventSo
 }
 
 const updateEventSource = `-- name: UpdateEventSource :one
-UPDATE event_sources SET
+UPDATE timeline_event_sources SET
     url = $1,
     title = $2,
     author = $3,
@@ -172,7 +172,7 @@ type UpdateEventSourceParams struct {
 	ID        int64  `json:"id"`
 }
 
-func (q *Queries) UpdateEventSource(ctx context.Context, arg UpdateEventSourceParams) (EventSource, error) {
+func (q *Queries) UpdateEventSource(ctx context.Context, arg UpdateEventSourceParams) (TimelineEventSource, error) {
 	row := q.db.QueryRow(ctx, updateEventSource,
 		arg.Url,
 		arg.Title,
@@ -181,7 +181,7 @@ func (q *Queries) UpdateEventSource(ctx context.Context, arg UpdateEventSourcePa
 		arg.SortOrder,
 		arg.ID,
 	)
-	var i EventSource
+	var i TimelineEventSource
 	err := row.Scan(
 		&i.ID,
 		&i.EventID,

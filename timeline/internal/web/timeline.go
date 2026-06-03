@@ -11,7 +11,7 @@ import (
 )
 
 type indexData struct {
-	Timelines []db.Timeline
+	Timelines []db.TimelineTimeline
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -34,9 +34,9 @@ type laneAssignment struct {
 }
 
 type timelineData struct {
-	Timeline   db.Timeline
+	Timeline   db.TimelineTimeline
 	Events     []db.ListEventsAfterDateRow
-	Categories []db.Category
+	Categories []db.TimelineCategory
 	Tags       []db.ListTagsRow
 	Lanes      []laneAssignment
 	LeftCount  int
@@ -47,7 +47,7 @@ type timelineData struct {
 }
 
 // assignLanes distributes categories across left and right sides of the axis.
-func assignLanes(categories []db.Category) ([]laneAssignment, int, int) {
+func assignLanes(categories []db.TimelineCategory) ([]laneAssignment, int, int) {
 	total := len(categories) + 1 // +1 for uncategorized
 	leftCount := (total + 1) / 2
 	rightCount := total - leftCount

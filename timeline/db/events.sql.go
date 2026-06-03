@@ -12,7 +12,7 @@ import (
 )
 
 const countEventsByTimeline = `-- name: CountEventsByTimeline :one
-SELECT COUNT(*) FROM events
+SELECT COUNT(*) FROM timeline_events
 WHERE timeline_id = $1
 `
 
@@ -24,7 +24,7 @@ func (q *Queries) CountEventsByTimeline(ctx context.Context, timelineID int64) (
 }
 
 const createEvent = `-- name: CreateEvent :one
-INSERT INTO events (timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id)
+INSERT INTO timeline_events (timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING id, timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id, created_at, updated_at
 `
@@ -42,7 +42,7 @@ type CreateEventParams struct {
 	CategoryID    pgtype.Int8 `json:"category_id"`
 }
 
-func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error) {
+func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (TimelineEvent, error) {
 	row := q.db.QueryRow(ctx, createEvent,
 		arg.TimelineID,
 		arg.Slug,
@@ -55,7 +55,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event
 		arg.SortOrder,
 		arg.CategoryID,
 	)
-	var i Event
+	var i TimelineEvent
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -75,7 +75,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event
 }
 
 const deleteEvent = `-- name: DeleteEvent :exec
-DELETE FROM events WHERE id = $1 AND timeline_id = $2
+DELETE FROM timeline_events WHERE id = $1 AND timeline_id = $2
 `
 
 type DeleteEventParams struct {
@@ -92,8 +92,8 @@ const getEvent = `-- name: GetEvent :one
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND e.slug = $2
 `
@@ -148,8 +148,8 @@ const getEventByID = `-- name: GetEventByID :one
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.id = $1
 `
 
@@ -198,8 +198,8 @@ const getEventBySlug = `-- name: GetEventBySlug :one
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND e.slug = $2
 `
@@ -251,14 +251,14 @@ func (q *Queries) GetEventBySlug(ctx context.Context, arg GetEventBySlugParams) 
 }
 
 const getTimelineDateBounds = `-- name: GetTimelineDateBounds :one
-SELECT MIN(event_date) AS min_date, MAX(event_date) AS max_date
-FROM events
+SELECT MIN(event_date)::date AS min_date, MAX(event_date)::date AS max_date
+FROM timeline_events
 WHERE timeline_id = $1
 `
 
 type GetTimelineDateBoundsRow struct {
-	MinDate interface{} `json:"min_date"`
-	MaxDate interface{} `json:"max_date"`
+	MinDate pgtype.Date `json:"min_date"`
+	MaxDate pgtype.Date `json:"max_date"`
 }
 
 func (q *Queries) GetTimelineDateBounds(ctx context.Context, timelineID int64) (GetTimelineDateBoundsRow, error) {
@@ -272,8 +272,8 @@ const listEventsAfterDate = `-- name: ListEventsAfterDate :many
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND (e.event_date > $2 OR (e.event_date = $2 AND e.sort_order > $3))
 ORDER BY e.event_date ASC, e.sort_order ASC
@@ -350,8 +350,8 @@ const listEventsAfterDateByCategory = `-- name: ListEventsAfterDateByCategory :m
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND e.category_id = $2
   AND (e.event_date > $3 OR (e.event_date = $3 AND e.sort_order > $4))
@@ -431,9 +431,9 @@ const listEventsAfterDateByTag = `-- name: ListEventsAfterDateByTag :many
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
-JOIN event_tags et ON et.event_id = e.id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
+JOIN timeline_event_tags et ON et.event_id = e.id
 WHERE e.timeline_id = $1
   AND et.tag_id = $2
   AND (e.event_date > $3 OR (e.event_date = $3 AND e.sort_order > $4))
@@ -513,8 +513,8 @@ const listEventsBeforeDate = `-- name: ListEventsBeforeDate :many
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND (e.event_date < $2 OR (e.event_date = $2 AND e.sort_order < $3))
 ORDER BY e.event_date DESC, e.sort_order DESC
@@ -591,8 +591,8 @@ const listEventsBeforeDateByCategory = `-- name: ListEventsBeforeDateByCategory 
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND e.category_id = $2
   AND (e.event_date < $3 OR (e.event_date = $3 AND e.sort_order < $4))
@@ -672,9 +672,9 @@ const listEventsBeforeDateByTag = `-- name: ListEventsBeforeDateByTag :many
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
-JOIN event_tags et ON et.event_id = e.id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
+JOIN timeline_event_tags et ON et.event_id = e.id
 WHERE e.timeline_id = $1
   AND et.tag_id = $2
   AND (e.event_date < $3 OR (e.event_date = $3 AND e.sort_order < $4))
@@ -754,8 +754,8 @@ const listEventsByDateRange = `-- name: ListEventsByDateRange :many
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND e.event_date >= $2
   AND e.event_date <= $3
@@ -833,8 +833,8 @@ const listEventsByDateRangeAndCategory = `-- name: ListEventsByDateRangeAndCateg
 SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date, e.event_end_date, e.date_precision, e.sort_order, e.category_id, e.created_at, e.updated_at,
        c.name AS category_name,
        c.color AS category_color
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $1
   AND e.category_id = $2
   AND e.event_date >= $3
@@ -916,8 +916,8 @@ SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date,
        c.name AS category_name,
        c.color AS category_color,
        ts_rank(to_tsvector('english', e.title || ' ' || e.summary || ' ' || e.article), plainto_tsquery('english', $1)) AS rank
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE e.timeline_id = $2
   AND to_tsvector('english', e.title || ' ' || e.summary || ' ' || e.article) @@ plainto_tsquery('english', $1)
 ORDER BY rank DESC
@@ -987,7 +987,7 @@ func (q *Queries) SearchEvents(ctx context.Context, arg SearchEventsParams) ([]S
 }
 
 const updateEvent = `-- name: UpdateEvent :one
-UPDATE events SET
+UPDATE timeline_events SET
     title = $1,
     summary = $2,
     article = $3,
@@ -1014,7 +1014,7 @@ type UpdateEventParams struct {
 	TimelineID    int64       `json:"timeline_id"`
 }
 
-func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event, error) {
+func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (TimelineEvent, error) {
 	row := q.db.QueryRow(ctx, updateEvent,
 		arg.Title,
 		arg.Summary,
@@ -1027,7 +1027,7 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event
 		arg.ID,
 		arg.TimelineID,
 	)
-	var i Event
+	var i TimelineEvent
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,

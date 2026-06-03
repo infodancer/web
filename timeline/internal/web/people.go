@@ -8,8 +8,8 @@ import (
 )
 
 type personProfileData struct {
-	Timeline db.Timeline
-	Person   db.Person
+	Timeline db.TimelineTimeline
+	Person   db.TimelinePerson
 	Events   []db.ListPersonEventsRow
 }
 
@@ -45,8 +45,8 @@ func (s *Server) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 type peopleListData struct {
-	Timeline db.Timeline
-	People   []db.Person
+	Timeline db.TimelineTimeline
+	People   []db.TimelinePerson
 }
 
 func (s *Server) handlePeopleList(w http.ResponseWriter, r *http.Request) {

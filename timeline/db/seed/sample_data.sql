@@ -1,26 +1,26 @@
--- Sample timeline: World War I key events
+-- Sample timeline: World War I key timeline_events
 
-INSERT INTO timelines (slug, name, description, start_date, end_date, is_public)
-VALUES ('wwi', 'World War I', 'Key events of the First World War, 1914-1918', '1914-06-28', '1918-11-11', true);
+INSERT INTO timeline_timelines (slug, name, description, start_date, end_date, is_public)
+VALUES ('wwi', 'World War I', 'Key timeline_events of the First World War, 1914-1918', '1914-06-28', '1918-11-11', true);
 
-INSERT INTO categories (timeline_id, slug, name, color, sort_order) VALUES
+INSERT INTO timeline_categories (timeline_id, slug, name, color, sort_order) VALUES
     (1, 'political', 'Political', '#ef4444', 1),
     (1, 'military', 'Military', '#3b82f6', 2),
     (1, 'diplomatic', 'Diplomatic', '#8b5cf6', 3),
     (1, 'naval', 'Naval', '#06b6d4', 4),
     (1, 'technology', 'Technology', '#f59e0b', 5);
 
-INSERT INTO tags (slug, name) VALUES
+INSERT INTO timeline_tags (slug, name) VALUES
     ('western-front', 'Western Front'),
     ('eastern-front', 'Eastern Front'),
     ('home-front', 'Home Front'),
     ('casualties', 'Casualties'),
     ('turning-point', 'Turning Point');
 
-INSERT INTO events (timeline_id, slug, title, summary, article, event_date, date_precision, sort_order, category_id) VALUES
+INSERT INTO timeline_events (timeline_id, slug, title, summary, article, event_date, date_precision, sort_order, category_id) VALUES
     (1, 'assassination-archduke', 'Assassination of Archduke Franz Ferdinand',
      'Archduke Franz Ferdinand of Austria and his wife Sophie are assassinated in Sarajevo by Gavrilo Princip.',
-     'On June 28, 1914, Archduke Franz Ferdinand of Austria, heir presumptive to the Austro-Hungarian throne, and his wife Sophie, Duchess of Hohenberg, were assassinated by Gavrilo Princip, a Bosnian Serb nationalist. The assassination set off a chain of international events that led to the outbreak of World War I.',
+     'On June 28, 1914, Archduke Franz Ferdinand of Austria, heir presumptive to the Austro-Hungarian throne, and his wife Sophie, Duchess of Hohenberg, were assassinated by Gavrilo Princip, a Bosnian Serb nationalist. The assassination set off a chain of international timeline_events that led to the outbreak of World War I.',
      '1914-06-28', 'day', 0, 1),
 
     (1, 'austria-ultimatum', 'Austria-Hungary Issues Ultimatum to Serbia',
@@ -129,41 +129,41 @@ INSERT INTO events (timeline_id, slug, title, summary, article, event_date, date
      '1918-11-11', 'day', 0, 3);
 
 -- Tag associations
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'battle-of-marne' AND t.slug = 'western-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'battle-of-marne' AND t.slug = 'turning-point';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'battle-of-verdun' AND t.slug = 'western-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'battle-of-verdun' AND t.slug = 'casualties';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'battle-of-somme' AND t.slug = 'western-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'battle-of-somme' AND t.slug = 'casualties';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'us-enters-war' AND t.slug = 'turning-point';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'hundred-days-offensive' AND t.slug = 'western-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'hundred-days-offensive' AND t.slug = 'turning-point';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'russian-revolution' AND t.slug = 'eastern-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'russian-revolution' AND t.slug = 'turning-point';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'lusitania-sinking' AND t.slug = 'home-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'passchendaele' AND t.slug = 'western-front';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'passchendaele' AND t.slug = 'casualties';
-INSERT INTO event_tags (event_id, tag_id)
-SELECT e.id, t.id FROM events e, tags t WHERE e.slug = 'christmas-truce' AND t.slug = 'western-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'battle-of-marne' AND t.slug = 'western-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'battle-of-marne' AND t.slug = 'turning-point';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'battle-of-verdun' AND t.slug = 'western-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'battle-of-verdun' AND t.slug = 'casualties';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'battle-of-somme' AND t.slug = 'western-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'battle-of-somme' AND t.slug = 'casualties';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'us-enters-war' AND t.slug = 'turning-point';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'hundred-days-offensive' AND t.slug = 'western-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'hundred-days-offensive' AND t.slug = 'turning-point';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'russian-revolution' AND t.slug = 'eastern-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'russian-revolution' AND t.slug = 'turning-point';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'lusitania-sinking' AND t.slug = 'home-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'passchendaele' AND t.slug = 'western-front';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'passchendaele' AND t.slug = 'casualties';
+INSERT INTO timeline_event_tags (event_id, tag_id)
+SELECT e.id, t.id FROM timeline_events e, timeline_tags t WHERE e.slug = 'christmas-truce' AND t.slug = 'western-front';
 
 -- People
-INSERT INTO people (timeline_id, slug, name, sort_name, bio, born_date, died_date) VALUES
+INSERT INTO timeline_people (timeline_id, slug, name, sort_name, bio, born_date, died_date) VALUES
     (1, 'gavrilo-princip', 'Gavrilo Princip', 'Princip, Gavrilo',
-     'Bosnian Serb nationalist who assassinated Archduke Franz Ferdinand and his wife Sophie, triggering the chain of events that led to World War I. A member of the Young Bosnia movement, Princip was 19 at the time of the assassination. He was sentenced to 20 years in prison, as he was too young for the death penalty under Austro-Hungarian law, and died of tuberculosis in prison in 1918.',
+     'Bosnian Serb nationalist who assassinated Archduke Franz Ferdinand and his wife Sophie, triggering the chain of timeline_events that led to World War I. A member of the Young Bosnia movement, Princip was 19 at the time of the assassination. He was sentenced to 20 years in prison, as he was too young for the death penalty under Austro-Hungarian law, and died of tuberculosis in prison in 1918.',
      '1894-07-25', '1918-04-28'),
 
     (1, 'franz-ferdinand', 'Archduke Franz Ferdinand', 'Franz Ferdinand',
@@ -196,141 +196,141 @@ INSERT INTO people (timeline_id, slug, name, sort_name, bio, born_date, died_dat
 
 -- Event-People links
 -- Assassination
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Assassin', 'Carried out the assassination that triggered the war', 1
-FROM events e, people p WHERE e.slug = 'assassination-archduke' AND p.slug = 'gavrilo-princip';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'assassination-archduke' AND p.slug = 'gavrilo-princip';
 
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Victim', 'His assassination was the immediate trigger for the war', 2
-FROM events e, people p WHERE e.slug = 'assassination-archduke' AND p.slug = 'franz-ferdinand';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'assassination-archduke' AND p.slug = 'franz-ferdinand';
 
 -- US enters war
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'President', 'Asked Congress to declare war on Germany', 1
-FROM events e, people p WHERE e.slug = 'us-enters-war' AND p.slug = 'woodrow-wilson';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'us-enters-war' AND p.slug = 'woodrow-wilson';
 
 -- Fourteen Points
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Author', 'Drafted and delivered the Fourteen Points speech to Congress', 1
-FROM events e, people p WHERE e.slug = 'fourteen-points' AND p.slug = 'woodrow-wilson';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'fourteen-points' AND p.slug = 'woodrow-wilson';
 
 -- Zimmermann Telegram
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Author', 'Sent the telegram proposing a German-Mexican alliance against the US', 1
-FROM events e, people p WHERE e.slug = 'zimmermann-telegram' AND p.slug = 'arthur-zimmermann';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'zimmermann-telegram' AND p.slug = 'arthur-zimmermann';
 
 -- Battle of the Somme
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'British Commander', 'Commanded British forces; oversaw the bloodiest day in British military history', 1
-FROM events e, people p WHERE e.slug = 'battle-of-somme' AND p.slug = 'douglas-haig';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'battle-of-somme' AND p.slug = 'douglas-haig';
 
 -- Passchendaele
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'British Commander', 'Planned and directed the offensive despite deteriorating conditions', 1
-FROM events e, people p WHERE e.slug = 'passchendaele' AND p.slug = 'douglas-haig';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'passchendaele' AND p.slug = 'douglas-haig';
 
 -- Spring Offensive
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Planner', 'Planned the offensive as Germany''s last bid for victory', 1
-FROM events e, people p WHERE e.slug = 'spring-offensive' AND p.slug = 'erich-ludendorff';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'spring-offensive' AND p.slug = 'erich-ludendorff';
 
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Allied Supreme Commander', 'Coordinated the Allied defense that ultimately stopped the offensive', 2
-FROM events e, people p WHERE e.slug = 'spring-offensive' AND p.slug = 'ferdinand-foch';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'spring-offensive' AND p.slug = 'ferdinand-foch';
 
 -- Hundred Days Offensive
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Allied Supreme Commander', 'Directed the series of Allied offensives that ended the war', 1
-FROM events e, people p WHERE e.slug = 'hundred-days-offensive' AND p.slug = 'ferdinand-foch';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'hundred-days-offensive' AND p.slug = 'ferdinand-foch';
 
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'British Commander', 'Led British forces in the decisive final offensives', 2
-FROM events e, people p WHERE e.slug = 'hundred-days-offensive' AND p.slug = 'douglas-haig';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'hundred-days-offensive' AND p.slug = 'douglas-haig';
 
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'German Commander', 'Called August 8 "the black day of the German Army"', 3
-FROM events e, people p WHERE e.slug = 'hundred-days-offensive' AND p.slug = 'erich-ludendorff';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'hundred-days-offensive' AND p.slug = 'erich-ludendorff';
 
 -- Russian Revolution
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Revolutionary Leader', 'Led the Bolshevik seizure of power and later took Russia out of the war', 1
-FROM events e, people p WHERE e.slug = 'russian-revolution' AND p.slug = 'vladimir-lenin';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'russian-revolution' AND p.slug = 'vladimir-lenin';
 
 -- Armistice
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 SELECT e.id, p.id, 'Allied Supreme Commander', 'The Armistice was signed in his railway carriage', 1
-FROM events e, people p WHERE e.slug = 'armistice' AND p.slug = 'ferdinand-foch';
+FROM timeline_events e, timeline_people p WHERE e.slug = 'armistice' AND p.slug = 'ferdinand-foch';
 
 -- Event links (event_a_id < event_b_id enforced by CHECK constraint)
 -- Assassination -> Austria ultimatum -> Austria declares war (causal chain)
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'caused', 'The assassination prompted Austria-Hungary''s ultimatum to Serbia'
-FROM events a, events b WHERE a.slug = 'assassination-archduke' AND b.slug = 'austria-ultimatum';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'assassination-archduke' AND b.slug = 'austria-ultimatum';
 
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'caused', 'Serbia''s partial rejection of the ultimatum was used to justify war'
-FROM events a, events b WHERE a.slug = 'austria-ultimatum' AND b.slug = 'austria-declares-war';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'austria-ultimatum' AND b.slug = 'austria-declares-war';
 
 -- Lusitania + Zimmermann -> US enters war
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'contributed to', 'The loss of 128 American lives shifted US public opinion against Germany'
-FROM events a, events b WHERE a.slug = 'lusitania-sinking' AND b.slug = 'us-enters-war';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'lusitania-sinking' AND b.slug = 'us-enters-war';
 
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'caused', 'The telegram''s publication was a decisive factor in the US declaration of war'
-FROM events a, events b WHERE a.slug = 'zimmermann-telegram' AND b.slug = 'us-enters-war';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'zimmermann-telegram' AND b.slug = 'us-enters-war';
 
 -- US enters -> Fourteen Points
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'preceded', 'Wilson outlined his peace vision nine months after entering the war'
-FROM events a, events b WHERE a.slug = 'us-enters-war' AND b.slug = 'fourteen-points';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'us-enters-war' AND b.slug = 'fourteen-points';
 
 -- Spring Offensive -> Hundred Days -> Armistice
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'caused', 'The failure of the Spring Offensive left Germany vulnerable to the Allied counterattack'
-FROM events a, events b WHERE a.slug = 'spring-offensive' AND b.slug = 'hundred-days-offensive';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'spring-offensive' AND b.slug = 'hundred-days-offensive';
 
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'caused', 'The Hundred Days Offensive forced Germany to seek an armistice'
-FROM events a, events b WHERE a.slug = 'hundred-days-offensive' AND b.slug = 'armistice';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'hundred-days-offensive' AND b.slug = 'armistice';
 
 -- Marne -> trench warfare context
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'related', 'Both major Western Front battles defined by the trench warfare the Marne initiated'
-FROM events a, events b WHERE a.slug = 'battle-of-marne' AND b.slug = 'battle-of-verdun';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'battle-of-marne' AND b.slug = 'battle-of-verdun';
 
 -- Somme -> tanks first used
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 SELECT a.id, b.id, 'related', 'Tanks were first deployed during the later stages of the Somme campaign'
-FROM events a, events b WHERE a.slug = 'battle-of-somme' AND b.slug = 'tanks-first-used';
+FROM timeline_events a, timeline_events b WHERE a.slug = 'battle-of-somme' AND b.slug = 'tanks-first-used';
 
 -- Sources
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 SELECT e.id, 'https://en.wikipedia.org/wiki/Assassination_of_Archduke_Franz_Ferdinand',
     'Assassination of Archduke Franz Ferdinand', '', 'Wikipedia', 1
-FROM events e WHERE e.slug = 'assassination-archduke';
+FROM timeline_events e WHERE e.slug = 'assassination-archduke';
 
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 SELECT e.id, 'https://www.britannica.com/event/Battle-of-the-Somme',
     'Battle of the Somme', '', 'Encyclopaedia Britannica', 1
-FROM events e WHERE e.slug = 'battle-of-somme';
+FROM timeline_events e WHERE e.slug = 'battle-of-somme';
 
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 SELECT e.id, 'https://www.archives.gov/historical-docs/todays-doc/?dod-date=108',
     'Zimmermann Telegram', '', 'US National Archives', 1
-FROM events e WHERE e.slug = 'zimmermann-telegram';
+FROM timeline_events e WHERE e.slug = 'zimmermann-telegram';
 
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 SELECT e.id, 'https://avalon.law.yale.edu/20th_century/wilson14.asp',
     'President Woodrow Wilson''s Fourteen Points', '', 'The Avalon Project, Yale Law School', 1
-FROM events e WHERE e.slug = 'fourteen-points';
+FROM timeline_events e WHERE e.slug = 'fourteen-points';
 
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 SELECT e.id, 'https://www.iwm.org.uk/history/the-christmas-truce',
     'The Christmas Truce', '', 'Imperial War Museums', 1
-FROM events e WHERE e.slug = 'christmas-truce';
+FROM timeline_events e WHERE e.slug = 'christmas-truce';
 
-INSERT INTO event_sources (event_id, url, title, author, citation, sort_order)
+INSERT INTO timeline_event_sources (event_id, url, title, author, citation, sort_order)
 SELECT e.id, 'https://www.britannica.com/event/Battle-of-Verdun',
     'Battle of Verdun', '', 'Encyclopaedia Britannica', 1
-FROM events e WHERE e.slug = 'battle-of-verdun';
+FROM timeline_events e WHERE e.slug = 'battle-of-verdun';

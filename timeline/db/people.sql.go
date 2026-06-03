@@ -12,7 +12,7 @@ import (
 )
 
 const addEventPerson = `-- name: AddEventPerson :exec
-INSERT INTO event_people (event_id, person_id, role, explainer, sort_order)
+INSERT INTO timeline_event_people (event_id, person_id, role, explainer, sort_order)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING
 `
@@ -37,7 +37,7 @@ func (q *Queries) AddEventPerson(ctx context.Context, arg AddEventPersonParams) 
 }
 
 const createPerson = `-- name: CreatePerson :one
-INSERT INTO people (timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url)
+INSERT INTO timeline_people (timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at
 `
@@ -53,7 +53,7 @@ type CreatePersonParams struct {
 	PhotoUrl   string      `json:"photo_url"`
 }
 
-func (q *Queries) CreatePerson(ctx context.Context, arg CreatePersonParams) (Person, error) {
+func (q *Queries) CreatePerson(ctx context.Context, arg CreatePersonParams) (TimelinePerson, error) {
 	row := q.db.QueryRow(ctx, createPerson,
 		arg.TimelineID,
 		arg.Slug,
@@ -64,7 +64,7 @@ func (q *Queries) CreatePerson(ctx context.Context, arg CreatePersonParams) (Per
 		arg.DiedDate,
 		arg.PhotoUrl,
 	)
-	var i Person
+	var i TimelinePerson
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -82,7 +82,7 @@ func (q *Queries) CreatePerson(ctx context.Context, arg CreatePersonParams) (Per
 }
 
 const deletePerson = `-- name: DeletePerson :exec
-DELETE FROM people WHERE id = $1 AND timeline_id = $2
+DELETE FROM timeline_people WHERE id = $1 AND timeline_id = $2
 `
 
 type DeletePersonParams struct {
@@ -96,7 +96,7 @@ func (q *Queries) DeletePerson(ctx context.Context, arg DeletePersonParams) erro
 }
 
 const getPerson = `-- name: GetPerson :one
-SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM people
+SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM timeline_people
 WHERE timeline_id = $1 AND slug = $2
 `
 
@@ -105,9 +105,9 @@ type GetPersonParams struct {
 	Slug       string `json:"slug"`
 }
 
-func (q *Queries) GetPerson(ctx context.Context, arg GetPersonParams) (Person, error) {
+func (q *Queries) GetPerson(ctx context.Context, arg GetPersonParams) (TimelinePerson, error) {
 	row := q.db.QueryRow(ctx, getPerson, arg.TimelineID, arg.Slug)
-	var i Person
+	var i TimelinePerson
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -125,13 +125,13 @@ func (q *Queries) GetPerson(ctx context.Context, arg GetPersonParams) (Person, e
 }
 
 const getPersonByID = `-- name: GetPersonByID :one
-SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM people
+SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM timeline_people
 WHERE id = $1
 `
 
-func (q *Queries) GetPersonByID(ctx context.Context, id int64) (Person, error) {
+func (q *Queries) GetPersonByID(ctx context.Context, id int64) (TimelinePerson, error) {
 	row := q.db.QueryRow(ctx, getPersonByID, id)
-	var i Person
+	var i TimelinePerson
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -150,8 +150,8 @@ func (q *Queries) GetPersonByID(ctx context.Context, id int64) (Person, error) {
 
 const listEventPeople = `-- name: ListEventPeople :many
 SELECT p.id, p.timeline_id, p.slug, p.name, p.sort_name, p.bio, p.born_date, p.died_date, p.photo_url, p.created_at, p.updated_at, ep.role, ep.explainer, ep.sort_order
-FROM people p
-JOIN event_people ep ON ep.person_id = p.id
+FROM timeline_people p
+JOIN timeline_event_people ep ON ep.person_id = p.id
 WHERE ep.event_id = $1
 ORDER BY ep.sort_order ASC, p.name ASC
 `
@@ -209,20 +209,20 @@ func (q *Queries) ListEventPeople(ctx context.Context, eventID int64) ([]ListEve
 }
 
 const listPeople = `-- name: ListPeople :many
-SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM people
+SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM timeline_people
 WHERE timeline_id = $1
 ORDER BY sort_name ASC, name ASC
 `
 
-func (q *Queries) ListPeople(ctx context.Context, timelineID int64) ([]Person, error) {
+func (q *Queries) ListPeople(ctx context.Context, timelineID int64) ([]TimelinePerson, error) {
 	rows, err := q.db.Query(ctx, listPeople, timelineID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Person{}
+	items := []TimelinePerson{}
 	for rows.Next() {
-		var i Person
+		var i TimelinePerson
 		if err := rows.Scan(
 			&i.ID,
 			&i.TimelineID,
@@ -252,9 +252,9 @@ SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date,
        c.color AS category_color,
        ep.role,
        ep.explainer
-FROM events e
-LEFT JOIN categories c ON c.id = e.category_id
-JOIN event_people ep ON ep.event_id = e.id
+FROM timeline_events e
+LEFT JOIN timeline_categories c ON c.id = e.category_id
+JOIN timeline_event_people ep ON ep.event_id = e.id
 WHERE ep.person_id = $1
 ORDER BY e.event_date ASC, e.sort_order ASC
 `
@@ -318,7 +318,7 @@ func (q *Queries) ListPersonEvents(ctx context.Context, personID int64) ([]ListP
 }
 
 const searchPeople = `-- name: SearchPeople :many
-SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM people
+SELECT id, timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url, created_at, updated_at FROM timeline_people
 WHERE timeline_id = $1
   AND (name ILIKE '%' || $2 || '%' OR sort_name ILIKE '%' || $2 || '%')
 ORDER BY sort_name ASC, name ASC
@@ -331,15 +331,15 @@ type SearchPeopleParams struct {
 	MaxResults int32       `json:"max_results"`
 }
 
-func (q *Queries) SearchPeople(ctx context.Context, arg SearchPeopleParams) ([]Person, error) {
+func (q *Queries) SearchPeople(ctx context.Context, arg SearchPeopleParams) ([]TimelinePerson, error) {
 	rows, err := q.db.Query(ctx, searchPeople, arg.TimelineID, arg.Query, arg.MaxResults)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Person{}
+	items := []TimelinePerson{}
 	for rows.Next() {
-		var i Person
+		var i TimelinePerson
 		if err := rows.Scan(
 			&i.ID,
 			&i.TimelineID,
@@ -364,7 +364,7 @@ func (q *Queries) SearchPeople(ctx context.Context, arg SearchPeopleParams) ([]P
 }
 
 const updatePerson = `-- name: UpdatePerson :one
-UPDATE people SET
+UPDATE timeline_people SET
     name = $1,
     sort_name = $2,
     bio = $3,
@@ -387,7 +387,7 @@ type UpdatePersonParams struct {
 	TimelineID int64       `json:"timeline_id"`
 }
 
-func (q *Queries) UpdatePerson(ctx context.Context, arg UpdatePersonParams) (Person, error) {
+func (q *Queries) UpdatePerson(ctx context.Context, arg UpdatePersonParams) (TimelinePerson, error) {
 	row := q.db.QueryRow(ctx, updatePerson,
 		arg.Name,
 		arg.SortName,
@@ -398,7 +398,7 @@ func (q *Queries) UpdatePerson(ctx context.Context, arg UpdatePersonParams) (Per
 		arg.ID,
 		arg.TimelineID,
 	)
-	var i Person
+	var i TimelinePerson
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,

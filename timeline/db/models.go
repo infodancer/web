@@ -8,16 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type ApiKey struct {
-	ID         int64              `json:"id"`
-	TimelineID pgtype.Int8        `json:"timeline_id"`
-	KeyHash    string             `json:"key_hash"`
-	Label      string             `json:"label"`
-	Readonly   bool               `json:"readonly"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-}
-
-type Category struct {
+type TimelineCategory struct {
 	ID         int64  `json:"id"`
 	TimelineID int64  `json:"timeline_id"`
 	Slug       string `json:"slug"`
@@ -26,7 +17,7 @@ type Category struct {
 	SortOrder  int32  `json:"sort_order"`
 }
 
-type Event struct {
+type TimelineEvent struct {
 	ID            int64              `json:"id"`
 	TimelineID    int64              `json:"timeline_id"`
 	Slug          string             `json:"slug"`
@@ -42,14 +33,14 @@ type Event struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
-type EventLink struct {
+type TimelineEventLink struct {
 	EventAID     int64  `json:"event_a_id"`
 	EventBID     int64  `json:"event_b_id"`
 	Relationship string `json:"relationship"`
 	Description  string `json:"description"`
 }
 
-type EventPerson struct {
+type TimelineEventPerson struct {
 	EventID   int64  `json:"event_id"`
 	PersonID  int64  `json:"person_id"`
 	Role      string `json:"role"`
@@ -57,7 +48,7 @@ type EventPerson struct {
 	SortOrder int32  `json:"sort_order"`
 }
 
-type EventSource struct {
+type TimelineEventSource struct {
 	ID        int64  `json:"id"`
 	EventID   int64  `json:"event_id"`
 	Url       string `json:"url"`
@@ -67,24 +58,12 @@ type EventSource struct {
 	SortOrder int32  `json:"sort_order"`
 }
 
-type EventTag struct {
+type TimelineEventTag struct {
 	EventID int64 `json:"event_id"`
 	TagID   int64 `json:"tag_id"`
 }
 
-type Image struct {
-	ID          int64              `json:"id"`
-	TimelineID  int64              `json:"timeline_id"`
-	Slug        string             `json:"slug"`
-	Usage       string             `json:"usage"`
-	ContentType string             `json:"content_type"`
-	Width       int32              `json:"width"`
-	Height      int32              `json:"height"`
-	FileSize    int32              `json:"file_size"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-}
-
-type Person struct {
+type TimelinePerson struct {
 	ID         int64              `json:"id"`
 	TimelineID int64              `json:"timeline_id"`
 	Slug       string             `json:"slug"`
@@ -98,13 +77,13 @@ type Person struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
-type Tag struct {
+type TimelineTag struct {
 	ID   int64  `json:"id"`
 	Slug string `json:"slug"`
 	Name string `json:"name"`
 }
 
-type Timeline struct {
+type TimelineTimeline struct {
 	ID          int64              `json:"id"`
 	Slug        string             `json:"slug"`
 	Name        string             `json:"name"`

@@ -12,7 +12,7 @@ import (
 )
 
 const upsertCategory = `-- name: UpsertCategory :one
-INSERT INTO categories (timeline_id, slug, name, color, sort_order)
+INSERT INTO timeline_categories (timeline_id, slug, name, color, sort_order)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (timeline_id, slug) DO UPDATE SET
     name = EXCLUDED.name,
@@ -29,7 +29,7 @@ type UpsertCategoryParams struct {
 	SortOrder  int32  `json:"sort_order"`
 }
 
-func (q *Queries) UpsertCategory(ctx context.Context, arg UpsertCategoryParams) (Category, error) {
+func (q *Queries) UpsertCategory(ctx context.Context, arg UpsertCategoryParams) (TimelineCategory, error) {
 	row := q.db.QueryRow(ctx, upsertCategory,
 		arg.TimelineID,
 		arg.Slug,
@@ -37,7 +37,7 @@ func (q *Queries) UpsertCategory(ctx context.Context, arg UpsertCategoryParams) 
 		arg.Color,
 		arg.SortOrder,
 	)
-	var i Category
+	var i TimelineCategory
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -50,7 +50,7 @@ func (q *Queries) UpsertCategory(ctx context.Context, arg UpsertCategoryParams) 
 }
 
 const upsertEvent = `-- name: UpsertEvent :one
-INSERT INTO events (timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id)
+INSERT INTO timeline_events (timeline_id, slug, title, summary, article, event_date, event_end_date, date_precision, sort_order, category_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (timeline_id, slug) DO UPDATE SET
     title = EXCLUDED.title,
@@ -78,7 +78,7 @@ type UpsertEventParams struct {
 	CategoryID    pgtype.Int8 `json:"category_id"`
 }
 
-func (q *Queries) UpsertEvent(ctx context.Context, arg UpsertEventParams) (Event, error) {
+func (q *Queries) UpsertEvent(ctx context.Context, arg UpsertEventParams) (TimelineEvent, error) {
 	row := q.db.QueryRow(ctx, upsertEvent,
 		arg.TimelineID,
 		arg.Slug,
@@ -91,7 +91,7 @@ func (q *Queries) UpsertEvent(ctx context.Context, arg UpsertEventParams) (Event
 		arg.SortOrder,
 		arg.CategoryID,
 	)
-	var i Event
+	var i TimelineEvent
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -111,7 +111,7 @@ func (q *Queries) UpsertEvent(ctx context.Context, arg UpsertEventParams) (Event
 }
 
 const upsertPerson = `-- name: UpsertPerson :one
-INSERT INTO people (timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url)
+INSERT INTO timeline_people (timeline_id, slug, name, sort_name, bio, born_date, died_date, photo_url)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (timeline_id, slug) DO UPDATE SET
     name = EXCLUDED.name,
@@ -135,7 +135,7 @@ type UpsertPersonParams struct {
 	PhotoUrl   string      `json:"photo_url"`
 }
 
-func (q *Queries) UpsertPerson(ctx context.Context, arg UpsertPersonParams) (Person, error) {
+func (q *Queries) UpsertPerson(ctx context.Context, arg UpsertPersonParams) (TimelinePerson, error) {
 	row := q.db.QueryRow(ctx, upsertPerson,
 		arg.TimelineID,
 		arg.Slug,
@@ -146,7 +146,7 @@ func (q *Queries) UpsertPerson(ctx context.Context, arg UpsertPersonParams) (Per
 		arg.DiedDate,
 		arg.PhotoUrl,
 	)
-	var i Person
+	var i TimelinePerson
 	err := row.Scan(
 		&i.ID,
 		&i.TimelineID,
@@ -164,7 +164,7 @@ func (q *Queries) UpsertPerson(ctx context.Context, arg UpsertPersonParams) (Per
 }
 
 const upsertTimeline = `-- name: UpsertTimeline :one
-INSERT INTO timelines (slug, name, description, is_public)
+INSERT INTO timeline_timelines (slug, name, description, is_public)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (slug) DO UPDATE SET
     name = EXCLUDED.name,
@@ -181,14 +181,14 @@ type UpsertTimelineParams struct {
 	IsPublic    bool   `json:"is_public"`
 }
 
-func (q *Queries) UpsertTimeline(ctx context.Context, arg UpsertTimelineParams) (Timeline, error) {
+func (q *Queries) UpsertTimeline(ctx context.Context, arg UpsertTimelineParams) (TimelineTimeline, error) {
 	row := q.db.QueryRow(ctx, upsertTimeline,
 		arg.Slug,
 		arg.Name,
 		arg.Description,
 		arg.IsPublic,
 	)
-	var i Timeline
+	var i TimelineTimeline
 	err := row.Scan(
 		&i.ID,
 		&i.Slug,

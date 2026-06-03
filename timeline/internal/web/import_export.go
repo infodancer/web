@@ -303,7 +303,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	s.importData(w, ctx, tl, data)
 }
 
-func (s *Server) importData(w http.ResponseWriter, ctx context.Context, tl db.Timeline, data timelineExport) {
+func (s *Server) importData(w http.ResponseWriter, ctx context.Context, tl db.TimelineTimeline, data timelineExport) {
 	// Categories: create, build slug->id map
 	catMap := map[string]int64{}
 	for _, c := range data.Categories {

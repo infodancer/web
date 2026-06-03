@@ -215,12 +215,12 @@ type eventCardsData struct {
 }
 
 type eventDetailData struct {
-	Timeline     db.Timeline
+	Timeline     db.TimelineTimeline
 	Event        db.GetEventRow
-	Tags         []db.Tag
+	Tags         []db.TimelineTag
 	People       []db.ListEventPeopleRow
 	LinkedEvents []db.ListLinkedEventsRow
-	Sources      []db.EventSource
+	Sources      []db.TimelineEventSource
 }
 
 func toEventCard(id, timelineID int64, slug, title, summary string, eventDate pgtype.Date, precision string, sortOrder int32, categoryID pgtype.Int8, catName, catColor pgtype.Text) eventCardData {

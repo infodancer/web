@@ -12,7 +12,7 @@ import (
 )
 
 const createTimeline = `-- name: CreateTimeline :one
-INSERT INTO timelines (slug, name, description, start_date, end_date, is_public)
+INSERT INTO timeline_timelines (slug, name, description, start_date, end_date, is_public)
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, slug, name, description, start_date, end_date, is_public, created_at, updated_at
 `
@@ -26,7 +26,7 @@ type CreateTimelineParams struct {
 	IsPublic    bool        `json:"is_public"`
 }
 
-func (q *Queries) CreateTimeline(ctx context.Context, arg CreateTimelineParams) (Timeline, error) {
+func (q *Queries) CreateTimeline(ctx context.Context, arg CreateTimelineParams) (TimelineTimeline, error) {
 	row := q.db.QueryRow(ctx, createTimeline,
 		arg.Slug,
 		arg.Name,
@@ -35,7 +35,7 @@ func (q *Queries) CreateTimeline(ctx context.Context, arg CreateTimelineParams) 
 		arg.EndDate,
 		arg.IsPublic,
 	)
-	var i Timeline
+	var i TimelineTimeline
 	err := row.Scan(
 		&i.ID,
 		&i.Slug,
@@ -51,7 +51,7 @@ func (q *Queries) CreateTimeline(ctx context.Context, arg CreateTimelineParams) 
 }
 
 const deleteTimeline = `-- name: DeleteTimeline :exec
-DELETE FROM timelines WHERE slug = $1
+DELETE FROM timeline_timelines WHERE slug = $1
 `
 
 func (q *Queries) DeleteTimeline(ctx context.Context, slug string) error {
@@ -60,13 +60,13 @@ func (q *Queries) DeleteTimeline(ctx context.Context, slug string) error {
 }
 
 const getTimeline = `-- name: GetTimeline :one
-SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timelines
+SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timeline_timelines
 WHERE slug = $1
 `
 
-func (q *Queries) GetTimeline(ctx context.Context, slug string) (Timeline, error) {
+func (q *Queries) GetTimeline(ctx context.Context, slug string) (TimelineTimeline, error) {
 	row := q.db.QueryRow(ctx, getTimeline, slug)
-	var i Timeline
+	var i TimelineTimeline
 	err := row.Scan(
 		&i.ID,
 		&i.Slug,
@@ -82,13 +82,13 @@ func (q *Queries) GetTimeline(ctx context.Context, slug string) (Timeline, error
 }
 
 const getTimelineByID = `-- name: GetTimelineByID :one
-SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timelines
+SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timeline_timelines
 WHERE id = $1
 `
 
-func (q *Queries) GetTimelineByID(ctx context.Context, id int64) (Timeline, error) {
+func (q *Queries) GetTimelineByID(ctx context.Context, id int64) (TimelineTimeline, error) {
 	row := q.db.QueryRow(ctx, getTimelineByID, id)
-	var i Timeline
+	var i TimelineTimeline
 	err := row.Scan(
 		&i.ID,
 		&i.Slug,
@@ -104,20 +104,20 @@ func (q *Queries) GetTimelineByID(ctx context.Context, id int64) (Timeline, erro
 }
 
 const listPublicTimelines = `-- name: ListPublicTimelines :many
-SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timelines
+SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timeline_timelines
 WHERE is_public = true
 ORDER BY name ASC
 `
 
-func (q *Queries) ListPublicTimelines(ctx context.Context) ([]Timeline, error) {
+func (q *Queries) ListPublicTimelines(ctx context.Context) ([]TimelineTimeline, error) {
 	rows, err := q.db.Query(ctx, listPublicTimelines)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Timeline{}
+	items := []TimelineTimeline{}
 	for rows.Next() {
-		var i Timeline
+		var i TimelineTimeline
 		if err := rows.Scan(
 			&i.ID,
 			&i.Slug,
@@ -140,19 +140,19 @@ func (q *Queries) ListPublicTimelines(ctx context.Context) ([]Timeline, error) {
 }
 
 const listTimelines = `-- name: ListTimelines :many
-SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timelines
+SELECT id, slug, name, description, start_date, end_date, is_public, created_at, updated_at FROM timeline_timelines
 ORDER BY name ASC
 `
 
-func (q *Queries) ListTimelines(ctx context.Context) ([]Timeline, error) {
+func (q *Queries) ListTimelines(ctx context.Context) ([]TimelineTimeline, error) {
 	rows, err := q.db.Query(ctx, listTimelines)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Timeline{}
+	items := []TimelineTimeline{}
 	for rows.Next() {
-		var i Timeline
+		var i TimelineTimeline
 		if err := rows.Scan(
 			&i.ID,
 			&i.Slug,
@@ -175,7 +175,7 @@ func (q *Queries) ListTimelines(ctx context.Context) ([]Timeline, error) {
 }
 
 const updateTimeline = `-- name: UpdateTimeline :one
-UPDATE timelines SET
+UPDATE timeline_timelines SET
     name = $1,
     description = $2,
     start_date = $3,
@@ -195,7 +195,7 @@ type UpdateTimelineParams struct {
 	Slug        string      `json:"slug"`
 }
 
-func (q *Queries) UpdateTimeline(ctx context.Context, arg UpdateTimelineParams) (Timeline, error) {
+func (q *Queries) UpdateTimeline(ctx context.Context, arg UpdateTimelineParams) (TimelineTimeline, error) {
 	row := q.db.QueryRow(ctx, updateTimeline,
 		arg.Name,
 		arg.Description,
@@ -204,7 +204,7 @@ func (q *Queries) UpdateTimeline(ctx context.Context, arg UpdateTimelineParams) 
 		arg.IsPublic,
 		arg.Slug,
 	)
-	var i Timeline
+	var i TimelineTimeline
 	err := row.Scan(
 		&i.ID,
 		&i.Slug,

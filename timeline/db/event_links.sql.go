@@ -12,7 +12,7 @@ import (
 )
 
 const addEventLink = `-- name: AddEventLink :exec
-INSERT INTO event_links (event_a_id, event_b_id, relationship, description)
+INSERT INTO timeline_event_links (event_a_id, event_b_id, relationship, description)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING
 `
@@ -35,7 +35,7 @@ func (q *Queries) AddEventLink(ctx context.Context, arg AddEventLinkParams) erro
 }
 
 const deleteEventLink = `-- name: DeleteEventLink :exec
-DELETE FROM event_links
+DELETE FROM timeline_event_links
 WHERE event_a_id = $1 AND event_b_id = $2
 `
 
@@ -50,7 +50,7 @@ func (q *Queries) DeleteEventLink(ctx context.Context, arg DeleteEventLinkParams
 }
 
 const deleteEventPerson = `-- name: DeleteEventPerson :exec
-DELETE FROM event_people
+DELETE FROM timeline_event_people
 WHERE event_id = $1 AND person_id = $2
 `
 
@@ -70,9 +70,9 @@ SELECT e.id, e.timeline_id, e.slug, e.title, e.summary, e.article, e.event_date,
        c.color AS category_color,
        el.relationship,
        el.description AS link_description
-FROM event_links el
-JOIN events e ON (e.id = CASE WHEN el.event_a_id = $1 THEN el.event_b_id ELSE el.event_a_id END)
-LEFT JOIN categories c ON c.id = e.category_id
+FROM timeline_event_links el
+JOIN timeline_events e ON (e.id = CASE WHEN el.event_a_id = $1 THEN el.event_b_id ELSE el.event_a_id END)
+LEFT JOIN timeline_categories c ON c.id = e.category_id
 WHERE el.event_a_id = $1 OR el.event_b_id = $1
 ORDER BY e.event_date ASC
 `

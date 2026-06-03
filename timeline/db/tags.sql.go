@@ -10,7 +10,7 @@ import (
 )
 
 const addEventTag = `-- name: AddEventTag :exec
-INSERT INTO event_tags (event_id, tag_id)
+INSERT INTO timeline_event_tags (event_id, tag_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING
 `
@@ -26,7 +26,7 @@ func (q *Queries) AddEventTag(ctx context.Context, arg AddEventTagParams) error 
 }
 
 const getOrCreateTag = `-- name: GetOrCreateTag :one
-INSERT INTO tags (slug, name)
+INSERT INTO timeline_tags (slug, name)
 VALUES ($1, $2)
 ON CONFLICT (slug) DO UPDATE SET slug = EXCLUDED.slug
 RETURNING id, slug, name
@@ -37,30 +37,30 @@ type GetOrCreateTagParams struct {
 	Name string `json:"name"`
 }
 
-func (q *Queries) GetOrCreateTag(ctx context.Context, arg GetOrCreateTagParams) (Tag, error) {
+func (q *Queries) GetOrCreateTag(ctx context.Context, arg GetOrCreateTagParams) (TimelineTag, error) {
 	row := q.db.QueryRow(ctx, getOrCreateTag, arg.Slug, arg.Name)
-	var i Tag
+	var i TimelineTag
 	err := row.Scan(&i.ID, &i.Slug, &i.Name)
 	return i, err
 }
 
 const listEventTags = `-- name: ListEventTags :many
 SELECT t.id, t.slug, t.name
-FROM tags t
-JOIN event_tags et ON et.tag_id = t.id
+FROM timeline_tags t
+JOIN timeline_event_tags et ON et.tag_id = t.id
 WHERE et.event_id = $1
 ORDER BY t.name ASC
 `
 
-func (q *Queries) ListEventTags(ctx context.Context, eventID int64) ([]Tag, error) {
+func (q *Queries) ListEventTags(ctx context.Context, eventID int64) ([]TimelineTag, error) {
 	rows, err := q.db.Query(ctx, listEventTags, eventID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Tag{}
+	items := []TimelineTag{}
 	for rows.Next() {
-		var i Tag
+		var i TimelineTag
 		if err := rows.Scan(&i.ID, &i.Slug, &i.Name); err != nil {
 			return nil, err
 		}
@@ -74,9 +74,9 @@ func (q *Queries) ListEventTags(ctx context.Context, eventID int64) ([]Tag, erro
 
 const listTags = `-- name: ListTags :many
 SELECT t.id, t.slug, t.name, COUNT(et.event_id) AS event_count
-FROM tags t
-LEFT JOIN event_tags et ON et.tag_id = t.id
-LEFT JOIN events e ON e.id = et.event_id AND e.timeline_id = $1
+FROM timeline_tags t
+LEFT JOIN timeline_event_tags et ON et.tag_id = t.id
+LEFT JOIN timeline_events e ON e.id = et.event_id AND e.timeline_id = $1
 GROUP BY t.id
 HAVING COUNT(et.event_id) > 0
 ORDER BY t.name ASC
@@ -115,7 +115,7 @@ func (q *Queries) ListTags(ctx context.Context, timelineID int64) ([]ListTagsRow
 }
 
 const removeEventTag = `-- name: RemoveEventTag :exec
-DELETE FROM event_tags WHERE event_id = $1 AND tag_id = $2
+DELETE FROM timeline_event_tags WHERE event_id = $1 AND tag_id = $2
 `
 
 type RemoveEventTagParams struct {
