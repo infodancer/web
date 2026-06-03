@@ -1,0 +1,10 @@
+{{- $base := .BasePath -}}{{- $slug := .TimelineSlug -}}{{ range .Events }}
+<div class="tl-event"
+     data-date="{{ .EventDate.Format "2006-01-02" }}"
+     data-sort="{{ .SortOrder }}"
+     data-category-id="{{ .CategoryID }}"
+     data-slug="{{ .Slug }}"
+     title="{{ formatDate .EventDate .DatePrecision }}">
+  <span class="tl-event-title" data-inline-url="{{ $base }}/t/{{ $slug }}/event/{{ .Slug }}/inline">{{ .Title }}</span>
+</div>
+{{ end }}

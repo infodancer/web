@@ -53,7 +53,11 @@ func sampleTimeline() transfer.TimelineExport {
 		Name: "Test Timeline", Slug: "test", IsPublic: true,
 		Categories: []transfer.Category{{Slug: "politics", Name: "Politics"}},
 		Events: []transfer.Event{
-			{Slug: "e1", Title: "First Event", Summary: "the start", Date: "2001-01-01", Category: "politics"},
+			{
+				Slug: "e1", Title: "First Event", Summary: "the start",
+				Article: "## Origins\n\nThe **first** event of note.",
+				Date:    "2001-01-01", Category: "politics",
+			},
 			{Slug: "e2", Title: "Second Event", Summary: "the middle", Date: "2002-02-02"},
 		},
 	}
@@ -91,9 +95,17 @@ func TestModuleServesImportedTimeline(t *testing.T) {
 
 	srv := mount(m)
 
-	// Index lists the public timeline.
-	if body, code := get(t, srv, basePath+"/"); code != 200 || !strings.Contains(body, "Test Timeline") {
+	// Index lists the public timeline and renders through ui chrome (ui CSS +
+	// timeline's own layout CSS via ExtraCSS).
+	body, code := get(t, srv, basePath+"/")
+	if code != 200 || !strings.Contains(body, "Test Timeline") {
 		t.Fatalf("index: code=%d, contains-name=%v", code, strings.Contains(body, "Test Timeline"))
+	}
+	if !strings.Contains(body, basePath+"/static/ui/css/tokens.css") {
+		t.Error("index: ui chrome tokens.css not linked")
+	}
+	if !strings.Contains(body, basePath+"/static/style.css") {
+		t.Error("index: timeline layout CSS not linked via ExtraCSS")
 	}
 	// Timeline page renders.
 	if _, code := get(t, srv, basePath+"/t/test"); code != 200 {
@@ -102,6 +114,66 @@ func TestModuleServesImportedTimeline(t *testing.T) {
 	// Admin export succeeds (resolver returns an admin).
 	if body, code := get(t, srv, basePath+"/t/test/export"); code != 200 || !strings.Contains(body, `"slug": "test"`) {
 		t.Fatalf("export: code=%d", code)
+	}
+}
+
+// TestEventDetailRendersMarkdown confirms the event Article is rendered through
+// infodancer/ui/markdown (M5) rather than escaped.
+func TestEventDetailRendersMarkdown(t *testing.T) {
+	ctx := context.Background()
+	pool := newPool(t)
+	admin := &timelineuser.User{Subject: "s", Issuer: "i", Admin: true}
+	m, err := timeline.New(timeline.Config{
+		DB: pool, Resolver: resolver{u: admin}, BasePath: basePath, AutoMigrate: true,
+	})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "TRUNCATE timeline_timelines, timeline_events, timeline_categories, timeline_tags, timeline_users RESTART IDENTITY CASCADE"); err != nil {
+		t.Fatalf("truncate: %v", err)
+	}
+	if _, err := m.Import(ctx, "test", sampleTimeline()); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+
+	body, code := get(t, mount(m), basePath+"/t/test/event/e1")
+	if code != 200 {
+		t.Fatalf("event detail: code=%d, want 200", code)
+	}
+	if !strings.Contains(body, "<h2") || !strings.Contains(body, "<strong>first</strong>") {
+		t.Errorf("article not rendered as markdown HTML; body lacked <h2>/<strong>")
+	}
+	if strings.Contains(body, "## Origins") {
+		t.Errorf("article rendered as raw/escaped markdown, not HTML")
+	}
+}
+
+// TestEmbedModeStripsChrome confirms ?embed=true renders the chrome-less
+// document (M5): the embed body class is present and the ui footer is absent.
+func TestEmbedModeStripsChrome(t *testing.T) {
+	ctx := context.Background()
+	pool := newPool(t)
+	m, err := timeline.New(timeline.Config{
+		DB: pool, Resolver: resolver{u: nil}, BasePath: basePath, AutoMigrate: true,
+	})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "TRUNCATE timeline_timelines, timeline_events, timeline_categories, timeline_tags, timeline_users RESTART IDENTITY CASCADE"); err != nil {
+		t.Fatalf("truncate: %v", err)
+	}
+	if _, err := m.Import(ctx, "test", sampleTimeline()); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	srv := mount(m)
+
+	embed, code := get(t, srv, basePath+"/t/test?embed=true")
+	if code != 200 || !strings.Contains(embed, `class="embed-mode"`) {
+		t.Fatalf("embed: code=%d, has embed-mode=%v", code, strings.Contains(embed, `class="embed-mode"`))
+	}
+	full, _ := get(t, srv, basePath+"/t/test")
+	if strings.Contains(embed, "<footer") && !strings.Contains(full, "<footer") {
+		t.Error("embed should not include the footer that the full page has")
 	}
 }
 

@@ -1,0 +1,102 @@
+{{ define "title" }}{{ .Page.Timeline.Name }}{{ end }}
+
+{{ define "head" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<meta name="description" content="{{ $v.Timeline.Description }}">
+<link rel="canonical" href="{{ .BaseURL }}{{ $base }}/t/{{ $v.Timeline.Slug }}">
+<meta property="og:title" content="{{ $v.Timeline.Name }}">
+<meta property="og:description" content="{{ $v.Timeline.Description }}">
+<meta property="og:type" content="website">
+<link rel="alternate" type="application/atom+xml" title="{{ $v.Timeline.Name }}" href="{{ .BaseURL }}{{ $base }}/t/{{ $v.Timeline.Slug }}/feed.atom">
+<script defer src="{{ $base }}/static/timeline.js"></script>
+{{ end }}
+
+{{ define "content" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<div class="page-timeline"
+     data-base="{{ $base }}"
+     data-slug="{{ $v.Timeline.Slug }}"
+     data-min-date="{{ $v.MinDate }}"
+     data-max-date="{{ $v.MaxDate }}"
+     data-left-count="{{ $v.LeftCount }}"
+     data-right-count="{{ $v.RightCount }}">
+
+  <div class="timeline-header">
+    <h1>{{ $v.Timeline.Name }}</h1>
+    {{ if $v.Timeline.Description }}<p class="timeline-description">{{ $v.Timeline.Description }}</p>{{ end }}
+    <div class="timeline-meta">
+      <span class="event-count">{{ $v.EventCount }} events</span>
+      {{ if $v.MinDate }}<span class="date-range">{{ $v.MinDate }} &mdash; {{ $v.MaxDate }}</span>{{ end }}
+      <div class="search-box">
+        <input type="search" name="q" placeholder="Search events..."
+               hx-get="{{ $base }}/t/{{ $v.Timeline.Slug }}/search"
+               hx-trigger="input changed delay:300ms, search"
+               hx-target="#search-results"
+               autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <div id="search-results" class="search-results-container"></div>
+
+  {{ if $v.Lanes }}
+  <div class="column-controls">
+    {{ range $v.Lanes }}
+    <button class="column-toggle active" data-category-id="{{ .CategoryID }}" data-side="{{ .Side }}" data-lane-index="{{ .Index }}" style="--cat-color: {{ .Color }}">
+      <span class="toggle-swatch"></span>{{ .Name }}
+    </button>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{ if $v.Tags }}
+  <div class="tag-controls collapsed" id="tag-controls">
+    <button class="tag-controls-toggle" onclick="document.getElementById('tag-controls').classList.toggle('collapsed')">
+      Tags <span class="tag-controls-count">({{ len $v.Tags }})</span>
+    </button>
+    <div class="tag-controls-list">
+      {{ range $v.Tags }}
+      <button class="tag-toggle" data-tag-id="{{ .ID }}">{{ .Name }} <span class="tag-count">{{ .EventCount }}</span></button>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+
+  <div class="tl-wrap">
+    <div class="tl-lane-bar">
+      {{ range $v.Lanes }}
+      <div class="tl-lane-label" data-category-id="{{ .CategoryID }}" data-side="{{ .Side }}" data-lane-index="{{ .Index }}" style="--cat-color: {{ .Color }}">{{ .Name }}</div>
+      {{ end }}
+      <div class="tl-lane-bar-axis"></div>
+    </div>
+
+    <div class="tl-body">
+      <div id="sentinel-top" class="sentinel"></div>
+
+      <div id="event-list" class="tl-events"
+           data-lanes='[{{ range $i, $l := $v.Lanes }}{{ if $i }},{{ end }}{"id":{{ $l.CategoryID }},"side":"{{ $l.Side }}","index":{{ $l.Index }},"color":"{{ $l.Color }}","name":"{{ $l.Name }}"}{{ end }}]'>
+        {{ range $v.Events }}
+        <div class="tl-event"
+             data-date="{{ .EventDate.Time.Format "2006-01-02" }}"
+             data-sort="{{ .SortOrder }}"
+             data-category-id="{{ .CategoryID.Int64 }}"
+             data-slug="{{ .Slug }}"
+             title="{{ formatDate .EventDate.Time .DatePrecision }}">
+          <span class="tl-event-title" data-inline-url="{{ $base }}/t/{{ $v.Timeline.Slug }}/event/{{ .Slug }}/inline">{{ .Title }}</span>
+        </div>
+        {{ end }}
+      </div>
+
+      <div id="sentinel-bottom" class="sentinel"></div>
+    </div>
+  </div>
+
+  <div id="density-minimap" class="density-minimap"></div>
+
+  <div class="tl-people-link">
+    <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}/people">View all people &rarr;</a>
+  </div>
+</div>
+{{ end }}

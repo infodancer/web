@@ -1,0 +1,63 @@
+{{- $base := .BasePath -}}
+<div class="evt-inline">
+  <div class="evt-inline-header">
+    <time datetime="{{ .Event.EventDate.Time.Format "2006-01-02" }}">{{ formatDate .Event.EventDate.Time .Event.DatePrecision }}</time>
+    {{ if .Event.CategoryName.Valid }}
+    <span class="event-category" style="border-color: {{ .Event.CategoryColor.String }}; color: {{ .Event.CategoryColor.String }}">{{ .Event.CategoryName.String }}</span>
+    {{ end }}
+    <h2>{{ .Event.Title }}</h2>
+  </div>
+
+  {{ if .Event.Summary }}<p class="evt-inline-summary">{{ .Event.Summary }}</p>{{ end }}
+
+  {{ if .Tags }}
+  <div class="event-tags">{{ range .Tags }}<span class="tag">{{ .Name }}</span>{{ end }}</div>
+  {{ end }}
+
+  {{ if .Event.Article }}
+  <div class="evt-inline-article">{{ markdown .Event.Article }}</div>
+  {{ end }}
+
+  {{ if .People }}
+  <div class="evt-inline-section">
+    <h3>People Involved</h3>
+    {{ range .People }}
+    <div class="evt-inline-person">
+      <a href="{{ $base }}/t/{{ $.Timeline.Slug }}/person/{{ .Slug }}">{{ .Name }}</a>
+      {{ if .Role }}<span class="person-role">{{ .Role }}</span>{{ end }}
+      {{ if .Explainer }}<span class="evt-inline-explainer">{{ .Explainer }}</span>{{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{ if .LinkedEvents }}
+  <div class="evt-inline-section">
+    <h3>Related Events</h3>
+    {{ range .LinkedEvents }}
+    <div class="evt-inline-link">
+      <a href="#" class="evt-inline-jump" data-slug="{{ .Slug }}">{{ .Title }}</a>
+      {{ if .Relationship }}<span class="link-relationship">{{ .Relationship }}</span>{{ end }}
+      {{ if .LinkDescription }}<span class="evt-inline-explainer">{{ .LinkDescription }}</span>{{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{ if .Sources }}
+  <div class="evt-inline-section">
+    <h3>Sources</h3>
+    <ol class="source-list">
+      {{ range .Sources }}
+      <li>
+        {{ if .Url }}<a href="{{ .Url }}" target="_blank" rel="noopener">{{ if .Title }}{{ .Title }}{{ else }}{{ .Url }}{{ end }}</a>{{ else if .Title }}{{ .Title }}{{ end }}
+        {{ if .Author }}<span class="source-author">{{ .Author }}</span>{{ end }}
+        {{ if .Citation }}<span class="source-citation">{{ .Citation }}</span>{{ end }}
+      </li>
+      {{ end }}
+    </ol>
+  </div>
+  {{ end }}
+
+  <a href="{{ $base }}/t/{{ .Timeline.Slug }}/event/{{ .Event.Slug }}" class="evt-inline-fulllink">Open full page &rarr;</a>
+</div>

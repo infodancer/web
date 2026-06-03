@@ -2,8 +2,11 @@ package timeline
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	ui "github.com/infodancer/ui"
 
 	"github.com/infodancer/web/media"
 	"github.com/infodancer/web/timeline/timelineuser"
@@ -36,6 +39,18 @@ type Config struct {
 	// SignInURL is the host's login URL, surfaced to anonymous visitors. The
 	// module owns no login flow.
 	SignInURL string
+
+	// SiteName, HomeURL, LogoURL drive the default nav/footer brand chrome used
+	// when Chrome is nil. All optional; SiteName defaults to "Timelines".
+	SiteName string
+	HomeURL  string
+	LogoURL  string
+
+	// Chrome, when set, supplies the full host page chrome per request as a
+	// ui.DocumentData that base.gohtml renders through ui/document. nil uses the
+	// SiteName/HomeURL-derived default, so a standalone mount still renders a
+	// complete page.
+	Chrome func(*http.Request) ui.DocumentData
 
 	// Blobs is the media blob store portraits are read from and written to.
 	// Optional: nil disables portrait storage and serving.

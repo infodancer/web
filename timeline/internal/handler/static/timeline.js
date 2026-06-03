@@ -5,6 +5,9 @@
     if (!container) return;
 
     var slug = container.dataset.slug;
+    // base is the module's mount prefix (e.g. "/timeline"); fetch URLs are
+    // built mount-relative so the timeline works under any host mount point.
+    var base = container.dataset.base || '';
     var wrap = container.querySelector('.tl-wrap');
     var eventList = document.getElementById('event-list');
     var sentinelTop = document.getElementById('sentinel-top');
@@ -299,7 +302,7 @@
     function reloadTimeline() {
         reachedTop = false;
         reachedBottom = false;
-        var url = '/t/' + slug + '/events?direction=forward&cursor_date=1000-01-01&cursor_sort=-1&limit=50' +
+        var url = base + '/t/' + slug + '/events?direction=forward&cursor_date=1000-01-01&cursor_sort=-1&limit=50' +
             (activeTag ? '&tag=' + activeTag : '');
         fetch(url)
             .then(function(resp) { return resp.text(); })
@@ -333,7 +336,7 @@
         var cursor = direction === 'forward' ? getCursor(getLastEvent()) : getCursor(getFirstEvent());
         if (!cursor.date) return;
         loading = true;
-        var url = '/t/' + slug + '/events?direction=' + direction +
+        var url = base + '/t/' + slug + '/events?direction=' + direction +
             '&cursor_date=' + cursor.date + '&cursor_sort=' + cursor.sort + '&limit=50' +
             (activeTag ? '&tag=' + activeTag : '');
         fetch(url)
@@ -447,7 +450,7 @@
         var minimap = document.getElementById('density-minimap');
         if (!minimap) return;
 
-        fetch('/t/' + slug + '/density')
+        fetch(base + '/t/' + slug + '/density')
             .then(function(resp) { return resp.json(); })
             .then(function(buckets) {
                 if (!buckets || buckets.length === 0) return;
@@ -482,7 +485,7 @@
                         var date = this.dataset.date;
                         reachedTop = false;
                         reachedBottom = false;
-                        var url = '/t/' + slug + '/events?direction=forward&cursor_date=' + date + '&cursor_sort=-1&limit=50' +
+                        var url = base + '/t/' + slug + '/events?direction=forward&cursor_date=' + date + '&cursor_sort=-1&limit=50' +
                             (activeTag ? '&tag=' + activeTag : '');
                         fetch(url)
                             .then(function(resp) { return resp.text(); })

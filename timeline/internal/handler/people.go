@@ -41,7 +41,7 @@ func (s *Server) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
 		log.Printf("list person events: %v", err)
 	}
 
-	s.render(w, r, "person_profile.html", personProfileData{
+	s.renderPage(w, r, "person_profile.gohtml", personProfileData{
 		Timeline: tl,
 		Person:   person,
 		Events:   events,
@@ -73,7 +73,7 @@ func (s *Server) handlePeopleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, "people_list.html", peopleListData{
+	s.renderPage(w, r, "people_list.gohtml", peopleListData{
 		Timeline: tl,
 		People:   people,
 	})

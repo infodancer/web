@@ -68,6 +68,10 @@ func New(cfg Config) (*Module, error) {
 		BasePath:  cfg.BasePath,
 		BaseURL:   cfg.BaseURL,
 		SignInURL: cfg.SignInURL,
+		SiteName:  cfg.SiteName,
+		HomeURL:   cfg.HomeURL,
+		LogoURL:   cfg.LogoURL,
+		Chrome:    cfg.Chrome,
 		Blobs:     cfg.Blobs,
 		Objects:   cfg.Objects,
 	})

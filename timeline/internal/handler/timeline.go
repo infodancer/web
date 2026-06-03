@@ -21,7 +21,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	s.render(w, r, "index.html", indexData{Timelines: timelines})
+	s.renderPage(w, r, "index.gohtml", indexData{Timelines: timelines})
 }
 
 // laneAssignment maps a category to a side and column position.
@@ -154,7 +154,7 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 
 	lanes, leftCount, rightCount := assignLanes(categories)
 
-	s.render(w, r, "timeline.html", timelineData{
+	s.renderPage(w, r, "timeline.gohtml", timelineData{
 		Timeline:   tl,
 		Events:     events,
 		Categories: categories,

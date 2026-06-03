@@ -1,0 +1,94 @@
+{{ define "title" }}{{ .Page.Event.Title }} - {{ .Page.Timeline.Name }}{{ end }}
+
+{{ define "head" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<meta name="description" content="{{ $v.Event.Summary }}">
+<link rel="canonical" href="{{ .BaseURL }}{{ $base }}/t/{{ $v.Timeline.Slug }}/event/{{ $v.Event.Slug }}">
+<meta property="og:title" content="{{ $v.Event.Title }}">
+<meta property="og:description" content="{{ $v.Event.Summary }}">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="{{ $v.Event.EventDate.Time.Format "2006-01-02" }}">
+<link rel="alternate" type="application/atom+xml" title="{{ $v.Timeline.Name }}" href="{{ .BaseURL }}{{ $base }}/t/{{ $v.Timeline.Slug }}/feed.atom">
+{{ end }}
+
+{{ define "content" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<div class="page-event-detail">
+  <nav class="breadcrumb">
+    <a href="{{ $base }}/">Timelines</a> /
+    <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}">{{ $v.Timeline.Name }}</a> /
+    <span>{{ $v.Event.Title }}</span>
+  </nav>
+
+  <div class="detail-layout">
+    <article class="event-article">
+      <header>
+        <time datetime="{{ $v.Event.EventDate.Time.Format "2006-01-02" }}">{{ formatDate $v.Event.EventDate.Time $v.Event.DatePrecision }}</time>
+        {{ if $v.Event.CategoryName.Valid }}
+        <span class="event-category" style="border-color: {{ $v.Event.CategoryColor.String }}; color: {{ $v.Event.CategoryColor.String }}">{{ $v.Event.CategoryName.String }}</span>
+        {{ end }}
+        <h1>{{ $v.Event.Title }}</h1>
+        {{ if $v.Event.Summary }}<p class="event-summary-lead">{{ $v.Event.Summary }}</p>{{ end }}
+      </header>
+
+      {{ if $v.Tags }}
+      <div class="event-tags">
+        {{ range $v.Tags }}<span class="tag">{{ .Name }}</span>{{ end }}
+      </div>
+      {{ end }}
+
+      {{ if $v.Event.Article }}
+      <div class="event-body">{{ markdown $v.Event.Article }}</div>
+      {{ end }}
+
+      {{ if $v.Sources }}
+      <div class="event-sources">
+        <h2>Sources</h2>
+        <ol class="source-list">
+          {{ range $v.Sources }}
+          <li>
+            {{ if .Url }}<a href="{{ .Url }}" target="_blank" rel="noopener">{{ if .Title }}{{ .Title }}{{ else }}{{ .Url }}{{ end }}</a>{{ else if .Title }}{{ .Title }}{{ end }}
+            {{ if .Author }}<span class="source-author">{{ .Author }}</span>{{ end }}
+            {{ if .Citation }}<span class="source-citation">{{ .Citation }}</span>{{ end }}
+          </li>
+          {{ end }}
+        </ol>
+      </div>
+      {{ end }}
+    </article>
+
+    <aside class="detail-sidebar">
+      {{ if $v.People }}
+      <div class="sidebar-section">
+        <h2>People Involved</h2>
+        {{ range $v.People }}
+        <div class="person-card">
+          <h3><a href="{{ $base }}/t/{{ $v.Timeline.Slug }}/person/{{ .Slug }}">{{ .Name }}</a></h3>
+          {{ if .Role }}<span class="person-role">{{ .Role }}</span>{{ end }}
+          {{ if .Explainer }}<p class="person-explainer">{{ .Explainer }}</p>{{ end }}
+        </div>
+        {{ end }}
+      </div>
+      {{ end }}
+
+      {{ if $v.LinkedEvents }}
+      <div class="sidebar-section">
+        <h2>Related Events</h2>
+        {{ range $v.LinkedEvents }}
+        <div class="linked-event">
+          <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}/event/{{ .Slug }}">{{ .Title }}</a>
+          <time>{{ formatDate .EventDate.Time .DatePrecision }}</time>
+          {{ if .Relationship }}<span class="link-relationship">{{ .Relationship }}</span>{{ end }}
+          {{ if .LinkDescription }}<p class="link-desc">{{ .LinkDescription }}</p>{{ end }}
+        </div>
+        {{ end }}
+      </div>
+      {{ end }}
+    </aside>
+  </div>
+
+  <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}" class="back-link">Back to timeline</a>
+</div>
+{{ end }}

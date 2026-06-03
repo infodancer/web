@@ -95,7 +95,8 @@ func (s *Server) handleEventRange(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.renderPartial(w, "event_cards.html", eventCardsData{
+	s.renderPartial(w, "event_cards.gohtml", eventCardsData{
+		BasePath:     s.basePath,
 		TimelineSlug: slug,
 		Events:       events,
 	})
@@ -144,7 +145,8 @@ func (s *Server) handleEventDetail(w http.ResponseWriter, r *http.Request) {
 		log.Printf("list event sources: %v", err)
 	}
 
-	s.render(w, r, "event_detail.html", eventDetailData{
+	s.renderPage(w, r, "event_detail.gohtml", eventDetailData{
+		BasePath:     s.basePath,
 		Timeline:     tl,
 		Event:        event,
 		Tags:         tags,
@@ -197,7 +199,8 @@ func (s *Server) handleEventInline(w http.ResponseWriter, r *http.Request) {
 		log.Printf("list event sources: %v", err)
 	}
 
-	s.renderPartial(w, "event_inline.html", eventDetailData{
+	s.renderPartial(w, "event_inline.gohtml", eventDetailData{
+		BasePath:     s.basePath,
 		Timeline:     tl,
 		Event:        event,
 		Tags:         tags,
@@ -222,11 +225,13 @@ type eventCardData struct {
 }
 
 type eventCardsData struct {
+	BasePath     string
 	TimelineSlug string
 	Events       []eventCardData
 }
 
 type eventDetailData struct {
+	BasePath     string
 	Timeline     db.TimelineTimeline
 	Event        db.GetEventRow
 	Tags         []db.TimelineTag

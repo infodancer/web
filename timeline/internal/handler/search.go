@@ -9,6 +9,7 @@ import (
 )
 
 type searchResultsData struct {
+	BasePath     string
 	TimelineSlug string
 	Query        string
 	Results      []db.SearchEventsRow
@@ -29,7 +30,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	if query == "" {
-		s.renderPartial(w, "search_results.html", searchResultsData{
+		s.renderPartial(w, "search_results.gohtml", searchResultsData{
+			BasePath:     s.basePath,
 			TimelineSlug: slug,
 		})
 		return
@@ -46,7 +48,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.renderPartial(w, "search_results.html", searchResultsData{
+	s.renderPartial(w, "search_results.gohtml", searchResultsData{
+		BasePath:     s.basePath,
 		TimelineSlug: slug,
 		Query:        query,
 		Results:      results,
