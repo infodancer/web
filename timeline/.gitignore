@@ -1,10 +1,6 @@
-# Binaries
-/timeline
-*.exe
-
-# Environment
-.env
-.env.local
+# Coverage / build artifacts
+coverage.out
+coverage.html
 
 # IDE
 .idea/

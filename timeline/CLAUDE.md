@@ -1,68 +1,70 @@
-# Timeline Tool
+# CLAUDE.md — timeline
 
-Interactive web timeline tool for tracking complex events over extended timeframes. PostgreSQL-backed, supports massive event counts (tested to hundreds, designed for 15k+), with a REST API and CUE data format.
+Guidance for Claude Code working in the `timeline` module of `infodancer/web`.
 
-## Tech Stack
+## What this is
 
-- **Go** backend with `jackc/pgx`, `pressly/goose`, `sqlc`
-- **PostgreSQL** database
-- **HTML templates + htmx + vanilla JS/CSS** frontend
-- **CUE** for data schemas, validation, and wire format
-- **Taskfile** for dev automation
+`timeline` is a **mountable full-UI component** in the infodancer/web suite — an
+interactive event-timeline tool a host application mounts in-process. It is not
+a standalone server. Read the repo-root [CONVENTIONS.md](../CONVENTIONS.md) for
+the suite-wide contract; `faq` is the closest analog and the template this
+module follows.
 
-## Key Commands
+## Mount surface (package `timeline`)
 
-- `task dev` -- run the dev server
-- `task sync DIR=/path/to/data` -- sync CUE directory tree into database
-- `task test` -- run integration tests (requires Docker for testcontainers)
-- `task sqlc` -- regenerate sqlc after query changes
-- `go run ./cmd/timeline --create-key "label"` -- bootstrap an API key
-- `go run ./cmd/timeline --sync /path/to/data` -- sync from CUE tree
+- `New(Config) (*Module, error)` — `DB` (`*pgxpool.Pool`) and `Resolver`
+  (`timelineuser.UserResolver`) are required; the host owns both.
+- `Module.Routes() http.Handler` — mount under `Config.BasePath` with
+  `http.StripPrefix`.
+- `Module.Migrate(ctx)` — embedded goose migrations in the dedicated
+  `timeline_goose_db_version` table.
+- `Module.Sync(ctx, dir)` — ingest a CUE directory tree.
+- `Module.Import(ctx, slug, data)` — materialize the JSON interchange format
+  (atomic via `store.WithTx`).
 
-## Architecture
+## Conventions specific to this module
 
-- `cmd/timeline/` -- entry point
-- `internal/web/` -- HTTP server, handlers, templates, static assets, CUE schemas
-- `internal/sync/` -- CUE directory tree sync tool
-- `db/` -- migrations, sqlc queries, generated code, and a WWI sample
-  dataset in `db/seed/`
+- **Tables are prefixed `timeline_`** so the component shares one database with
+  the rest of the suite. The sqlc model types carry the prefix (`TimelineEvent`,
+  `TimelinePerson`, …).
+- **Owns no auth.** Identity arrives through the host's `UserResolver`; anonymous
+  reads public timelines, `Admin` gates export and non-public timelines. Never
+  add a login flow or credential store here.
+- **Chrome from `infodancer/ui`.** Pages render through `ui/document` (see
+  `internal/render`); the host can override via `Config.Chrome`. Timeline's own
+  layout CSS rides in `ExtraCSS`; htmx comes from ui's `HeadTags`.
+- **Images via the `media` module.** Portraits are stored content-addressed in a
+  `media.BlobStore` and served from `{BasePath}/portrait/{hash}`. Do not write
+  images to the host filesystem.
+- **Markdown via `infodancer/ui/markdown`.** Event articles and person bios go
+  through `render.Markdown` (goldmark + bluemonday). Never cast unsanitized
+  strings to `template.HTML`.
+- **Links are `BasePath`-relative.** Pages use the `BaseView` envelope
+  (`.BasePath`, `.Page`); partials carry a `BasePath` field; `timeline.js` builds
+  fetch URLs from `data-base`. Absolute SEO links use `Config.BaseURL`.
 
-## Data Model
+## Layout
 
-Events, people, categories, tags, sources, event-to-event links, event-to-person links. Each event has a date, title, summary, article (markdown), category assignment, tags, and cross-references to people/events/sources.
+- `timeline.go` / `config.go` / `user.go` — mount surface and re-exports
+- `internal/handler/` — HTTP layer; `templates/pages/*.gohtml`,
+  `templates/partials/*.gohtml`, `static/`
+- `internal/render/` — template loader + markdown
+- `internal/sync/` — CUE directory importer
+- `internal/transfer/` — JSON interchange + import
+- `internal/images/` — portrait processing (bytes handed to `media`)
+- `store/` — thin wrapper over the generated `db` package
+- `db/migrations/`, `db/queries/` — goose + sqlc
 
-## API
+## Commands
 
-REST API under `/timeline/api/`:
-- `/timeline/api/timelines` -- timeline CRUD
-- `/timeline/api/timelines/{slug}/events` -- event CRUD, search (`?q=`), date lookup (`?date=`)
-- `/timeline/api/timelines/{slug}/people` -- people CRUD, search (`?q=`)
-- Plus categories, sources, tags, links, import/export
+- `task check` — fmt, vet, lint, test, vulncheck (the gating set).
+- `TEST_DATABASE_URL=postgres://… task test` — DB-backed tests; they skip when
+  the DSN is unset (matching CI, which provides a Postgres service).
+- `task generate` — regenerate the `db` package via the pinned sqlc.
+- Build the suite-wide tasks from the repo root (`task build` / `task test`).
 
-Content negotiation: JSON (default) and CUE (`Content-Type: application/cue`, `Accept: application/cue`). CUE input is validated against schemas before database writes.
+## Workflow
 
-## Auth
-
-API key auth. Bearer token on write endpoints. Keys are SHA-256 hashed, scoped per-timeline or global. Public timelines readable without auth. Bootstrap first key via `--create-key`.
-
-## CUE Directory Sync
-
-The sync tool reads a CUE directory tree and upserts into the database:
-
-```
-any-timeline/
-  timeline.cue          # name, slug, description
-  categories/*.cue      # one per category
-  people/*.cue          # one per person
-  events/*.cue          # one per event (date-prefixed filename)
-```
-
-Schema-owned fields are updated on conflict. DB-only content (comments, supplementary data added via web/API) is never touched. Two-pass event sync resolves cross-references by slug.
-
-## Frontend
-
-Central-axis column layout with category lanes. Events are compact one-line titles that expand inline on click (no page navigation). Year markers and time-gap spacing convey temporal relationships. Category column toggles, collapsible tag filter, full-text search, density minimap. Embed mode via `?embed=true`.
-
-## Current Status
-
-Phases 1-5 complete (foundation, people/links, search/filtering, import/export/API/CUE, auth). Phase 6 partial (cache headers done, integration tests done, sync tool done). Remaining: keyboard nav, 15k perf test, mobile polish.
+Open a GitHub issue before a distinct change; branch `feature/<n>` or
+`bug/<n>`; reference the issue URL in commits; small, logical commits; PRs merge
+to `main`. Bump the Go toolchain in lockstep with the rest of the suite.

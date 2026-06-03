@@ -1,50 +1,74 @@
-version: "3"
+version: '3'
 
-dotenv: [".env.local"]
+vars:
+  COVERAGE_FILE: coverage.out
 
 tasks:
-  dev:
-    desc: Run the dev server
-    cmd: go run ./cmd/timeline
-
-  test:
-    desc: Run all tests
-    cmd: go test ./...
+  default:
+    cmds:
+      - task: check
 
   build:
-    desc: Build the binary
-    cmd: go build -o timeline ./cmd/timeline
-
-  migrate:
-    desc: Run database migrations
-    cmd: goose -dir db/migrations postgres "{{.DATABASE_URL}}" up
-
-  migrate:status:
-    desc: Show migration status
-    cmd: goose -dir db/migrations postgres "{{.DATABASE_URL}}" status
-
-  migrate:down:
-    desc: Roll back the last migration
-    cmd: goose -dir db/migrations postgres "{{.DATABASE_URL}}" down
-
-  sqlc:
-    desc: Regenerate sqlc Go code
-    cmd: sqlc generate
-
-  sync:
-    desc: Sync timeline data from a CUE directory tree
-    cmd: go run ./cmd/timeline --sync {{.DIR}}
-    requires:
-      vars: [DIR]
-
-  seed:
-    desc: Load sample data into the dev database
-    cmd: psql "{{.DATABASE_URL}}" -f db/seed/sample_data.sql
-
-  reset:
-    desc: Drop and recreate the dev database, run migrations, seed
+    desc: Build all packages (the module is library-only; mounted by a host)
     cmds:
-      - psql "postgres:///postgres?host=/var/run/postgresql" -c "DROP DATABASE IF EXISTS timeline_dev;"
-      - psql "postgres:///postgres?host=/var/run/postgresql" -c "CREATE DATABASE timeline_dev;"
-      - task: migrate
-      - task: seed
+      - go build ./...
+
+  test:
+    desc: Run tests with the race detector (DB tests skip without TEST_DATABASE_URL)
+    cmds:
+      - go test -race -count=1 ./...
+
+  test:cover:
+    desc: Run tests with coverage
+    cmds:
+      - go test -race -count=1 -coverprofile={{.COVERAGE_FILE}} ./...
+      - go tool cover -func={{.COVERAGE_FILE}} | tail -1
+
+  fmt:
+    desc: Format code
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Fail if any file needs formatting
+    cmds:
+      - test -z "$(gofmt -l .)"
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  vulncheck:
+    desc: Run govulncheck
+    cmds:
+      - govulncheck ./...
+
+  check:
+    desc: All gating checks (fmt, vet, lint, test, vulncheck)
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: lint
+      - task: test
+      - task: vulncheck
+
+  generate:
+    desc: Regenerate the db package from db/queries via the pinned sqlc version
+    cmds:
+      - go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
+
+  tidy:
+    desc: go mod tidy
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f {{.COVERAGE_FILE}} coverage.html
