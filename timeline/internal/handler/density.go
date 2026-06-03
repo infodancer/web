@@ -1,4 +1,4 @@
-package web
+package handler
 
 import (
 	"encoding/json"
@@ -15,13 +15,17 @@ type densityBucket struct {
 func (s *Server) handleDensity(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	rows, err := s.store.queries.GetEventDensityByYear(r.Context(), tl.ID)
+	rows, err := s.store.GetEventDensityByYear(r.Context(), tl.ID)
 	if err != nil {
 		log.Printf("get density: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -42,5 +46,7 @@ func (s *Server) handleDensity(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=60")
-	json.NewEncoder(w).Encode(buckets)
+	if err := json.NewEncoder(w).Encode(buckets); err != nil {
+		log.Printf("encode density: %v", err)
+	}
 }

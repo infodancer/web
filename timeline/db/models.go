@@ -94,3 +94,12 @@ type TimelineTimeline struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
+
+type TimelineUser struct {
+	ID          int64              `json:"id"`
+	SubHash     []byte             `json:"sub_hash"`
+	DisplayName string             `json:"display_name"`
+	IsAdmin     bool               `json:"is_admin"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt  pgtype.Timestamptz `json:"last_seen_at"`
+}

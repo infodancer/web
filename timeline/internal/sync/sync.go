@@ -1,4 +1,5 @@
-// Package sync reads a CUE directory tree and upserts timeline data into the database.
+// Package sync reads a CUE directory tree and upserts timeline data into the
+// database.
 //
 // Directory structure:
 //
@@ -8,12 +9,15 @@
 //	  people/*.cue          # one file per person
 //	  events/*.cue          # one file per event
 //
-// Schema-owned fields are updated on conflict. DB-only content
-// (e.g. comments added via the web UI) is never touched.
+// Schema-owned fields are updated on conflict. DB-only content (e.g. data added
+// via the web UI) is never touched. Sibling portrait images are stored through
+// the media blob store.
 package sync
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -26,19 +30,28 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/infodancer/web/media"
 	"github.com/infodancer/web/timeline/db"
 	"github.com/infodancer/web/timeline/internal/images"
 )
 
-// Runner holds the database queries and runs the sync.
+// portraitCategory is the media bucket portraits are stored under. It must
+// match the constant of the same name in the handler package, which serves
+// them.
+const portraitCategory = "timeline-portrait"
+
+// Runner holds the dependencies for a sync run.
 type Runner struct {
 	queries  *db.Queries
+	blobs    media.BlobStore // optional; nil disables portrait ingestion
+	objects  *media.Store    // optional; portrait metadata
+	basePath string          // mount prefix, used to build portrait URLs
 	ctx      context.Context
 	dir      string
-	imageDir string
 	stats    Stats
 }
 
+// Stats reports what a sync run touched.
 type Stats struct {
 	Categories int
 	People     int
@@ -49,35 +62,34 @@ type Stats struct {
 	Images     int
 }
 
-func New(ctx context.Context, queries *db.Queries, dir, imageDir string) *Runner {
-	return &Runner{queries: queries, ctx: ctx, dir: dir, imageDir: imageDir}
+// New constructs a Runner over the given queries and optional media stores.
+func New(queries *db.Queries, blobs media.BlobStore, objects *media.Store, basePath string) *Runner {
+	return &Runner{queries: queries, blobs: blobs, objects: objects, basePath: basePath}
 }
 
-func (r *Runner) Run() (Stats, error) {
+// Run reads the CUE tree at dir and upserts it.
+func (r *Runner) Run(ctx context.Context, dir string) (Stats, error) {
+	r.ctx = ctx
+	r.dir = dir
 	cctx := cuecontext.New()
 
-	// 1. Timeline metadata
 	tl, err := r.syncTimeline(cctx)
 	if err != nil {
 		return r.stats, fmt.Errorf("sync timeline: %w", err)
 	}
 	log.Printf("sync: timeline %q (id=%d)", tl.Slug, tl.ID)
 
-	// 2. Categories
 	catMap, err := r.syncCategories(cctx, tl.ID)
 	if err != nil {
 		return r.stats, fmt.Errorf("sync categories: %w", err)
 	}
 
-	// 3. People
-	personMap, err := r.syncPeople(cctx, tl.ID, tl.Slug)
+	personMap, err := r.syncPeople(cctx, tl.ID)
 	if err != nil {
 		return r.stats, fmt.Errorf("sync people: %w", err)
 	}
 
-	// 4. Events (with inline tags, sources, people links)
-	err = r.syncEvents(cctx, tl.ID, catMap, personMap)
-	if err != nil {
+	if err := r.syncEvents(cctx, tl.ID, catMap, personMap); err != nil {
 		return r.stats, fmt.Errorf("sync events: %w", err)
 	}
 
@@ -169,7 +181,7 @@ type personCUE struct {
 	PhotoURL string `json:"photo_url"`
 }
 
-func (r *Runner) syncPeople(cctx *cue.Context, tlID int64, tlSlug string) (map[string]int64, error) {
+func (r *Runner) syncPeople(cctx *cue.Context, tlID int64) (map[string]int64, error) {
 	personMap := map[string]int64{}
 	files, _ := filepath.Glob(filepath.Join(r.dir, "people", "*.cue"))
 	for _, f := range files {
@@ -184,11 +196,12 @@ func (r *Runner) syncPeople(cctx *cue.Context, tlID int64, tlSlug string) (map[s
 			continue
 		}
 
-		// Detect sibling image file (e.g., james-comey.jpg alongside james-comey.cue).
-		// Only process if photo_url is not already set to an external URL.
-		if r.imageDir != "" && !strings.HasPrefix(p.PhotoURL, "http") {
+		// A sibling image file (e.g. james-comey.jpg beside james-comey.cue) is
+		// stored through the media blob store, unless photo_url already points
+		// at an external URL.
+		if r.blobs != nil && !strings.HasPrefix(p.PhotoURL, "http") {
 			if imgPath := findSiblingImage(f); imgPath != "" {
-				photoURL, err := r.processPersonImage(tlID, tlSlug, p.Slug, imgPath)
+				photoURL, err := r.processPersonImage(tlID, p.Slug, imgPath)
 				if err != nil {
 					log.Printf("sync: image for %s: %v", p.Slug, err)
 				} else {
@@ -217,7 +230,7 @@ func (r *Runner) syncPeople(cctx *cue.Context, tlID int64, tlSlug string) (map[s
 	return personMap, nil
 }
 
-// findSiblingImage looks for a .jpg or .png file with the same basename as the CUE file.
+// findSiblingImage looks for a .jpg/.jpeg/.png file sharing the CUE file's basename.
 func findSiblingImage(cuePath string) string {
 	base := strings.TrimSuffix(cuePath, filepath.Ext(cuePath))
 	for _, ext := range []string{".jpg", ".jpeg", ".png"} {
@@ -229,35 +242,43 @@ func findSiblingImage(cuePath string) string {
 	return ""
 }
 
-// processPersonImage processes a portrait image and returns the URL path to serve it.
-func (r *Runner) processPersonImage(tlID int64, tlSlug, personSlug, imgPath string) (string, error) {
+// processPersonImage produces a square portrait, stores its bytes in the media
+// blob store keyed by content hash, records metadata, and returns the URL the
+// handler serves it from.
+func (r *Runner) processPersonImage(tlID int64, personSlug, imgPath string) (string, error) {
 	f, err := os.Open(imgPath)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	outDir := filepath.Join(r.imageDir, tlSlug, personSlug)
-	result, err := images.ProcessPortrait(f, outDir)
+	data, contentType, width, height, err := images.PortraitBytes(f)
 	if err != nil {
 		return "", fmt.Errorf("process image: %w", err)
 	}
+	sum := sha256.Sum256(data)
+	hash := hex.EncodeToString(sum[:])
 
-	_, err = r.queries.UpsertImage(r.ctx, db.UpsertImageParams{
-		TimelineID:  tlID,
-		Slug:        personSlug,
-		Usage:       "portrait",
-		ContentType: result.ContentType,
-		Width:       int32(result.Width),
-		Height:      int32(result.Height),
-		FileSize:    int32(result.FileSize),
-	})
-	if err != nil {
-		return "", fmt.Errorf("upsert image record: %w", err)
+	if err := r.blobs.Put(r.ctx, portraitCategory, hash, contentType, data); err != nil {
+		return "", fmt.Errorf("store portrait blob: %w", err)
+	}
+	if r.objects != nil {
+		if err := r.objects.Put(r.ctx, media.ObjectMeta{
+			Category:    portraitCategory,
+			Hash:        hash,
+			ContentType: contentType,
+			Width:       width,
+			Height:      height,
+			ByteSize:    int64(len(data)),
+			Subject:     fmt.Sprintf("%d/%s", tlID, personSlug),
+			CreatedAt:   time.Now(),
+		}); err != nil {
+			return "", fmt.Errorf("record portrait metadata: %w", err)
+		}
 	}
 
 	r.stats.Images++
-	return fmt.Sprintf("/images/%s/%s/profile.jpg", tlSlug, personSlug), nil
+	return r.basePath + "/portrait/" + hash, nil
 }
 
 // ---- Events ----
@@ -298,12 +319,10 @@ type eventLinkCUE struct {
 }
 
 func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map[string]int64) error {
-	// First pass: upsert all events, collect slug->id mapping
 	eventMap := map[string]int64{}
 	type pendingEvent struct {
-		file string
-		cue  eventCUE
-		id   int64
+		cue eventCUE
+		id  int64
 	}
 	var pending []pendingEvent
 
@@ -347,13 +366,11 @@ func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map
 			continue
 		}
 		eventMap[e.Slug] = evt.ID
-		pending = append(pending, pendingEvent{f, e, evt.ID})
+		pending = append(pending, pendingEvent{e, evt.ID})
 		r.stats.Events++
 	}
 
-	// Second pass: sync tags, sources, people, links
 	for _, pe := range pending {
-		// Tags
 		for _, tagSlug := range pe.cue.Tags {
 			tag, err := r.queries.GetOrCreateTag(r.ctx, db.GetOrCreateTagParams{
 				Slug: tagSlug,
@@ -362,30 +379,29 @@ func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map
 			if err != nil {
 				continue
 			}
-			r.queries.AddEventTag(r.ctx, db.AddEventTagParams{
-				EventID: pe.id,
-				TagID:   tag.ID,
-			})
+			if err := r.queries.AddEventTag(r.ctx, db.AddEventTagParams{EventID: pe.id, TagID: tag.ID}); err != nil {
+				continue
+			}
 			r.stats.Tags++
 		}
 
-		// Sources — additive (don't remove existing sources not in CUE)
 		for i, src := range pe.cue.Sources {
-			r.queries.AddEventSource(r.ctx, db.AddEventSourceParams{
+			if _, err := r.queries.AddEventSource(r.ctx, db.AddEventSourceParams{
 				EventID:   pe.id,
 				Url:       src.URL,
 				Title:     src.Title,
 				Author:    src.Author,
 				Citation:  src.Citation,
 				SortOrder: int32(i),
-			})
+			}); err != nil {
+				continue
+			}
 			r.stats.Sources++
 		}
 
-		// People links — additive
 		for i, ep := range pe.cue.People {
 			if pid, ok := personMap[ep.Slug]; ok {
-				r.queries.AddEventPerson(r.ctx, db.AddEventPersonParams{
+				_ = r.queries.AddEventPerson(r.ctx, db.AddEventPersonParams{
 					EventID:   pe.id,
 					PersonID:  pid,
 					Role:      ep.Role,
@@ -395,20 +411,20 @@ func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map
 			}
 		}
 
-		// Event links — resolved in this pass since all events are now in eventMap
 		for _, link := range pe.cue.Links {
 			if targetID, ok := eventMap[link.Slug]; ok {
 				a, b := pe.id, targetID
 				if a > b {
 					a, b = b, a
 				}
-				r.queries.AddEventLink(r.ctx, db.AddEventLinkParams{
+				if err := r.queries.AddEventLink(r.ctx, db.AddEventLinkParams{
 					EventAID:     a,
 					EventBID:     b,
 					Relationship: link.Relationship,
 					Description:  link.Description,
-				})
-				r.stats.Links++
+				}); err == nil {
+					r.stats.Links++
+				}
 			}
 		}
 	}

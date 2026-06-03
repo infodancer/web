@@ -1,4 +1,4 @@
-package web
+package handler
 
 import (
 	"log"
@@ -14,8 +14,12 @@ import (
 func (s *Server) handleEventRange(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
 		http.NotFound(w, r)
 		return
 	}
@@ -101,13 +105,17 @@ func (s *Server) handleEventDetail(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	eventSlug := r.PathValue("eventSlug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	event, err := s.store.queries.GetEvent(r.Context(), db.GetEventParams{
+	event, err := s.store.GetEvent(r.Context(), db.GetEventParams{
 		TimelineID: tl.ID,
 		Slug:       eventSlug,
 	})
@@ -116,22 +124,22 @@ func (s *Server) handleEventDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tags, err := s.store.queries.ListEventTags(r.Context(), event.ID)
+	tags, err := s.store.ListEventTags(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list event tags: %v", err)
 	}
 
-	people, err := s.store.queries.ListEventPeople(r.Context(), event.ID)
+	people, err := s.store.ListEventPeople(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list event people: %v", err)
 	}
 
-	linkedEvents, err := s.store.queries.ListLinkedEvents(r.Context(), event.ID)
+	linkedEvents, err := s.store.ListLinkedEvents(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list linked events: %v", err)
 	}
 
-	sources, err := s.store.queries.ListEventSources(r.Context(), event.ID)
+	sources, err := s.store.ListEventSources(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list event sources: %v", err)
 	}
@@ -150,13 +158,17 @@ func (s *Server) handleEventInline(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	eventSlug := r.PathValue("eventSlug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	event, err := s.store.queries.GetEvent(r.Context(), db.GetEventParams{
+	event, err := s.store.GetEvent(r.Context(), db.GetEventParams{
 		TimelineID: tl.ID,
 		Slug:       eventSlug,
 	})
@@ -165,22 +177,22 @@ func (s *Server) handleEventInline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tags, err := s.store.queries.ListEventTags(r.Context(), event.ID)
+	tags, err := s.store.ListEventTags(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list event tags: %v", err)
 	}
 
-	people, err := s.store.queries.ListEventPeople(r.Context(), event.ID)
+	people, err := s.store.ListEventPeople(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list event people: %v", err)
 	}
 
-	linkedEvents, err := s.store.queries.ListLinkedEvents(r.Context(), event.ID)
+	linkedEvents, err := s.store.ListLinkedEvents(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list linked events: %v", err)
 	}
 
-	sources, err := s.store.queries.ListEventSources(r.Context(), event.ID)
+	sources, err := s.store.ListEventSources(r.Context(), event.ID)
 	if err != nil {
 		log.Printf("list event sources: %v", err)
 	}

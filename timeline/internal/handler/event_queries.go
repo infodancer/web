@@ -1,4 +1,4 @@
-package web
+package handler
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 // fetchEventsAfter returns events after the given cursor, optionally filtered by category or tag.
 func (s *Server) fetchEventsAfter(ctx context.Context, timelineID int64, afterDate pgtype.Date, afterSort, limit int32, categoryID, tagID int64) ([]eventCardData, error) {
 	if tagID > 0 {
-		rows, err := s.store.queries.ListEventsAfterDateByTag(ctx, db.ListEventsAfterDateByTagParams{
+		rows, err := s.store.ListEventsAfterDateByTag(ctx, db.ListEventsAfterDateByTagParams{
 			TimelineID:     timelineID,
 			TagID:          tagID,
 			AfterDate:      afterDate,
@@ -27,7 +27,7 @@ func (s *Server) fetchEventsAfter(ctx context.Context, timelineID int64, afterDa
 	}
 
 	if categoryID > 0 {
-		rows, err := s.store.queries.ListEventsAfterDateByCategory(ctx, db.ListEventsAfterDateByCategoryParams{
+		rows, err := s.store.ListEventsAfterDateByCategory(ctx, db.ListEventsAfterDateByCategoryParams{
 			TimelineID:     timelineID,
 			CategoryID:     pgtype.Int8{Int64: categoryID, Valid: true},
 			AfterDate:      afterDate,
@@ -42,7 +42,7 @@ func (s *Server) fetchEventsAfter(ctx context.Context, timelineID int64, afterDa
 		}), nil
 	}
 
-	rows, err := s.store.queries.ListEventsAfterDate(ctx, db.ListEventsAfterDateParams{
+	rows, err := s.store.ListEventsAfterDate(ctx, db.ListEventsAfterDateParams{
 		TimelineID:     timelineID,
 		AfterDate:      afterDate,
 		AfterSortOrder: afterSort,
@@ -59,7 +59,7 @@ func (s *Server) fetchEventsAfter(ctx context.Context, timelineID int64, afterDa
 // fetchEventsBefore returns events before the given cursor (reversed to chronological order).
 func (s *Server) fetchEventsBefore(ctx context.Context, timelineID int64, beforeDate pgtype.Date, beforeSort, limit int32, categoryID, tagID int64) ([]eventCardData, error) {
 	if tagID > 0 {
-		rows, err := s.store.queries.ListEventsBeforeDateByTag(ctx, db.ListEventsBeforeDateByTagParams{
+		rows, err := s.store.ListEventsBeforeDateByTag(ctx, db.ListEventsBeforeDateByTagParams{
 			TimelineID:      timelineID,
 			TagID:           tagID,
 			BeforeDate:      beforeDate,
@@ -75,7 +75,7 @@ func (s *Server) fetchEventsBefore(ctx context.Context, timelineID int64, before
 	}
 
 	if categoryID > 0 {
-		rows, err := s.store.queries.ListEventsBeforeDateByCategory(ctx, db.ListEventsBeforeDateByCategoryParams{
+		rows, err := s.store.ListEventsBeforeDateByCategory(ctx, db.ListEventsBeforeDateByCategoryParams{
 			TimelineID:      timelineID,
 			CategoryID:      pgtype.Int8{Int64: categoryID, Valid: true},
 			BeforeDate:      beforeDate,
@@ -90,7 +90,7 @@ func (s *Server) fetchEventsBefore(ctx context.Context, timelineID int64, before
 		}), nil
 	}
 
-	rows, err := s.store.queries.ListEventsBeforeDate(ctx, db.ListEventsBeforeDateParams{
+	rows, err := s.store.ListEventsBeforeDate(ctx, db.ListEventsBeforeDateParams{
 		TimelineID:      timelineID,
 		BeforeDate:      beforeDate,
 		BeforeSortOrder: beforeSort,

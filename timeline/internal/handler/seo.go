@@ -1,4 +1,4 @@
-package web
+package handler
 
 import (
 	"encoding/xml"
@@ -30,13 +30,17 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	ctx := r.Context()
 
-	tl, err := s.store.queries.GetTimeline(ctx, slug)
+	tl, err := s.store.GetTimeline(ctx, slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	baseURL := s.config.BaseURL
+	baseURL := s.baseURL
 	if baseURL == "" {
 		baseURL = "http://" + r.Host
 	}
@@ -52,7 +56,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// All events
-	events, err := s.store.queries.ListEventsAfterDate(ctx, db.ListEventsAfterDateParams{
+	events, err := s.store.ListEventsAfterDate(ctx, db.ListEventsAfterDateParams{
 		TimelineID:     tl.ID,
 		AfterDate:      pgtype.Date{Time: time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 		AfterSortOrder: -1,
@@ -69,7 +73,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// All people
-	people, err := s.store.queries.ListPeople(ctx, tl.ID)
+	people, err := s.store.ListPeople(ctx, tl.ID)
 	if err != nil {
 		log.Printf("sitemap people: %v", err)
 	}
@@ -87,8 +91,12 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write([]byte(xml.Header))
-	xml.NewEncoder(w).Encode(sitemap)
+	if _, err := w.Write([]byte(xml.Header)); err != nil {
+		return
+	}
+	if err := xml.NewEncoder(w).Encode(sitemap); err != nil {
+		log.Printf("encode sitemap: %v", err)
+	}
 }
 
 // ---- Atom Feed ----
@@ -133,19 +141,23 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	ctx := r.Context()
 
-	tl, err := s.store.queries.GetTimeline(ctx, slug)
+	tl, err := s.store.GetTimeline(ctx, slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	baseURL := s.config.BaseURL
+	baseURL := s.baseURL
 	if baseURL == "" {
 		baseURL = "http://" + r.Host
 	}
 
 	// Get the 50 most recently added events (by created_at, not event_date)
-	events, err := s.store.queries.ListEventsAfterDate(ctx, db.ListEventsAfterDateParams{
+	events, err := s.store.ListEventsAfterDate(ctx, db.ListEventsAfterDateParams{
 		TimelineID:     tl.ID,
 		AfterDate:      pgtype.Date{Time: time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 		AfterSortOrder: -1,
@@ -196,6 +208,10 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/atom+xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	w.Write([]byte(xml.Header))
-	xml.NewEncoder(w).Encode(feed)
+	if _, err := w.Write([]byte(xml.Header)); err != nil {
+		return
+	}
+	if err := xml.NewEncoder(w).Encode(feed); err != nil {
+		log.Printf("encode feed: %v", err)
+	}
 }

@@ -1,4 +1,4 @@
-package web
+package handler
 
 import (
 	"log"
@@ -17,13 +17,17 @@ func (s *Server) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	personSlug := r.PathValue("personSlug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	person, err := s.store.queries.GetPerson(r.Context(), db.GetPersonParams{
+	person, err := s.store.GetPerson(r.Context(), db.GetPersonParams{
 		TimelineID: tl.ID,
 		Slug:       personSlug,
 	})
@@ -32,7 +36,7 @@ func (s *Server) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	events, err := s.store.queries.ListPersonEvents(r.Context(), person.ID)
+	events, err := s.store.ListPersonEvents(r.Context(), person.ID)
 	if err != nil {
 		log.Printf("list person events: %v", err)
 	}
@@ -52,13 +56,17 @@ type peopleListData struct {
 func (s *Server) handlePeopleList(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
+		http.NotFound(w, r)
+		return
+	}
 
-	people, err := s.store.queries.ListPeople(r.Context(), tl.ID)
+	people, err := s.store.ListPeople(r.Context(), tl.ID)
 	if err != nil {
 		log.Printf("list people: %v", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

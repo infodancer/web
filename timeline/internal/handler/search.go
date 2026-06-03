@@ -1,4 +1,4 @@
-package web
+package handler
 
 import (
 	"log"
@@ -17,8 +17,12 @@ type searchResultsData struct {
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 
-	tl, err := s.store.queries.GetTimeline(r.Context(), slug)
+	tl, err := s.store.GetTimeline(r.Context(), slug)
 	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !s.canViewTimeline(r.Context(), tl.IsPublic) {
 		http.NotFound(w, r)
 		return
 	}
@@ -31,7 +35,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results, err := s.store.queries.SearchEvents(r.Context(), db.SearchEventsParams{
+	results, err := s.store.SearchEvents(r.Context(), db.SearchEventsParams{
 		Query:      query,
 		TimelineID: tl.ID,
 		MaxResults: 50,
