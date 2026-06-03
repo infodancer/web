@@ -1,0 +1,21 @@
+{{ define "title" }}{{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<div class="page-index">
+  <h1>Timelines</h1>
+  {{ if $v.Timelines }}
+  <div class="timeline-list">
+    {{ range $v.Timelines }}
+    <a href="{{ $base }}/t/{{ .Slug }}" class="timeline-card">
+      <h2>{{ .Name }}</h2>
+      {{ if .Description }}<p>{{ .Description }}</p>{{ end }}
+    </a>
+    {{ end }}
+  </div>
+  {{ else }}
+  <p class="empty-state">No timelines yet.</p>
+  {{ end }}
+</div>
+{{ end }}

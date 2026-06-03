@@ -1,0 +1,13 @@
+# Coverage / build artifacts
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+.claude/settings.local.json
+*.swp
+*~
+
+# OS
+.DS_Store

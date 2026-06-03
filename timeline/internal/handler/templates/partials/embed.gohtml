@@ -1,0 +1,28 @@
+{{- /*
+  timeline/embed is the chrome-less document used for ?embed=true: ui's base
+  stylesheets and timeline's own layout CSS (via .ExtraCSS) plus the content
+  block, on a transparent background, with no nav or footer. Same content block
+  as the full page, so every page works embedded.
+*/ -}}
+{{ define "timeline/embed" -}}
+<!doctype html>
+<html lang="{{ with .Lang }}{{ . }}{{ else }}en{{ end }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ block "title" . }}{{ .Meta.SiteName }}{{ end }}</title>
+  <link rel="stylesheet" href="{{ .AssetBase }}/css/open-props.css">
+  <link rel="stylesheet" href="{{ .AssetBase }}/css/tokens.css">
+  <link rel="stylesheet" href="{{ .AssetBase }}/css/base.css">
+  {{- range .ExtraCSS }}
+  <link rel="stylesheet" href="{{ . }}">
+  {{- end }}
+  {{- with .HeadTags }}{{ . }}{{- end }}
+  <style>body{background:transparent}</style>
+  {{- block "head" . }}{{ end }}
+</head>
+<body class="embed-mode">
+  <main class="app-container">{{ block "content" . }}{{ end }}</main>
+</body>
+</html>
+{{- end }}

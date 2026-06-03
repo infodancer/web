@@ -9,4 +9,5 @@ use (
 	./newsletter
 	./notify
 	./search
+	./timeline
 )

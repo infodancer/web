@@ -1,0 +1,17 @@
+{{- $base := .BasePath -}}{{- $slug := .TimelineSlug -}}
+{{ if .Query }}
+  {{ if .Results }}
+  <div class="search-results">
+    <div class="search-count">{{ len .Results }} result{{ if ne (len .Results) 1 }}s{{ end }} for &ldquo;{{ .Query }}&rdquo;</div>
+    {{ range .Results }}
+    <a href="{{ $base }}/t/{{ $slug }}/event/{{ .Slug }}" class="search-result">
+      <span class="search-result-title">{{ .Title }}</span>
+      <span class="search-result-date">{{ formatDate .EventDate.Time .DatePrecision }}</span>
+      {{ if .Summary }}<span class="search-result-summary">{{ .Summary }}</span>{{ end }}
+    </a>
+    {{ end }}
+  </div>
+  {{ else }}
+  <div class="search-empty">No results for &ldquo;{{ .Query }}&rdquo;</div>
+  {{ end }}
+{{ end }}

@@ -1,0 +1,67 @@
+{{ define "title" }}{{ .Page.Person.Name }} - {{ .Page.Timeline.Name }}{{ end }}
+
+{{ define "head" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<meta name="description" content="{{ $v.Person.Name }} - {{ $v.Timeline.Name }}.{{ if $v.Person.Bio }} {{ $v.Person.Bio }}{{ end }}">
+<link rel="canonical" href="{{ .BaseURL }}{{ $base }}/t/{{ $v.Timeline.Slug }}/person/{{ $v.Person.Slug }}">
+<meta property="og:title" content="{{ $v.Person.Name }}">
+<meta property="og:type" content="profile">
+{{ if $v.Person.PhotoUrl }}<meta property="og:image" content="{{ .BaseURL }}{{ $v.Person.PhotoUrl }}">{{ end }}
+{{ end }}
+
+{{ define "content" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<div class="page-person-profile">
+  <nav class="breadcrumb">
+    <a href="{{ $base }}/">Timelines</a> /
+    <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}">{{ $v.Timeline.Name }}</a> /
+    <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}/people">People</a> /
+    <span>{{ $v.Person.Name }}</span>
+  </nav>
+
+  <header class="person-header">
+    {{ if $v.Person.PhotoUrl }}
+    <img class="person-portrait" src="{{ $v.Person.PhotoUrl }}" alt="{{ $v.Person.Name }}">
+    {{ end }}
+    <div class="person-header-text">
+      <h1>{{ $v.Person.Name }}</h1>
+      {{ if or $v.Person.BornDate.Valid $v.Person.DiedDate.Valid }}
+      <div class="person-dates">
+        {{ if $v.Person.BornDate.Valid }}Born: {{ $v.Person.BornDate.Time.Format "January 2, 2006" }}{{ end }}
+        {{ if and $v.Person.BornDate.Valid $v.Person.DiedDate.Valid }} &mdash; {{ end }}
+        {{ if $v.Person.DiedDate.Valid }}Died: {{ $v.Person.DiedDate.Time.Format "January 2, 2006" }}{{ end }}
+      </div>
+      {{ end }}
+    </div>
+  </header>
+
+  {{ if $v.Person.Bio }}
+  <div class="person-bio">{{ markdown $v.Person.Bio }}</div>
+  {{ end }}
+
+  {{ if $v.Events }}
+  <div class="person-timeline">
+    <h2>Timeline</h2>
+    <div class="person-events">
+      {{ range $v.Events }}
+      <div class="person-event-card">
+        <div class="person-event-date">
+          <time datetime="{{ .EventDate.Time.Format "2006-01-02" }}">{{ formatDate .EventDate.Time .DatePrecision }}</time>
+        </div>
+        <div class="person-event-content" {{ if .CategoryColor.Valid }}style="border-left-color: {{ .CategoryColor.String }}"{{ end }}>
+          <h3><a href="{{ $base }}/t/{{ $v.Timeline.Slug }}/event/{{ .Slug }}">{{ .Title }}</a></h3>
+          {{ if .Role }}<span class="person-role">{{ .Role }}</span>{{ end }}
+          {{ if .Explainer }}<p class="person-explainer">{{ .Explainer }}</p>{{ end }}
+          {{ if .Summary }}<p class="event-summary">{{ .Summary }}</p>{{ end }}
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+
+  <a href="{{ $base }}/t/{{ $v.Timeline.Slug }}" class="back-link">Back to timeline</a>
+</div>
+{{ end }}
