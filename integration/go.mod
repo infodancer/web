@@ -48,3 +48,5 @@ require (
 )
 
 replace github.com/infodancer/web/timeline => ../timeline
+
+replace github.com/infodancer/web/media => ../media
