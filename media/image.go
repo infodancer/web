@@ -13,8 +13,15 @@ import (
 
 	"github.com/HugoSmits86/nativewebp"
 
-	// Register the WebP decoder so DecodeConfig/Decode recognize it. The
-	// standard library has no WebP encoder; the lossless VP8L re-encode is
+	// Register decoders for every format Process accepts. Go's image registry
+	// is populated by each decoder package's init(), so a format the switch
+	// lists ("png") is still rejected by image.DecodeConfig unless its decoder
+	// is linked in. image/jpeg and image/gif above are imported directly for
+	// their encode/decode; PNG and WebP are decode-only here (Process re-encodes
+	// to WebP/JPEG), so they are blank imports.
+	_ "image/png"
+
+	// The standard library has no WebP encoder; the lossless VP8L re-encode is
 	// provided by nativewebp (pure Go, no cgo). Animation is not preserved.
 	_ "golang.org/x/image/webp"
 )
