@@ -57,9 +57,18 @@ func (s *Server) baseView(r *http.Request, page any) BaseView {
 	if doc.Meta.SiteName == "" {
 		doc.Meta.SiteName = orFAQ(s.deps.SiteName)
 	}
-	// The FAQ section nav lives in the left sidebar so it survives whatever
-	// chrome the host injects (the host owns the top nav).
-	doc.SidebarLeft = s.faqSectionSidebar(user)
+	// Place the FAQ section nav (Tags / Search / Ask) per the host's
+	// configuration. Left is the default and survives whatever chrome the host
+	// injects; right merges it atop the host's discovery rail so a host with
+	// its own right sidebar keeps one column; none lets the host own it.
+	switch s.deps.SectionNavPlacement {
+	case "none":
+		// Host renders the section nav itself; add nothing.
+	case "right":
+		doc.SidebarRight = mergeSidebarTop(doc.SidebarRight, s.faqSectionSidebar(user))
+	default: // "left" and any unrecognized value
+		doc.SidebarLeft = s.faqSectionSidebar(user)
+	}
 
 	return BaseView{
 		DocumentData: doc,
@@ -106,6 +115,23 @@ func (s *Server) faqSectionSidebar(user *faquser.User) *uiassets.SidebarData {
 			{Key: "faq", Title: "FAQ", Open: true, Items: items},
 		},
 	}
+}
+
+// mergeSidebarTop returns a sidebar with extra's sections placed above base's,
+// without mutating either argument. It is used to fold the FAQ section nav into
+// the top of a host-supplied right sidebar (SectionNavRight). Either side may
+// be nil: a nil base yields extra as-is, a nil extra yields base unchanged.
+func mergeSidebarTop(base, extra *uiassets.SidebarData) *uiassets.SidebarData {
+	if extra == nil {
+		return base
+	}
+	if base == nil {
+		return extra
+	}
+	sections := make([]uiassets.SidebarSection, 0, len(extra.Sections)+len(base.Sections))
+	sections = append(sections, extra.Sections...)
+	sections = append(sections, base.Sections...)
+	return &uiassets.SidebarData{Sections: sections}
 }
 
 // orFAQ returns name or "FAQ" when empty, matching the standalone chrome's

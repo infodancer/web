@@ -72,19 +72,20 @@ func New(cfg Config) (*Module, error) {
 	}
 
 	srv, err := handler.New(handler.Deps{
-		Store:        store.NewStore(cfg.DB),
-		Templates:    tpls,
-		Resolver:     cfg.Resolver,
-		Logger:       cfg.Logger,
-		BasePath:     cfg.BasePath,
-		SiteName:     cfg.SiteName,
-		HomeURL:      cfg.HomeURL,
-		LogoURL:      cfg.LogoURL,
-		SignInURL:    cfg.SignInURL,
-		Chrome:       cfg.Chrome,
-		PageSize:     cfg.PageSize,
-		Static:       overlayStatic(withUIAssets(staticFiles), cfg.Static),
-		CSRFDisabled: cfg.CSRF.Disable,
+		Store:               store.NewStore(cfg.DB),
+		Templates:           tpls,
+		Resolver:            cfg.Resolver,
+		Logger:              cfg.Logger,
+		BasePath:            cfg.BasePath,
+		SiteName:            cfg.SiteName,
+		HomeURL:             cfg.HomeURL,
+		LogoURL:             cfg.LogoURL,
+		SignInURL:           cfg.SignInURL,
+		Chrome:              cfg.Chrome,
+		SectionNavPlacement: string(cfg.SectionNavPlacement),
+		PageSize:            cfg.PageSize,
+		Static:              overlayStatic(withUIAssets(staticFiles), cfg.Static),
+		CSRFDisabled:        cfg.CSRF.Disable,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("faq: handler: %w", err)

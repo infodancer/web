@@ -53,6 +53,11 @@ type Deps struct {
 	// SiteName/HomeURL-derived default (see [Server.baseView]).
 	Chrome func(*http.Request) ui.DocumentData
 
+	// SectionNavPlacement is "left" (default), "right", or "none" — where the
+	// FAQ section nav renders relative to the chrome. See [faq.Config] for
+	// semantics; [Server.baseView] applies it. Empty is treated as "left".
+	SectionNavPlacement string
+
 	// PageSize is the default page size for list endpoints.
 	PageSize int
 

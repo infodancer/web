@@ -11,6 +11,20 @@ import (
 	"github.com/infodancer/ui"
 )
 
+// SectionNavPlacement selects where the module renders its section nav (Tags /
+// Search / Ask) relative to the host chrome. See [Config.SectionNavPlacement].
+type SectionNavPlacement string
+
+const (
+	// SectionNavLeft renders the section nav as its own left sidebar (default).
+	SectionNavLeft SectionNavPlacement = "left"
+	// SectionNavRight merges the section nav into the top of the chrome's
+	// right sidebar.
+	SectionNavRight SectionNavPlacement = "right"
+	// SectionNavNone omits the section nav so the host can render its own.
+	SectionNavNone SectionNavPlacement = "none"
+)
+
 // Config captures all wiring the host application supplies to [New]. Most
 // fields have sensible defaults; only DB and Resolver are required.
 type Config struct {
@@ -55,10 +69,20 @@ type Config struct {
 	// that pages render through ui/document. A host site sets this to inject its
 	// own live, auth-aware navigation so the FAQ matches the rest of the site.
 	// nil keeps the SiteName/HomeURL-derived default chrome, so a standalone
-	// faq still renders a complete page. The module always adds its own section
-	// nav (Tags / Search / Ask) as the left sidebar on top of whatever chrome
-	// this returns.
+	// faq still renders a complete page. The module adds its own section nav
+	// (Tags / Search / Ask) on top of whatever chrome this returns; see
+	// SectionNavPlacement for where.
 	Chrome func(*http.Request) ui.DocumentData
+
+	// SectionNavPlacement controls where the module's section nav (Tags /
+	// Search / Ask) renders relative to the Chrome:
+	//   - SectionNavLeft (default): its own left sidebar.
+	//   - SectionNavRight: merged at the top of whatever right sidebar the
+	//     Chrome supplies, so a host with its own right-hand rail keeps a
+	//     single column instead of growing a second one.
+	//   - SectionNavNone: omitted — the host takes ownership of that nav.
+	// An empty value is treated as SectionNavLeft (the historical behavior).
+	SectionNavPlacement SectionNavPlacement
 
 	// Templates optionally overrides the embedded template filesystem. Layered:
 	// names found here take precedence over the module's defaults.
@@ -120,5 +144,8 @@ func (c *Config) applyDefaults() {
 	}
 	if c.EditGracePeriod == 0 {
 		c.EditGracePeriod = 10 * time.Minute
+	}
+	if c.SectionNavPlacement == "" {
+		c.SectionNavPlacement = SectionNavLeft
 	}
 }
