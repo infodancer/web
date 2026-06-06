@@ -99,3 +99,51 @@ func TestChrome_HostHookInjected(t *testing.T) {
 	require.Contains(t, body, "app-sidebar-left", "faq section sidebar still rendered under host chrome")
 	require.Contains(t, body, `href="/faq/tags"`)
 }
+
+// hostRightRail returns a Chrome hook whose right sidebar carries one host
+// section ("Discover"/discover), so the placement tests can prove the merge.
+func hostRightRail() func(*http.Request) uiassets.DocumentData {
+	return func(_ *http.Request) uiassets.DocumentData {
+		return uiassets.DocumentData{
+			AssetBase: "/static/ui",
+			Meta:      uiassets.Meta{SiteName: "HostSite"},
+			SidebarRight: &uiassets.SidebarData{Sections: []uiassets.SidebarSection{
+				{Key: "discover", Title: "Discover", Open: true, Items: []uiassets.SidebarItem{
+					{Label: "HOSTRAILITEM", URL: "/campaign/"},
+				}},
+			}},
+		}
+	}
+}
+
+// SectionNavRight merges the FAQ section into the host's right rail: the page
+// has no left sidebar, and the FAQ links and the host rail both live on the
+// right.
+func TestChrome_SectionNavRight(t *testing.T) {
+	srv, _ := freshServer(t, func(d *handler.Deps) {
+		d.Chrome = hostRightRail()
+		d.SectionNavPlacement = "right"
+	})
+	body := themeBody(t, srv, "/q")
+	require.NotContains(t, body, "app-sidebar-left", "no left sidebar when nav is placed right")
+	require.Contains(t, body, "app-sidebar-right", "right rail rendered")
+	require.Contains(t, body, "HOSTRAILITEM", "host's own right-rail section survives the merge")
+	require.Contains(t, body, `href="/faq/tags"`, "FAQ section nav moved into the right rail")
+
+	// The FAQ section is merged on top of the host's sections.
+	require.Less(t, strings.Index(body, "/faq/tags"), strings.Index(body, "HOSTRAILITEM"),
+		"FAQ section sits above the host's own right-rail section")
+}
+
+// SectionNavNone omits the module nav entirely — neither sidebar carries the
+// FAQ section links, leaving the host to render that navigation itself.
+func TestChrome_SectionNavNone(t *testing.T) {
+	srv, _ := freshServer(t, func(d *handler.Deps) {
+		d.Chrome = hostRightRail()
+		d.SectionNavPlacement = "none"
+	})
+	body := themeBody(t, srv, "/q")
+	require.NotContains(t, body, "app-sidebar-left", "no left sidebar when nav is omitted")
+	require.NotContains(t, body, `href="/faq/tags"`, "module section nav omitted")
+	require.Contains(t, body, "HOSTRAILITEM", "host's right rail is untouched")
+}
