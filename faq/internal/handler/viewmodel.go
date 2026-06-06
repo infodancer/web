@@ -99,16 +99,20 @@ func (s *Server) defaultChrome() uiassets.DocumentData {
 }
 
 // faqSectionSidebar builds the FAQ section navigation (Tags / Search, plus Ask
-// for a signed-in user) as a left-sidebar panel, so it renders consistently
-// whatever top-nav chrome the host supplies.
+// for a signed-in user) so it renders consistently whatever top-nav chrome the
+// host supplies. Each item carries a short Meta description (the SidebarItem's
+// second line): a host that wants single-line items can hide .app-sidebar-meta
+// in CSS, but the module always supplies the text so the choice is the host's.
 func (s *Server) faqSectionSidebar(user *faquser.User) *uiassets.SidebarData {
 	base := s.deps.BasePath
 	items := []uiassets.SidebarItem{
-		{Label: "Tags", URL: base + "/tags"},
-		{Label: "Search", URL: base + "/search"},
+		{Label: "Tags", URL: base + "/tags", Meta: "Browse questions by topic"},
+		{Label: "Search", URL: base + "/search", Meta: "Find a question"},
 	}
 	if user != nil {
-		items = append(items, uiassets.SidebarItem{Label: "Ask a question", URL: base + "/q/new"})
+		items = append(items, uiassets.SidebarItem{
+			Label: "Ask a question", URL: base + "/q/new", Meta: "Post a new question",
+		})
 	}
 	return &uiassets.SidebarData{
 		Sections: []uiassets.SidebarSection{

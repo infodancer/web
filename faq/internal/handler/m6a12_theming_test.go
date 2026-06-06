@@ -49,6 +49,10 @@ func TestChrome_DefaultWithoutSiteName(t *testing.T) {
 	require.Contains(t, body, "app-sidebar-left", "faq section sidebar rendered")
 	require.Contains(t, body, `href="/faq/tags"`)
 	require.Contains(t, body, `href="/faq/search"`)
+	// Each section item carries a Meta second line so a host's sidebar matches
+	// its other (two-line) sections; a host that wants one line hides it in CSS.
+	require.Contains(t, body, "app-sidebar-meta", "section nav items render their Meta line")
+	require.Contains(t, body, "Browse questions by topic", "Tags item carries its description")
 }
 
 // Default chrome threads SiteName + HomeURL into the ui nav brand and footer.
