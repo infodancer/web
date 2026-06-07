@@ -194,9 +194,10 @@ func mountNewsletter(t *testing.T, ctx context.Context, pool *pgxpool.Pool, mux 
 func seedMediaBlob(t *testing.T, ctx context.Context, blobs media.BlobStore) string {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	shades := []uint8{0, 60, 120, 180}
 	for y := 0; y < 4; y++ {
 		for x := 0; x < 4; x++ {
-			img.Set(x, y, color.RGBA{R: uint8(x * 60), G: uint8(y * 60), B: 120, A: 255})
+			img.Set(x, y, color.RGBA{R: shades[x], G: shades[y], B: 120, A: 255})
 		}
 	}
 	var raw bytes.Buffer
