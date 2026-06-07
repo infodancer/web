@@ -263,7 +263,7 @@ func resize(src image.Image, spec ThumbnailSpec) image.Image {
 	if srcW <= spec.MaxWidth && srcH <= spec.MaxHeight {
 		return src // already fits; no upscale, re-encode at native size
 	}
-	outW, outH := srcW, srcH
+	var outW, outH int
 	if int64(srcW)*int64(spec.MaxHeight) > int64(srcH)*int64(spec.MaxWidth) {
 		// Width is the binding constraint.
 		outW = spec.MaxWidth
