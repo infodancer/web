@@ -6,26 +6,40 @@ replace github.com/infodancer/web/contact => ../contact
 
 replace github.com/infodancer/web/newsletter => ../newsletter
 
+replace github.com/infodancer/web/faq => ../faq
+
+replace github.com/infodancer/web/search => ../search
+
+replace github.com/infodancer/web/notify => ../notify
+
 require (
+	github.com/infodancer/smoke v0.1.0
 	github.com/infodancer/web/contact v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/faq v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/media v0.1.0
 	github.com/infodancer/web/newsletter v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/notify v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/search v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgx/v5 v5.9.2
 )
 
 require (
 	cuelang.org/go v0.16.0 // indirect
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
+	github.com/PuerkitoBio/goquery v1.12.0 // indirect
+	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/emicklei/proto v1.14.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/infodancer/ui v0.4.2 // indirect
 	github.com/infodancer/ui/markdown v0.2.1 // indirect
-	github.com/infodancer/web/media v0.1.0 // indirect
+	github.com/matthewjhunter/go-embedding v0.4.6 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
 	github.com/protocolbuffers/txtpbfmt v0.0.0-20260217160748-a481f6a22f94 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
