@@ -12,13 +12,24 @@ type Querier interface {
 	GetBlob(ctx context.Context, arg GetBlobParams) (GetBlobRow, error)
 	GetObject(ctx context.Context, arg GetObjectParams) (MediaObjects, error)
 	HasBlob(ctx context.Context, arg HasBlobParams) (bool, error)
+	// A page of objects in a category, keyset-paginated by the primary key (hash)
+	// so a backfill can walk the whole category. Pass the empty string as the
+	// cursor to start (it sorts before any hex hash); pass the last hash of a page
+	// to fetch the next. Index-backed by the (category, hash) primary key.
+	ListObjectsAfter(ctx context.Context, arg ListObjectsAfterParams) ([]MediaObjects, error)
 	// All images tied to one owning record within a category, newest first.
 	ListObjectsBySubject(ctx context.Context, arg ListObjectsBySubjectParams) ([]MediaObjects, error)
+	// Every derived size of one original, by spec name.
+	ListVariants(ctx context.Context, arg ListVariantsParams) ([]MediaVariants, error)
 	// Store bytes for a content address. Idempotent on (category, hash).
 	PutBlob(ctx context.Context, arg PutBlobParams) error
 	// Insert object metadata. Idempotent: a re-upload of identical content
 	// (same category + hash) is a no-op.
 	PutObject(ctx context.Context, arg PutObjectParams) error
+	// Map an original to one named derived size. Idempotent on
+	// (category, parent_hash, name). The variant's bytes are stored separately in
+	// the BlobStore under (category, hash).
+	PutVariant(ctx context.Context, arg PutVariantParams) error
 }
 
 var _ Querier = (*Queries)(nil)

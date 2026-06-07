@@ -15,6 +15,13 @@
 // and served with Content-Type, X-Content-Type-Options: nosniff, immutable
 // caching, and ETag.
 //
+// A handler configured with [Config.Thumbnails] also pregenerates derived sizes
+// for every upload: each [ThumbnailSpec] yields a downscaled variant through the
+// same pipeline (re-encoded, EXIF stripped), content-addressed by its own bytes
+// and stored in the same blob store under the same category — so the GET path
+// serves it unchanged. [BackfillThumbnails] fills variants for images stored
+// before a spec was added.
+//
 // Images are partitioned by category — a server-side bucket like "campaign",
 // "creature", or "character", fixed per handler and never set by the client.
 // One configured store serves every category; a host registers one handler per

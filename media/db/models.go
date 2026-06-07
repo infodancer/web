@@ -27,3 +27,15 @@ type MediaObjects struct {
 	Subject     string
 	CreatedAt   time.Time
 }
+
+type MediaVariants struct {
+	Category    string
+	ParentHash  string
+	Name        string
+	Hash        string
+	ContentType string
+	Width       int32
+	Height      int32
+	ByteSize    int64
+	CreatedAt   time.Time
+}

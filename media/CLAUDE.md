@@ -57,5 +57,9 @@ the mount contract are in the root [`CONVENTIONS.md`](../CONVENTIONS.md).
   [infodancer/ui#14](https://github.com/infodancer/ui/issues/14).
 - `BlobStore` backends shipped: `PostgresBlobStore` (default),
   `FilesystemBlobStore` (sharded, atomic writes), `MemoryBlobStore` (tests/dev).
-- Deferred: an object-store (S3) `BlobStore` backend; thumbnails/derived sizes;
-  a hardened sanitized-SVG path; per-owner quotas.
+- Thumbnails/derived sizes shipped (v0.2): `Config.Thumbnails` pregenerates
+  variants at upload time (FitInside/FitCover, never upscale); they are stored
+  as ordinary content-addressed blobs (served by the existing GET path) with a
+  `media_variants` map table; `BackfillThumbnails` fills an existing corpus.
+- Deferred: an object-store (S3) `BlobStore` backend; lossy-WebP thumbnails (would
+  need cgo); a hardened sanitized-SVG path; per-owner quotas.
