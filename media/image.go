@@ -10,8 +10,14 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"io"
+	"math"
 
 	"github.com/HugoSmits86/nativewebp"
+
+	// High-quality pure-Go downscaler for thumbnail generation (CatmullRom).
+	// x/image is already a dependency (the WebP decoder below); /draw adds no
+	// cgo and no new module.
+	xdraw "golang.org/x/image/draw"
 
 	// Register decoders for every format Process accepts. Go's image registry
 	// is populated by each decoder package's init(), so a format the switch
@@ -71,6 +77,23 @@ type Processed struct {
 	Width       int
 	Height      int
 	SHA256      string
+	// Thumbnails holds the derived sizes requested via Config.Thumbnails, in the
+	// same order. Each is a safe, content-addressed image produced from the same
+	// decoded source and re-encoded with the same format policy as the original.
+	// Nil when no thumbnails were configured.
+	Thumbnails []Thumbnail
+}
+
+// Thumbnail is one derived size produced by [Process]. Like [Processed] it is a
+// re-encoded, content-addressed image (its own SHA256), carrying the spec Name
+// that requested it so a caller can map it back to a [ThumbnailSpec].
+type Thumbnail struct {
+	Name        string // the requesting ThumbnailSpec.Name
+	Bytes       []byte
+	ContentType string // "image/webp" or "image/jpeg"
+	Width       int
+	Height      int
+	SHA256      string
 }
 
 // Process validates an untrusted image and returns a safe canonical form.
@@ -85,6 +108,11 @@ type Processed struct {
 // trailing/leading polyglot bytes; and finally content-address the result with
 // SHA-256.
 func Process(r io.Reader, cfg Config) (Processed, error) {
+	// Fail fast on a misconfigured spec list before reading or decoding anything.
+	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
+		return Processed{}, err
+	}
+
 	maxBytes := cfg.MaxUploadBytes
 	if maxBytes <= 0 {
 		maxBytes = defaultMaxUploadBytes
@@ -146,6 +174,13 @@ func Process(r io.Reader, cfg Config) (Processed, error) {
 		return Processed{}, err
 	}
 
+	// Derive the requested thumbnails from the one decoded source (no re-decode
+	// per size). Each is re-encoded with the same format policy as the original.
+	thumbs, err := generateThumbnails(img, format, cfg.Thumbnails)
+	if err != nil {
+		return Processed{}, err
+	}
+
 	sum := sha256.Sum256(out)
 	b := img.Bounds()
 	return Processed{
@@ -154,7 +189,111 @@ func Process(r io.Reader, cfg Config) (Processed, error) {
 		Width:       b.Dx(),
 		Height:      b.Dy(),
 		SHA256:      hex.EncodeToString(sum[:]),
+		Thumbnails:  thumbs,
 	}, nil
+}
+
+// generateThumbnails downscales src once per spec and re-encodes each with the
+// same format policy as the original (JPEG source -> JPEG thumb, else lossless
+// WebP). It is shared by [Process] and [BackfillThumbnails]; specs are assumed
+// already validated by [validateThumbnailSpecs]. Returns nil for no specs.
+func generateThumbnails(src image.Image, format string, specs []ThumbnailSpec) ([]Thumbnail, error) {
+	if len(specs) == 0 {
+		return nil, nil
+	}
+	thumbs := make([]Thumbnail, 0, len(specs))
+	for _, spec := range specs {
+		scaled := resize(src, spec)
+		data, contentType, err := reencode(scaled, format)
+		if err != nil {
+			return nil, fmt.Errorf("media: thumbnail %q: %w", spec.Name, err)
+		}
+		sum := sha256.Sum256(data)
+		b := scaled.Bounds()
+		thumbs = append(thumbs, Thumbnail{
+			Name:        spec.Name,
+			Bytes:       data,
+			ContentType: contentType,
+			Width:       b.Dx(),
+			Height:      b.Dy(),
+			SHA256:      hex.EncodeToString(sum[:]),
+		})
+	}
+	return thumbs, nil
+}
+
+// resize downscales src per spec, never upscaling. For FitInside the result fits
+// within MaxWidth×MaxHeight with the aspect ratio preserved; for FitCover it is
+// the largest centered crop of src matching the box aspect ratio, scaled down to
+// at most MaxWidth×MaxHeight. The high-quality CatmullRom kernel is used.
+func resize(src image.Image, spec ThumbnailSpec) image.Image {
+	sb := src.Bounds()
+	srcW, srcH := sb.Dx(), sb.Dy()
+	if srcW <= 0 || srcH <= 0 {
+		return src
+	}
+
+	if spec.Fit == FitCover {
+		// Largest centered sub-rectangle of src with the box aspect ratio.
+		cropW, cropH := srcW, srcH
+		if int64(srcW)*int64(spec.MaxHeight) > int64(srcH)*int64(spec.MaxWidth) {
+			// Source is wider than the box: crop the width.
+			cropW = scaleRound(srcH, spec.MaxWidth, spec.MaxHeight)
+		} else {
+			// Source is taller (or equal): crop the height.
+			cropH = scaleRound(srcW, spec.MaxHeight, spec.MaxWidth)
+		}
+		cropW = clampInt(cropW, 1, srcW)
+		cropH = clampInt(cropH, 1, srcH)
+		cropRect := image.Rect(0, 0, cropW, cropH).
+			Add(image.Pt(sb.Min.X+(srcW-cropW)/2, sb.Min.Y+(srcH-cropH)/2))
+
+		// No upscale: shrink the crop toward the box, but never enlarge it.
+		outW, outH := cropW, cropH
+		if cropW > spec.MaxWidth {
+			outW = spec.MaxWidth
+			outH = clampInt(scaleRound(cropH, spec.MaxWidth, cropW), 1, spec.MaxHeight)
+		}
+		dst := image.NewRGBA(image.Rect(0, 0, outW, outH))
+		xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, cropRect, xdraw.Over, nil)
+		return dst
+	}
+
+	// FitInside: scale down to fit within the box, aspect ratio preserved.
+	if srcW <= spec.MaxWidth && srcH <= spec.MaxHeight {
+		return src // already fits; no upscale, re-encode at native size
+	}
+	outW, outH := srcW, srcH
+	if int64(srcW)*int64(spec.MaxHeight) > int64(srcH)*int64(spec.MaxWidth) {
+		// Width is the binding constraint.
+		outW = spec.MaxWidth
+		outH = clampInt(scaleRound(srcH, spec.MaxWidth, srcW), 1, spec.MaxHeight)
+	} else {
+		outH = spec.MaxHeight
+		outW = clampInt(scaleRound(srcW, spec.MaxHeight, srcH), 1, spec.MaxWidth)
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, outW, outH))
+	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, sb, xdraw.Over, nil)
+	return dst
+}
+
+// scaleRound returns round(v * num / den), the standard aspect-preserving scale.
+func scaleRound(v, num, den int) int {
+	if den == 0 {
+		return v
+	}
+	return int(math.Round(float64(v) * float64(num) / float64(den)))
+}
+
+// clampInt constrains v to [lo, hi].
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 // reencode writes img to a canonical format chosen by its source: q85 JPEG for
