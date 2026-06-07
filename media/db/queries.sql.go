@@ -76,6 +76,53 @@ func (q *Queries) HasBlob(ctx context.Context, arg HasBlobParams) (bool, error) 
 	return exists, err
 }
 
+const listObjectsAfter = `-- name: ListObjectsAfter :many
+SELECT category, hash, content_type, width, height, byte_size, subject, created_at
+FROM media_objects
+WHERE category = $1 AND hash > $2
+ORDER BY hash
+LIMIT $3
+`
+
+type ListObjectsAfterParams struct {
+	Category string
+	Hash     string
+	Limit    int32
+}
+
+// A page of objects in a category, keyset-paginated by the primary key (hash)
+// so a backfill can walk the whole category. Pass the empty string as the
+// cursor to start (it sorts before any hex hash); pass the last hash of a page
+// to fetch the next. Index-backed by the (category, hash) primary key.
+func (q *Queries) ListObjectsAfter(ctx context.Context, arg ListObjectsAfterParams) ([]MediaObjects, error) {
+	rows, err := q.db.Query(ctx, listObjectsAfter, arg.Category, arg.Hash, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MediaObjects
+	for rows.Next() {
+		var i MediaObjects
+		if err := rows.Scan(
+			&i.Category,
+			&i.Hash,
+			&i.ContentType,
+			&i.Width,
+			&i.Height,
+			&i.ByteSize,
+			&i.Subject,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listObjectsBySubject = `-- name: ListObjectsBySubject :many
 SELECT category, hash, content_type, width, height, byte_size, subject, created_at
 FROM media_objects
@@ -106,6 +153,49 @@ func (q *Queries) ListObjectsBySubject(ctx context.Context, arg ListObjectsBySub
 			&i.Height,
 			&i.ByteSize,
 			&i.Subject,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVariants = `-- name: ListVariants :many
+SELECT category, parent_hash, name, hash, content_type, width, height, byte_size, created_at
+FROM media_variants
+WHERE category = $1 AND parent_hash = $2
+ORDER BY name
+`
+
+type ListVariantsParams struct {
+	Category   string
+	ParentHash string
+}
+
+// Every derived size of one original, by spec name.
+func (q *Queries) ListVariants(ctx context.Context, arg ListVariantsParams) ([]MediaVariants, error) {
+	rows, err := q.db.Query(ctx, listVariants, arg.Category, arg.ParentHash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MediaVariants
+	for rows.Next() {
+		var i MediaVariants
+		if err := rows.Scan(
+			&i.Category,
+			&i.ParentHash,
+			&i.Name,
+			&i.Hash,
+			&i.ContentType,
+			&i.Width,
+			&i.Height,
+			&i.ByteSize,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -172,6 +262,42 @@ func (q *Queries) PutObject(ctx context.Context, arg PutObjectParams) error {
 		arg.Height,
 		arg.ByteSize,
 		arg.Subject,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const putVariant = `-- name: PutVariant :exec
+INSERT INTO media_variants (category, parent_hash, name, hash, content_type, width, height, byte_size, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (category, parent_hash, name) DO NOTHING
+`
+
+type PutVariantParams struct {
+	Category    string
+	ParentHash  string
+	Name        string
+	Hash        string
+	ContentType string
+	Width       int32
+	Height      int32
+	ByteSize    int64
+	CreatedAt   time.Time
+}
+
+// Map an original to one named derived size. Idempotent on
+// (category, parent_hash, name). The variant's bytes are stored separately in
+// the BlobStore under (category, hash).
+func (q *Queries) PutVariant(ctx context.Context, arg PutVariantParams) error {
+	_, err := q.db.Exec(ctx, putVariant,
+		arg.Category,
+		arg.ParentHash,
+		arg.Name,
+		arg.Hash,
+		arg.ContentType,
+		arg.Width,
+		arg.Height,
+		arg.ByteSize,
 		arg.CreatedAt,
 	)
 	return err
