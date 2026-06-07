@@ -15,12 +15,15 @@ import (
 // fakeStore is an in-memory objectStore for handler unit tests, keyed by
 // (category, hash).
 type fakeStore struct {
-	mu      sync.Mutex
-	objects map[string]ObjectMeta
-	putErr  error
+	mu       sync.Mutex
+	objects  map[string]ObjectMeta
+	variants map[string]Variant
+	putErr   error
 }
 
-func newFakeStore() *fakeStore { return &fakeStore{objects: map[string]ObjectMeta{}} }
+func newFakeStore() *fakeStore {
+	return &fakeStore{objects: map[string]ObjectMeta{}, variants: map[string]Variant{}}
+}
 
 func (f *fakeStore) key(category, hash string) string { return category + "\x00" + hash }
 
@@ -39,6 +42,16 @@ func (f *fakeStore) Lookup(_ context.Context, category, hash string) (ObjectMeta
 	defer f.mu.Unlock()
 	m, ok := f.objects[f.key(category, hash)]
 	return m, ok, nil
+}
+
+func (f *fakeStore) PutVariant(_ context.Context, v Variant) error {
+	if f.putErr != nil {
+		return f.putErr
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.variants[v.Category+"\x00"+v.ParentHash+"\x00"+v.Name] = v
+	return nil
 }
 
 func newHandler(t *testing.T, cfg Config) (*Handler, *fakeStore, *MemoryBlobStore) {
@@ -112,6 +125,89 @@ func TestHandler_UploadPNG(t *testing.T) {
 		if ok, _ := blobs.Has(context.Background(), m.Category, m.Hash); !ok {
 			t.Errorf("blob for %s/%s not stored", m.Category, m.Hash)
 		}
+	}
+}
+
+// An upload to a handler configured with thumbnail specs returns the variant
+// URLs, records a variant row per spec, and each thumbnail is GET-servable with
+// the same security headers as an original.
+func TestHandler_UploadWithThumbnails(t *testing.T) {
+	cfg := Config{
+		Category:      "campaign",
+		PublicBaseURL: "/media",
+		Thumbnails: []ThumbnailSpec{
+			{Name: "thumb", MaxWidth: 64, MaxHeight: 64, Fit: FitCover},
+			{Name: "medium", MaxWidth: 256, MaxHeight: 256, Fit: FitInside},
+		},
+	}
+	h, store, blobs := newHandler(t, cfg)
+	rec := httptest.NewRecorder()
+	h.Routes().ServeHTTP(rec, uploadRequest(t, "image", pngBytes(t, 800, 600)))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp uploadResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Thumbnails) != 2 {
+		t.Fatalf("got %d thumbnails in response, want 2", len(resp.Thumbnails))
+	}
+	if len(store.variants) != 2 {
+		t.Errorf("stored %d variant rows, want 2", len(store.variants))
+	}
+	// thumb is FitCover 64x64; medium is FitInside (800x600 -> 256x192).
+	byName := map[string]thumbVariant{}
+	for _, tv := range resp.Thumbnails {
+		byName[tv.Name] = tv
+	}
+	if tv := byName["thumb"]; tv.Width != 64 || tv.Height != 64 {
+		t.Errorf("thumb dims = %dx%d, want 64x64", tv.Width, tv.Height)
+	}
+	if tv := byName["medium"]; tv.Width != 256 || tv.Height != 192 {
+		t.Errorf("medium dims = %dx%d, want 256x192", tv.Width, tv.Height)
+	}
+
+	// Each thumbnail is servable by its own URL with image headers + nosniff.
+	for _, tv := range resp.Thumbnails {
+		path := tv.URL[len("/media"):]
+		get := httptest.NewRecorder()
+		h.Routes().ServeHTTP(get, httptest.NewRequest(http.MethodGet, path, nil))
+		if get.Code != http.StatusOK {
+			t.Errorf("serve %s: status = %d, want 200", tv.Name, get.Code)
+		}
+		if ct := get.Header().Get("Content-Type"); ct != "image/webp" {
+			t.Errorf("serve %s: content-type = %q, want image/webp", tv.Name, ct)
+		}
+		if get.Header().Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("serve %s: missing nosniff", tv.Name)
+		}
+	}
+	// The original and both thumbnails are distinct blobs under the category.
+	if ok, _ := blobs.Has(context.Background(), "campaign", resp.URL[len("/media/"):len(resp.URL)-len(".webp")]); !ok {
+		t.Errorf("original blob not stored")
+	}
+}
+
+// With no thumbnail specs the response omits the thumbnails field entirely.
+func TestHandler_UploadOmitsThumbnailsWhenUnconfigured(t *testing.T) {
+	h, _, _ := newHandler(t, Config{Category: "campaign", PublicBaseURL: "/media"})
+	rec := httptest.NewRecorder()
+	h.Routes().ServeHTTP(rec, uploadRequest(t, "image", pngBytes(t, 40, 40)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", rec.Code)
+	}
+	if bytes.Contains(rec.Body.Bytes(), []byte("thumbnails")) {
+		t.Errorf("response includes thumbnails field with no specs: %s", rec.Body.String())
+	}
+}
+
+// NewHandler rejects an invalid thumbnail spec.
+func TestNewHandler_RejectsBadThumbnailSpec(t *testing.T) {
+	cfg := Config{Category: "campaign", Thumbnails: []ThumbnailSpec{{Name: "", MaxWidth: 10, MaxHeight: 10}}}
+	if _, err := NewHandler(newFakeStore(), NewMemoryBlobStore(), cfg); err == nil {
+		t.Errorf("NewHandler accepted an invalid thumbnail spec")
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 type objectStore interface {
 	Put(ctx context.Context, m ObjectMeta) error
 	Lookup(ctx context.Context, category, hash string) (ObjectMeta, bool, error)
+	PutVariant(ctx context.Context, v Variant) error
 }
 
 // Handler serves the media HTTP contract: POST an image to upload, GET its
@@ -35,6 +36,9 @@ func NewHandler(store objectStore, blobs BlobStore, cfg Config) (*Handler, error
 	if cfg.Category == "" || !ValidCategory(cfg.Category) {
 		return nil, fmt.Errorf("media: NewHandler: invalid category %q", cfg.Category)
 	}
+	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
+		return nil, fmt.Errorf("media: NewHandler: %w", err)
+	}
 	return &Handler{store: store, blobs: blobs, cfg: cfg}, nil
 }
 
@@ -52,6 +56,17 @@ func (h *Handler) Routes() http.Handler {
 
 // uploadResponse is the success body. mdedit's adapter inserts ![](url).
 type uploadResponse struct {
+	URL        string         `json:"url"`
+	Width      int            `json:"width"`
+	Height     int            `json:"height"`
+	Thumbnails []thumbVariant `json:"thumbnails,omitempty"`
+}
+
+// thumbVariant is one derived size in the upload response, keyed by spec name so
+// a caller can pick "thumb" vs "medium". Omitted entirely when no thumbnails are
+// configured (back-compat with consumers that only read url).
+type thumbVariant struct {
+	Name   string `json:"name"`
 	URL    string `json:"url"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
@@ -119,12 +134,46 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Store each pregenerated thumbnail: its bytes go in the same blob store
+	// under their own content address (so the GET path serves them unchanged),
+	// and a media_variants row maps the original to the named size.
+	var thumbs []thumbVariant
+	now := time.Now().UTC()
+	for _, t := range processed.Thumbnails {
+		if err := h.blobs.Put(ctx, h.cfg.Category, t.SHA256, t.ContentType, t.Bytes); err != nil {
+			http.Error(w, "storage error", http.StatusInternalServerError)
+			return
+		}
+		variant := Variant{
+			Category:    h.cfg.Category,
+			ParentHash:  processed.SHA256,
+			Name:        t.Name,
+			Hash:        t.SHA256,
+			ContentType: t.ContentType,
+			Width:       t.Width,
+			Height:      t.Height,
+			ByteSize:    int64(len(t.Bytes)),
+			CreatedAt:   now,
+		}
+		if err := h.store.PutVariant(ctx, variant); err != nil {
+			http.Error(w, "storage error", http.StatusInternalServerError)
+			return
+		}
+		thumbs = append(thumbs, thumbVariant{
+			Name:   t.Name,
+			URL:    h.objectURL(t.SHA256, t.ContentType),
+			Width:  t.Width,
+			Height: t.Height,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(uploadResponse{
-		URL:    h.objectURL(processed.SHA256, processed.ContentType),
-		Width:  processed.Width,
-		Height: processed.Height,
+		URL:        h.objectURL(processed.SHA256, processed.ContentType),
+		Width:      processed.Width,
+		Height:     processed.Height,
+		Thumbnails: thumbs,
 	})
 }
 
