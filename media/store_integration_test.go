@@ -3,6 +3,7 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log"
@@ -58,7 +59,7 @@ func TestMain(m *testing.M) {
 func fresh(t *testing.T) (*Store, *PostgresBlobStore) {
 	t.Helper()
 	_, err := testPool.Exec(context.Background(),
-		`TRUNCATE media_objects, media_blobs`)
+		`TRUNCATE media_objects, media_blobs, media_variants`)
 	require.NoError(t, err)
 	return NewStore(testPool), NewPostgresBlobStore(testPool)
 }
@@ -156,6 +157,122 @@ func TestStore_ListBySubject(t *testing.T) {
 		require.Equal(t, "shadowmaze", m.Subject)
 		require.Equal(t, "campaign", m.Category)
 	}
+}
+
+func sampleVariant() Variant {
+	return Variant{
+		Category:    "campaign",
+		ParentHash:  sampleMeta().Hash,
+		Name:        "thumb",
+		Hash:        "ffeeddccbbaa00998877665544332211ffeeddccbbaa00998877665544332211",
+		ContentType: "image/webp",
+		Width:       64,
+		Height:      64,
+		ByteSize:    512,
+		CreatedAt:   time.Now().UTC().Truncate(time.Microsecond),
+	}
+}
+
+func TestStore_VariantRoundTrip(t *testing.T) {
+	store, _ := fresh(t)
+	ctx := context.Background()
+	in := sampleVariant()
+
+	require.NoError(t, store.PutVariant(ctx, in))
+	require.NoError(t, store.PutVariant(ctx, in)) // idempotent on (category, parent, name)
+
+	got, err := store.ListVariants(ctx, in.Category, in.ParentHash)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, in.Name, got[0].Name)
+	require.Equal(t, in.Hash, got[0].Hash)
+	require.Equal(t, in.ContentType, got[0].ContentType)
+	require.Equal(t, in.Width, got[0].Width)
+	require.Equal(t, in.Height, got[0].Height)
+	require.Equal(t, in.ByteSize, got[0].ByteSize)
+}
+
+func TestStore_ListObjectsAfterPaging(t *testing.T) {
+	store, _ := fresh(t)
+	ctx := context.Background()
+
+	hashes := []string{
+		"1111111111111111111111111111111111111111111111111111111111111111",
+		"2222222222222222222222222222222222222222222222222222222222222222",
+		"3333333333333333333333333333333333333333333333333333333333333333",
+		"4444444444444444444444444444444444444444444444444444444444444444",
+	}
+	for _, hh := range hashes {
+		m := sampleMeta()
+		m.Hash = hh
+		require.NoError(t, store.Put(ctx, m))
+	}
+
+	// Walk in pages of 2 via the keyset cursor; expect all four in hash order.
+	var seen []string
+	cursor := ""
+	for {
+		page, err := store.ListObjectsAfter(ctx, "campaign", cursor, 2)
+		require.NoError(t, err)
+		if len(page) == 0 {
+			break
+		}
+		for _, m := range page {
+			seen = append(seen, m.Hash)
+		}
+		cursor = page[len(page)-1].Hash
+		if len(page) < 2 {
+			break
+		}
+	}
+	require.Equal(t, hashes, seen)
+}
+
+// BackfillThumbnails fills missing sizes for an already-stored original and is a
+// no-op on a second run.
+func TestBackfillThumbnails(t *testing.T) {
+	store, blobs := fresh(t)
+	ctx := context.Background()
+
+	// Store an original with no thumbnails (as if uploaded before the feature).
+	processed, err := Process(bytes.NewReader(pngBytes(t, 400, 300)), Config{Category: "campaign"})
+	require.NoError(t, err)
+	require.Empty(t, processed.Thumbnails)
+	require.NoError(t, blobs.Put(ctx, "campaign", processed.SHA256, processed.ContentType, processed.Bytes))
+	require.NoError(t, store.Put(ctx, ObjectMeta{
+		Category:    "campaign",
+		Hash:        processed.SHA256,
+		ContentType: processed.ContentType,
+		Width:       processed.Width,
+		Height:      processed.Height,
+		ByteSize:    int64(len(processed.Bytes)),
+		Subject:     "shadowmaze",
+		CreatedAt:   time.Now().UTC().Truncate(time.Microsecond),
+	}))
+
+	cfg := Config{Category: "campaign", Thumbnails: []ThumbnailSpec{
+		{Name: "thumb", MaxWidth: 64, MaxHeight: 64, Fit: FitCover},
+	}}
+
+	res, err := BackfillThumbnails(ctx, store, blobs, cfg)
+	require.NoError(t, err)
+	require.Equal(t, 1, res.Scanned)
+	require.Equal(t, 1, res.Created)
+
+	variants, err := store.ListVariants(ctx, "campaign", processed.SHA256)
+	require.NoError(t, err)
+	require.Len(t, variants, 1)
+	require.Equal(t, "thumb", variants[0].Name)
+	require.Equal(t, 64, variants[0].Width)
+	has, err := blobs.Has(ctx, "campaign", variants[0].Hash)
+	require.NoError(t, err)
+	require.True(t, has)
+
+	// Re-run: nothing new to create.
+	again, err := BackfillThumbnails(ctx, store, blobs, cfg)
+	require.NoError(t, err)
+	require.Equal(t, 1, again.Scanned)
+	require.Equal(t, 0, again.Created)
 }
 
 func TestPostgresBlobStore_RoundTrip(t *testing.T) {
