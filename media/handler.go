@@ -33,13 +33,23 @@ type Handler struct {
 // a non-empty valid category (see [ValidCategory]). A host registers one
 // handler per category over a single shared store.
 func NewHandler(store objectStore, blobs BlobStore, cfg Config) (*Handler, error) {
-	if cfg.Category == "" || !ValidCategory(cfg.Category) {
-		return nil, fmt.Errorf("media: NewHandler: invalid category %q", cfg.Category)
-	}
-	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
+	if err := validateConfig(cfg); err != nil {
 		return nil, fmt.Errorf("media: NewHandler: %w", err)
 	}
 	return &Handler{store: store, blobs: blobs, cfg: cfg}, nil
+}
+
+// validateConfig checks the parts of Config that every storage entry point
+// (the HTTP handler and [Ingest]) depends on: a server-side category and
+// well-formed thumbnail specs. Callers wrap the error with their own prefix.
+func validateConfig(cfg Config) error {
+	if cfg.Category == "" || !ValidCategory(cfg.Category) {
+		return fmt.Errorf("invalid category %q", cfg.Category)
+	}
+	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Routes returns the handler's mux. Mount it under a path with
@@ -212,9 +222,20 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data) //nolint:gosec // G705: re-encoded image bytes, nosniff + image content-type
 }
 
-// objectURL builds the public URL for a stored object.
+// objectURL builds the public URL for a stored object from this handler's
+// configured base. It delegates to the package-level [objectURL] so the serve
+// path and [Ingest] produce byte-identical URLs from one source of truth.
 func (h *Handler) objectURL(hash, contentType string) string {
-	base := strings.TrimRight(h.cfg.PublicBaseURL, "/")
+	return objectURL(h.cfg.PublicBaseURL, hash, contentType)
+}
+
+// objectURL builds the canonical public URL for a stored object: the base with
+// any trailing slash trimmed, then "/<hash><ext>". This is media's URL scheme
+// and stays internal — both [Handler] (serving) and [Ingest] (returning) call
+// it, so the storage layout and the URL shape cannot drift. Consumers take the
+// returned URL; they never construct it.
+func objectURL(base, hash, contentType string) string {
+	base = strings.TrimRight(base, "/")
 	return base + "/" + hash + extFor(contentType)
 }
 

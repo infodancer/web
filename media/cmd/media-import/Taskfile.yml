@@ -1,0 +1,69 @@
+version: '3'
+
+# Build against this module's own go.mod (GOWORK=off) so local results match CI.
+env:
+  GOWORK: 'off'
+
+tasks:
+  default:
+    cmds:
+      - task: check
+
+  build:
+    desc: Build the media-import binary
+    cmds:
+      - go build -o media-import .
+
+  run:
+    desc: Run with arguments, e.g. task run -- --category cover --dry-run ./covers
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  test:
+    desc: Run unit tests with the race detector
+    cmds:
+      - go test -race -count=1 ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Fail if any file needs formatting
+    cmds:
+      - test -z "$(gofmt -l .)"
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  vulncheck:
+    desc: Run govulncheck
+    cmds:
+      - govulncheck ./...
+
+  check:
+    desc: All gating checks (fmt, vet, lint, test, vulncheck)
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: lint
+      - task: test
+      - task: vulncheck
+
+  tidy:
+    desc: go mod tidy
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f media-import
