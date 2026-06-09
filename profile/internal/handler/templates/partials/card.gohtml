@@ -1,0 +1,9 @@
+{{- /*
+  card.gohtml is the embeddable avatar+name unit other components and host
+  surfaces inline next to user-authored content (forum posts, rosters,
+  bylines). Rendered by Module.Card; receives a cardView.
+*/ -}}
+<span class="profile-card">
+  {{- if .AvatarSrc }}<img class="profile-card-avatar" src="{{ .AvatarSrc }}" alt="" width="24" height="24" loading="lazy">{{ end -}}
+  {{- if .ProfileURL }}<a class="profile-card-name" href="{{ .ProfileURL }}">{{ .DisplayName }}</a>{{ else }}<span class="profile-card-name">{{ .DisplayName }}</span>{{ end -}}
+</span>
