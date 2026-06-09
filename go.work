@@ -6,6 +6,7 @@ use (
 	./faq
 	./integration
 	./media
+	./media/cmd/media-import
 	./newsletter
 	./notify
 	./paging
