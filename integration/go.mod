@@ -16,7 +16,7 @@ require (
 	github.com/infodancer/smoke v0.1.0
 	github.com/infodancer/web/contact v0.0.0-00010101000000-000000000000
 	github.com/infodancer/web/faq v0.0.0-00010101000000-000000000000
-	github.com/infodancer/web/media v0.1.0
+	github.com/infodancer/web/media v0.1.3
 	github.com/infodancer/web/newsletter v0.0.0-00010101000000-000000000000
 	github.com/infodancer/web/notify v0.0.0-00010101000000-000000000000
 	github.com/infodancer/web/search v0.0.0-00010101000000-000000000000
@@ -49,6 +49,7 @@ require (
 )
 
 require (
+	github.com/infodancer/web/profile v0.0.0-00010101000000-000000000000
 	github.com/infodancer/web/timeline v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -64,3 +65,5 @@ require (
 replace github.com/infodancer/web/timeline => ../timeline
 
 replace github.com/infodancer/web/media => ../media
+
+replace github.com/infodancer/web/profile => ../profile

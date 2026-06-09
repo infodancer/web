@@ -10,6 +10,7 @@ use (
 	./newsletter
 	./notify
 	./paging
+	./profile
 	./search
 	./timeline
 )

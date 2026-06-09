@@ -1,0 +1,84 @@
+/* profile component layout. Colors and typography come from the host's ui
+   chrome; only structural rules live here, hookable via the ui --app-*
+   variables. */
+
+.profile-edit,
+.profile-page {
+  max-width: 40rem;
+}
+
+.profile-flash {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--app-accent, #2a7);
+  border-radius: 4px;
+}
+
+.profile-errors {
+  padding: 0.5rem 0.75rem 0.5rem 2rem;
+  border: 1px solid var(--app-danger, #b33);
+  border-radius: 4px;
+}
+
+.profile-form label,
+.profile-form fieldset {
+  display: block;
+  margin-block: 1rem;
+}
+
+.profile-form input[type="text"],
+.profile-form input[type="url"],
+.profile-form textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-hint {
+  display: block;
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.profile-link-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-block: 0.25rem;
+}
+
+.profile-link-row input[name="link_label"] {
+  flex: 1;
+}
+
+.profile-link-row input[name="link_url"] {
+  flex: 2;
+}
+
+.profile-avatar {
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.profile-avatar-large {
+  border-radius: 6px;
+}
+
+.profile-header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.profile-handle {
+  opacity: 0.75;
+  margin-block: 0.25rem;
+}
+
+.profile-card {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.profile-card-avatar {
+  border-radius: 3px;
+}

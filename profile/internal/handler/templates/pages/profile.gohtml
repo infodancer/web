@@ -1,0 +1,30 @@
+{{ define "title" }}{{ if .Page.Profile.DisplayName }}{{ .Page.Profile.DisplayName }}{{ else }}{{ .Page.Profile.Handle }}{{ end }} - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<article class="profile-page">
+  <header class="profile-header">
+    {{ if $v.AvatarSrc }}
+    <img class="profile-avatar profile-avatar-large" src="{{ $v.AvatarSrc }}" alt="" width="96" height="96">
+    {{ end }}
+    <div>
+      <h1>{{ if $v.Profile.DisplayName }}{{ $v.Profile.DisplayName }}{{ else }}{{ $v.Profile.Handle }}{{ end }}</h1>
+      <p class="profile-handle">@{{ $v.Profile.Handle }}</p>
+    </div>
+  </header>
+
+  {{ if $v.Profile.BioMD }}
+  <section class="profile-bio">{{ bio $v.Profile.BioMD }}</section>
+  {{ end }}
+
+  {{ if $v.Profile.Links }}
+  <nav class="profile-link-list" aria-label="profile links">
+    <ul>
+      {{ range $v.Profile.Links }}
+      <li><a href="{{ .URL }}" rel="me nofollow ugc">{{ .Label }}</a></li>
+      {{ end }}
+    </ul>
+  </nav>
+  {{ end }}
+</article>
+{{ end }}

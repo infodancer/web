@@ -1,0 +1,78 @@
+{{ define "title" }}Your profile - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $base := .BasePath -}}
+{{- $v := .Page -}}
+<div class="profile-edit">
+  <h1>Your profile</h1>
+
+  {{ if $v.Saved }}<p class="profile-flash" role="status">Profile saved.</p>{{ end }}
+  {{ if $v.Errors }}
+  <ul class="profile-errors" role="alert">
+    {{ range $v.Errors }}<li>{{ . }}</li>{{ end }}
+  </ul>
+  {{ end }}
+
+  <section class="profile-avatar-section">
+    <h2>Picture</h2>
+    {{ if $v.AvatarSrc }}
+    <img class="profile-avatar" src="{{ $v.AvatarSrc }}" alt="" width="64" height="64">
+    {{ else }}
+    <p class="profile-hint">Claim a handle to get a generated avatar, or upload a picture.</p>
+    {{ end }}
+    {{ if $v.AvatarUploads }}
+    <form method="post" action="{{ $base }}/avatar" enctype="multipart/form-data" class="profile-avatar-form">
+      <label>Upload a picture
+        <input type="file" name="avatar" accept="image/*" required>
+      </label>
+      <button type="submit">Upload</button>
+    </form>
+    {{ if $v.Profile.AvatarURL }}
+    <form method="post" action="{{ $base }}/avatar" enctype="multipart/form-data">
+      <input type="hidden" name="action" value="remove">
+      <button type="submit">Remove picture</button>
+    </form>
+    {{ end }}
+    {{ end }}
+  </section>
+
+  <form method="post" action="{{ $base }}/edit" class="profile-form">
+    <label>Handle
+      {{ if $v.HandleLocked }}
+      <input type="text" name="handle" value="{{ $v.Profile.Handle }}" readonly>
+      <span class="profile-hint">Handles cannot be changed once claimed.</span>
+      {{ else }}
+      <input type="text" name="handle" value="{{ $v.Profile.Handle }}"
+             minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9]"
+             placeholder="your-handle">
+      <span class="profile-hint">3-32 characters: letters, digits, hyphens. This becomes your public profile URL and cannot be changed later.</span>
+      {{ end }}
+    </label>
+
+    <label>Display name
+      <input type="text" name="display_name" value="{{ $v.Profile.DisplayName }}" maxlength="80">
+    </label>
+
+    <label>About you
+      <textarea name="bio" rows="5" maxlength="2000"
+                placeholder="A short paragraph about yourself. Markdown is supported.">{{ $v.Profile.BioMD }}</textarea>
+    </label>
+
+    <fieldset class="profile-links">
+      <legend>Links</legend>
+      {{ range $v.LinkRows }}
+      <div class="profile-link-row">
+        <input type="text" name="link_label" value="{{ .Label }}" maxlength="40" placeholder="Label">
+        <input type="url" name="link_url" value="{{ .URL }}" maxlength="200" placeholder="https://...">
+      </div>
+      {{ end }}
+    </fieldset>
+
+    <button type="submit">Save profile</button>
+  </form>
+
+  {{ if $v.Profile.Handle }}
+  <p><a href="{{ $base }}/{{ $v.Profile.Handle }}">View your public profile</a></p>
+  {{ end }}
+</div>
+{{ end }}
