@@ -8,6 +8,7 @@ use (
 	./media
 	./newsletter
 	./notify
+	./paging
 	./search
 	./timeline
 )

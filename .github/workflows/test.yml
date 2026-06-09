@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration]
+        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging]
     services:
       postgres:
         image: pgvector/pgvector:pg17
