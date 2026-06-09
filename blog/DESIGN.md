@@ -1,6 +1,6 @@
 # infodancer/blog — design (v0.1)
 
-*Status: pre-implementation. Initial design proposal, 2026-05-19. This document is the source of truth until implementation begins; once code lands the design + code together are authoritative.*
+*Status: pre-implementation. Initial design 2026-05-19; motivation revised 2026-06-09 (decoupled from the OSG session-notes workflow, which shipped separately as its own feature -- see §1). This document is the source of truth until implementation begins; once code lands the design + code together are authoritative.*
 
 ## 1. Purpose
 
@@ -8,9 +8,11 @@
 
 ### Why this module exists
 
-The motivating case is the **osg session-notes workflow**. osg's campaign reports are authored as Hugo page bundles, edited locally, committed to git, and rendered as part of the Hugo build. This works for the maintainer; it does not work for the campaign players, who are the actual content creators — they aren't going to learn git, Hugo, markdown frontmatter, and a webp toolchain to write a session report from their character's POV. User adoption is gated on a real CMS with a real authoring UX. The shape of that CMS is "a blog": posts with title, body, author, tags, dates, comments, and a publish lifecycle.
+The motivating case is **a site's editorial voice.** Consumer sites in the portfolio accumulate tools and content but have no first-person layer -- nowhere for the maintainer to speak directly: announcements, dev notes, commentary, essays. A database-backed blog with a real authoring UX is that layer, and it is the kind of thing every site in the portfolio eventually wants, so it is built once as a module rather than rebuilt per site.
 
-The module exists to solve this user-adoption problem first, and to be reusable across other consumer sites second. mjh, hunterfamily, and amyhunter are plausible future consumers; they're not driving the design today.
+The near-term driver is **osg**: it has a bestiary, generators, and a campaign directory but no voice, and it is starting outreach into the OSR blogosphere -- which is person-to-person and needs a place where the maintainer writes directly (the player-owned philosophy, the AI-use stance, dev notes). osg is the first consumer; mjh, triggerfinger, hunterfamily, and amyhunter are plausible later ones.
+
+> **Not session-notes.** An earlier draft of this design was motivated by the osg session-notes workflow (players authoring character-POV session reports). That feature shipped separately and is in production -- DB-backed, campaign-scoped, authored in osg's own Go server, with its own transcription -> narrative pipeline. It is **not** this module. `blog` is a general editorial blog; it shares plumbing with session-notes (markdown, the `mdedit` editor, a publish lifecycle) but none of the campaign/character model. The session-notes-specific machinery that leaked into earlier drafts (a Hugo-bundle importer, a character-as-author model) has been removed.
 
 ### What the module is
 
@@ -20,14 +22,13 @@ The module exists to solve this user-adoption problem first, and to be reusable 
 - A read surface: index, single post, author pages, tag pages, archive by month/year, Atom feed, search.
 - Admin surfaces: post management across all statuses, author management, tag management.
 - Templates and CSS consuming `infodancer/ui` design tokens; markdown rendering and sanitizing delegated to `infodancer/markdown`; the editor component delegated to `infodancer/mdedit`.
-- A migration tool to import existing Hugo page bundles (osg's existing session-notes corpus).
 
 ### What the module is not
 
 See §2 for the v0.1 exclusions; a few framing points belong here:
 
 - Not a general-purpose CMS competing with Ghost, Wagtail, or WordPress. The scope is what this portfolio needs, no more.
-- Not a static-site generator. Hugo handles content sites where authors are devs; blog handles content sites where they aren't.
+- Not a static-site generator. It's a database-backed CMS -- authoring and publishing happen at runtime through a web UI, not as a build step over files in git.
 - Not a WYSIWYG editor. Markdown is the authoring format. The editor adds quality-of-life tooling around markdown (toolbar, preview), not a rich-text replacement.
 - Not multi-tenant. One blog instance per consumer site, per database. Multiple authors and many users are first-class; multiple separate blog instances in one deployment are not.
 
@@ -151,8 +152,7 @@ blog/
 │   └── *_integration_test.go
 ├── internal/
 │   ├── handler/                    // HTTP handlers, middleware, view-models
-│   ├── slug/                       // slug generation + validation
-│   └── importer/                   // Hugo bundle migration
+│   └── slug/                       // slug generation + validation
 │                                   // (render/sanitize delegated to infodancer/markdown — §10)
 ├── templates/                      // embed:all
 │   ├── base.gohtml
@@ -180,9 +180,9 @@ blog/
 
 Same shape as faq. `blog_users` stores one row per OIDC subject; `blog_authors` stores display identities used as post bylines.
 
-A `blog_user` can own multiple `blog_authors` — the osg use case is that one player has multiple characters across campaigns. When posting, the user picks which author identity to publish as.
+A `blog_user` can own multiple `blog_authors` — a single person may publish under more than one byline (a personal name and a site persona, say). When posting, the user picks which author identity to publish as. Most sites use exactly one author per user; the model simply doesn't preclude more.
 
-A `blog_author` can also exist without an associated `blog_user.id` — used during Hugo-bundle migration when the original frontmatter lists an author string that doesn't correspond to a registered user. Such authors can later be associated with a real user by an admin.
+A `blog_author` can also exist without an associated `blog_user.id` — a guest or historical byline an admin enters directly, not yet (or never) tied to a logged-in user. Such authors can later be associated with a real user by an admin.
 
 ```sql
 CREATE TABLE blog_users (
@@ -236,7 +236,7 @@ CREATE INDEX blog_posts_author_idx ON blog_posts (author_id) WHERE deleted_at IS
 CREATE INDEX blog_posts_external_idx ON blog_posts (external_id) WHERE external_id IS NOT NULL;
 ```
 
-Slug uniqueness is **global**. (osg's session-notes are typically date-prefixed slugs like `shadowmaze-2026-02-10-bancroft` which are naturally unique.)
+Slug uniqueness is **global** across the blog instance.
 
 `external_id` is opaque to blog — consumers populate it for their own linkage purposes; blog itself never interprets it. See §11.
 
@@ -297,7 +297,7 @@ A revision row is written on every save that changes `title` or `body_md`. The c
 
 ## 7. Authoring UX
 
-This is the make-or-break feature. The whole point of this module is that authoring works for non-developer contributors. Every design decision in this section is judged on that one criterion: "can a campaign player who doesn't use git successfully write a session report from start to publish?"
+This is the make-or-break feature. The point of a database-backed blog over a static-site generator is that authoring works without a developer toolchain. Every design decision in this section is judged on one criterion: "can a non-developer author write a post from start to publish without touching git, frontmatter, or a build step?"
 
 ### The editor: infodancer/mdedit
 
@@ -307,7 +307,7 @@ The body editor is the `infodancer/mdedit` component, not a hand-rolled control:
 ┌──────────────────────────────────────────────────────────────────┐
 │ Title:    [ The Plague at Bobwhite Castle                     ]  │
 │                                                                  │
-│ Author:   ( me as Bancroft  ▾ )                                  │
+│ Author:   ( me (osg admin)  ▾ )                                  │
 │                                                                  │
 │ ┌────────────────────────────┬───────────────────────────────┐   │
 │ │ [B] [I] [H] [link] [list]  │  Preview                       │   │
@@ -318,7 +318,7 @@ The body editor is the `infodancer/mdedit` component, not a hand-rolled control:
 │ │                            │  └─────────────────────────┘   │   │
 │ └────────────────────────────┴───────────────────────────────┘   │
 │                                                                  │
-│ Tags:     [ shadowmaze, 2026-02-10, bancroft           ]         │
+│ Tags:     [ announcements, osr, ai                     ]         │
 │                                                                  │
 │ Excerpt:  [ (optional override; auto-derived if empty)  ]        │
 │                                                                  │
@@ -352,7 +352,7 @@ mdedit's `Field.LivePreview` opts the body field into debounced server-side prev
 
 A `<select>` of the authoring user's `blog_authors` rows. Defaults to the most-recently-used author. Admins also see a "Post as someone else" option that opens a dropdown of all authors.
 
-A campaign player with two characters (Bancroft for Monday games, Cael for Tuesday) sees both in the dropdown. Switching authors changes the post's `author_id`; nothing else.
+A user who writes under more than one byline sees each in the dropdown; a single-byline user (the common case) sees just theirs. Switching authors changes the post's `author_id`; nothing else.
 
 ### Tag input
 
@@ -447,7 +447,6 @@ All paths relative to the configured `BasePath`.
 | POST | `/admin/p/{id}/feature` | Pin to top of index |
 | POST | `/admin/p/{id}/unfeature` | Remove pin |
 | POST | `/admin/p/{id}/hard-delete` | Permanently delete (after soft-delete) |
-| POST | `/admin/import-hugo` | Trigger Hugo-bundle import (see §12) |
 
 ### CSRF
 
@@ -538,49 +537,15 @@ The `infodancer/markdown` extraction this section originally deferred has happen
 
 Bodies are rendered to HTML on save and cached in `blog_posts.body_html`. The cache is regenerated on every save; reading is a single column fetch with no per-request rendering. `POST /preview` (§7) renders through the same renderer, so preview and stored output never diverge.
 
-## 11. External linkage (osg-shaped, but generic)
+## 11. External linkage (optional, consumer-defined)
 
-The osg session-notes use case wants each blog post to optionally link to a specific row in osg's `directory.sessions` table (campaign session metadata, attendance, etc.). Blog does **not** know what a session is; that's osg's domain.
+A generic mechanism for a consumer that wants to tie a blog post to one of its own records, without blog knowing anything about that record's domain.
 
-The mechanism: `blog_posts.external_id` is an opaque `TEXT NULL` column. osg sets it to the session UUID when creating a post via the editor. Blog stores and indexes it (`blog_posts_external_idx`) but otherwise ignores it. Read-side template view-models include `ExternalID` as a string the consumer can interpret in overridden templates if they want to (e.g., osg overrides `post_detail.gohtml` to add a "Session details →" link to its directory page).
+The mechanism: `blog_posts.external_id` is an opaque `TEXT NULL` column. A consumer sets it to whatever id it likes when creating a post; blog stores and indexes it (`blog_posts_external_idx`) but never interprets it. Read-side template view-models expose `ExternalID` as a string the consumer can act on in overridden templates -- e.g. add a "Related: …" link out to its own page for that record.
 
-If a consumer doesn't use external linkage, the column stays NULL and nothing happens. The feature has zero cost when unused.
+If a consumer doesn't use external linkage, the column stays NULL and nothing happens. The feature has zero cost when unused. Plausible uses: a portfolio site linking a post to a project, an art site linking a post to a piece. (Generic mechanism, deliberately, over a consumer-specific schema column.)
 
-This is a deliberate generic-mechanism choice over an osg-specific schema column. Other consumers (mjh linking posts to projects, amyhunter linking posts to art pieces) can use the same column for their own purposes.
-
-## 12. Hugo bundle migration
-
-osg has a corpus of existing Hugo session-notes as page bundles:
-
-```
-content/shadowmaze/2026-02-10-bancroft/
-├── index.md          # frontmatter + body
-└── *.webp            # images referenced from the body
-```
-
-The migration tool is a CLI (`cmd/blog-import-hugo`) and an admin endpoint (`POST /admin/import-hugo`). It takes a path to a Hugo content directory and:
-
-1. Walks the directory recursively, finding `index.md` files inside leaf directories.
-2. Parses TOML / YAML frontmatter (Hugo supports both; osg uses TOML).
-3. Creates a `blog_posts` row per bundle with:
-   - `title` from frontmatter `title`
-   - `slug` from frontmatter `slug` if present, else derived from the directory name
-   - `author_id` looked up by `display_name = frontmatter.author`; created if not found (with `user_id = NULL` until admin associates)
-   - `body_md` from the markdown body
-   - `body_html` generated via the standard pipeline
-   - `published_at` from frontmatter `date`
-   - `created_at` same as `published_at`
-   - `status = 'published'`
-   - `external_id` set if the consumer provides a mapping (e.g., osg maps each bundle to its session UUID)
-   - Tags from frontmatter `tags` — created if missing
-4. **Images are NOT migrated in v0.1.** The body retains its relative image references; admin can either fix them by hand post-import or wait for v0.2 media handling.
-5. Reports a summary: posts created, posts skipped (duplicate slug), authors created, tags created.
-
-The tool is **idempotent**: running it twice over the same corpus does not create duplicates. Re-running updates posts where the source markdown has changed. Slug is the dedup key.
-
-osg's flow on launch: import the existing corpus once into the live blog instance, then the campaign players take over authoring inside the editor. The Hugo content directory can be deleted from osg's repo once the import is verified.
-
-## 13. Search
+## 12. Search
 
 Postgres full-text search on `title` and `body_md` via a generated `tsvector` column. Same shape as faq's search:
 
@@ -597,7 +562,7 @@ CREATE INDEX blog_posts_search_idx ON blog_posts USING GIN (search_tsv);
 
 Comments are not searched in v0.1; defer if a consumer asks.
 
-## 14. Config
+## 13. Config
 
 ```go
 type Config struct {
@@ -627,7 +592,7 @@ type Config struct {
 
 Env-var driven defaults documented in README once implementation lands.
 
-## 15. Testing
+## 14. Testing
 
 Same approach as faq: integration tests against a real Postgres via `testcontainers`, build tag `integration` for the expensive tests, pure-Go unit tests for renderer / slug / sanitize policies without the tag.
 
@@ -635,11 +600,10 @@ Coverage targets (per the OSS polish checklist):
 
 - Every sqlc query has at least one integration test exercising it.
 - Every handler has happy-path + at least one error-path test.
-- Hugo importer has fixture tests over a small synthetic content tree.
 - Markdown renderer has round-trip tests for SE-style inline HTML (kbd/sub/sup/mark).
 - CSRF middleware tested via fixture requests.
 
-## 16. Security
+## 15. Security
 
 - **CSRF**: middleware on every write endpoint. Same shape as faq.
 - **XSS**: all rendered markdown passes through `infodancer/markdown` (goldmark + bluemonday), the audited portfolio sanitization boundary (§10). Authors can write inline HTML in posts (kbd/sub/sup/mark) because that preset allows them; script/style/iframe/event-handlers and dangerous URL schemes are stripped. The client editor's own preview is disabled (§7), so the server is the only renderer — preview and stored output share one sanitization path.
@@ -648,7 +612,7 @@ Coverage targets (per the OSS polish checklist):
 - **SQL injection**: sqlc-generated typed queries; no string concatenation into SQL.
 - **Open redirect**: any user-supplied redirect target validated against an allowlist of relative paths under `BasePath`.
 
-## 17. Validation of infodancer/ui token vocabulary
+## 16. Validation of infodancer/ui token vocabulary
 
 This DESIGN.md exists in part to validate that `infodancer/ui` v0.1's 26-token vocabulary covers a second known full-UI consumer (faq is the first; blog is the second). The discipline is to enumerate every visual surface blog has and confirm it maps to existing tokens.
 
@@ -704,16 +668,16 @@ The `--app-space` doubling scale (xs/sm/(default)/lg/xl) is sufficient for blog'
 
 None to retire. The v0.1 vocabulary is tight enough that nothing in the 26 is unused by blog.
 
-## 18. Open questions
+## 17. Open questions
 
 - **Comment moderation defaults.** v0.1 lets any authenticated user comment immediately. If spam is a real problem (it shouldn't be for a small portfolio site behind OIDC) we add a moderation queue in v0.2. The OIDC requirement should be enough friction to deter casual spam.
-- **Migrating Hugo authors without users.** When an imported post's frontmatter lists an author name that doesn't correspond to any registered OIDC user, we create a `blog_authors` row with `user_id = NULL`. An admin later associates the author with a real user. The UX flow for "associate this author with an existing user" needs to be designed during M5 (admin).
-- **Per-author slug uniqueness.** v0.1 makes slugs globally unique. If two campaigns each want a `session-1` post, they can't both have that slug. Mitigation: osg slugs are date-prefixed anyway. Reconsider if a real conflict emerges.
+- **Associating a guest/historical author with a user.** A `blog_authors` row with `user_id = NULL` (a byline entered by an admin, §5) may later need tying to a real logged-in user. The admin UX flow for "associate this author with an existing user" needs designing during M5 (admin).
+- **Slug collisions.** v0.1 makes slugs globally unique, so two posts can't share a slug. In practice titles differ and the slug is editable, so this is rarely felt; reconsider only if a real conflict emerges.
 - **Excerpt derivation.** When `excerpt` is empty, do we auto-derive from the first paragraph, the first 200 chars, the first sentence, or use the post's first heading + first paragraph? v0.1 defaults to "first 200 chars of body, stripped of markdown syntax, ellipsized." Easy to change.
 - **Atom feed pagination.** Single feed file with N most recent. If a consumer outgrows that (unlikely for portfolio sites), v0.2 adds paged feeds.
 - **Author pages: archive view vs. card view.** Author detail page shows their posts. List view or chronological archive? v0.1: chronological list with post-card partial. Reconsider if the author list grows beyond ~100 posts.
 
-## 19. Milestones (v0.1)
+## 18. Milestones (v0.1)
 
 - **M0 — skeleton (1 day)**: repo scaffolding (already done; this DESIGN.md is the design artifact). go.mod, empty `blog.go`, `bloguser/user.go`, embed FS declarations, empty handler stubs returning 501. Taskfile targets. CI workflow.
 - **M1 — schema + store (1-2 days)**: all migrations, sqlc queries, store-layer integration tests (testcontainers).
@@ -723,13 +687,12 @@ None to retire. The v0.1 vocabulary is tight enough that nothing in the 26 is un
 - **M5 — admin (1-2 days)**: posts/authors/tags/feature/merge admin endpoints + templates.
 - **M6 — revisions (1 day)**: edit history schema is already in M1; M6 adds the diff-rendering view and the `/p/{slug}/revisions` page.
 - **M7 — theme + infodancer/ui consumption (1 day)**: refactor `static/css/blog.css` to consume `--app-*` tokens via `--blog-*` chaining. Add `head_extra` block to `base.gohtml`. Make `partials/nav.gohtml` overridable via `Config.Templates`. Parallels faq M6a-12.
-- **M8 — Hugo bundle migration (2-3 days)**: importer package, CLI command, admin endpoint, idempotency, fixture tests against a synthetic Hugo content tree. Image migration explicitly deferred.
-- **M9 — osg integration (2-3 days)**: mount blog under `/blog` in osg's Go server with a `UserResolver` adapter over osg's existing session model, run the Hugo importer over osg's session-notes corpus, theme integration. Smoke tests against the live osg binary. Migration of the existing content is gradual after launch; players start using the new editor immediately for new posts.
-- **M10 — polish + v0.1.0 tag**: OSS polish checklist [[matthew-oss-polish-checklist]].
+- **M8 — osg integration (1-2 days)**: mount blog under `/blog` in osg's Go server with a `UserResolver` adapter over osg's existing session/admin model; theme integration via the `Config.Chrome` hook (as osg already does for `search`/`faq`); `AllowComments=false` for osg. Smoke tests against the live osg binary. First posts (the AI-use stance, the player-owned philosophy) author-tested through the editor.
+- **M9 — polish + v0.1.0 tag**: OSS polish checklist [[matthew-oss-polish-checklist]].
 
-Total realistic v0.1 effort: ~2-3 weeks of focused work. M0 + M1 + M2 + M3 + M4 are the critical path (~10 days); M5–M8 are sequence-flexible; M9 is the integration. Tag once osg is running blog successfully.
+Total realistic v0.1 effort: ~2 weeks of focused work. M0 + M1 + M2 + M3 + M4 are the critical path (~10 days); M5–M7 are sequence-flexible; M8 is the osg integration. Tag once osg is running blog successfully.
 
-## 20. v0.2 candidates
+## 19. v0.2 candidates
 
 - **Image / media upload** in the editor (drag-drop, server-side resize, storage backend).
 - **Draft autosave** (JS state, periodic background POST).
