@@ -2,38 +2,50 @@
 
 Guidance for Claude Code sessions in `github.com/infodancer/web/blog`.
 
-## What this repo is
+## What this module is
 
-A reusable Go module providing a database-backed blog / lightweight CMS for consumer sites in the infodancer / matthewjhunter web portfolio. Full-UI module — ships templates, CSS, and the authoring UX. See [DESIGN.md](DESIGN.md) for the v0.1 design.
+A reusable Go module providing a database-backed, multi-author blog — the
+authoritative editorial voice of a consumer site. Full-UI module: ships
+templates, CSS, and the authoring UX. See [DESIGN.md](DESIGN.md) for the v0.1
+design; once code lands, design + code together are authoritative.
 
-**Pre-implementation.** Only [DESIGN.md](DESIGN.md) and scaffolding exist. Don't generate code until the design is reviewed.
+Key shape: named blogs (distinct editorial streams in one instance),
+invitation-only authorship via `infodancer/authz` role grants, RSS/Atom/JSON
+Feed at combined/per-author/per-blog scope with autodiscovery, JSON-LD, and
+host-wired hooks into the suite's `profile`, `media`, and `search` components.
 
-## Primary consumer driving the design
+## Primary consumer
 
-**osg session-notes.** Campaign players (non-dev contributors) need a real CMS to author session reports from their character's POV. GitHub-plus-Hugo authoring is the wall this module exists to remove. The authoring UX is the load-bearing feature; everything else is in service of it.
+**osg's editorial voice** — announcements, dev notes, OSR commentary written
+by the site maintainers. Not the session-notes feature (that shipped
+separately inside osg's own server).
 
 ## Sister modules
 
-- [`infodancer/ui`](https://github.com/infodancer/ui) — design tokens this module consumes. Treat `--app-*` token names as a public API; chain through `--blog-*` in module CSS.
-- [`infodancer/oidclient`](https://github.com/infodancer/oidclient) — consumer sites use this for OIDC; blog accepts a `UserResolver` from the consumer (same shape as faq).
-- [`github.com/matthewjhunter/faq`](https://github.com/matthewjhunter/faq) — design parallel. blog's data model, mount pattern, and template shape mirror faq deliberately. Markdown rendering pipeline (goldmark + bluemonday) is identical; eventually extracted to a shared package once both have shipped.
+- [`infodancer/ui`](https://github.com/infodancer/ui) — chrome (`ui/document`),
+  design tokens (`--app-*`), `ui/markdown` (the sanitization boundary), and
+  `ui/mdedit` (the editor component).
+- [`infodancer/authz`](https://github.com/infodancer/authz) — role store;
+  `blogauthz` mirrors faq's `faqauthz` adapter. Roles: `blog`/`author`,
+  `blog`/`admin`.
+- Monorepo siblings `profile`, `media`, `search` — consumed through
+  host-injected hooks (`AuthorDirectory`, upload via `media.Ingest`,
+  `Indexer`), never imported for search/profile. `faq` and `profile` are the
+  pattern parallels for structure, CSRF, templates, and tests.
 
 ## What NOT to change without explicit approval
 
-- **License** is Apache-2.0. Don't change without explicit approval.
-- **Module mount contract** (`New(Config) → Module → Routes() http.Handler → Migrate(ctx)`) — mirrors faq, must remain compatible with the consumer-mount pattern documented in the portfolio architecture doc.
-- **`blog_*` schema-prefixed table names** — feature modules use prefixed tables so a single Postgres can host multiple modules without collision (see portfolio architecture).
+- **License** is Apache-2.0.
+- **Module mount contract** (`New(Config) → Module → Routes() → Migrate(ctx)`).
+- **`blog_*` table prefix** and the dedicated `blog_goose_db_version` table.
+- **Sanitization boundary**: only `ui/markdown` output may become
+  `template.HTML`.
 
 ## Conventions
 
-- Apache-2.0 license, Matthew Hunter copyright. Per-file headers not required.
-- Go version: track the latest patched release per the infodancer org standard.
-- Markdown rendering: `goldmark` + `bluemonday`, identical to faq.
-- Tests: integration tests against real Postgres via `testcontainers`, same pattern as faq.
-- No frontend framework. htmx + vanilla JS where dynamic. Templates consume `infodancer/ui` tokens.
-
-## Related docs
-
-- [DESIGN.md](DESIGN.md) — v0.1 design proposal.
-- [`infodancer/infodancer/docs/web-portfolio-architecture.md`](https://github.com/infodancer/infodancer/blob/master/docs/web-portfolio-architecture.md) — portfolio-level context.
-- [`infodancer/ui/DESIGN.md`](https://github.com/infodancer/ui/blob/main/DESIGN.md) — token vocabulary blog consumes.
+- Follow the monorepo [CONVENTIONS.md](../CONVENTIONS.md): Task, golangci-lint,
+  govulncheck, goose, sqlc + pgx/v5, Postgres only, host owns the pool.
+- Tests: handler unit tests on an in-memory fake store; Postgres integration
+  tests live in the monorepo `integration` module (TEST_DATABASE_URL).
+- No frontend framework. htmx + vanilla JS; templates consume `infodancer/ui`
+  tokens through a `--blog-*` chain.
