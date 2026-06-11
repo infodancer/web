@@ -1,0 +1,20 @@
+{{ define "title" }}Authors - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-authors">
+  <h1>Authors</h1>
+  {{- if $v.Authors }}
+  <ul class="blog-author-list">
+    {{- range $v.Authors }}
+    <li>
+      <a href="{{ $.BasePath }}/authors/{{ .Slug }}">{{ .DisplayName }}</a>
+      <span class="blog-hint">{{ .PostCount }} post{{ if ne .PostCount 1 }}s{{ end }}</span>
+    </li>
+    {{- end }}
+  </ul>
+  {{- else }}
+  <p class="blog-empty">No authors yet.</p>
+  {{- end }}
+</div>
+{{ end }}

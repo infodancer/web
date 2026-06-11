@@ -1,0 +1,41 @@
+{{ define "title" }}{{ .Page.Post.Title }} - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<article class="blog blog-post">
+  <header class="blog-post-header">
+    {{- if $v.IsDraft }}<p class="blog-badge blog-badge-{{ $v.Post.Status }}">{{ $v.Post.Status }} — only you (and admins) can see this</p>{{ end }}
+    <h1>{{ $v.Post.Title }}</h1>
+    <p class="blog-post-meta">
+      {{- if $v.Post.PublishedAt }}<time datetime="{{ $v.Post.PublishedAt.Format "2006-01-02" }}">{{ $v.Post.PublishedAt.Format "January 2, 2006" }}</time> · {{ end }}
+      {{- if $v.AuthorCard }}{{ $v.AuthorCard }}{{ else }}<a href="{{ .BasePath }}/authors/{{ $v.Post.AuthorSlug }}" rel="author">{{ $v.Post.AuthorName }}</a>{{ end }}
+      {{- if $v.Post.BlogSlug }} · in <a href="{{ .BasePath }}/b/{{ $v.Post.BlogSlug }}">{{ $v.Post.BlogName }}</a>{{ end }}
+    </p>
+    {{- if $v.CanEdit }}
+    <p class="blog-actions">
+      <a class="blog-button" href="{{ .BasePath }}/p/{{ $v.Post.ID }}/edit">Edit</a>
+      {{- if eq $v.Post.Status "published" }}
+      <form method="post" action="{{ .BasePath }}/p/{{ $v.Post.ID }}/unpublish">{{/* same-origin guarded */}}<button type="submit">Unpublish</button></form>
+      {{- else }}
+      <form method="post" action="{{ .BasePath }}/p/{{ $v.Post.ID }}/publish"><button type="submit">Publish</button></form>
+      {{- end }}
+      {{- if ne $v.Post.Status "archived" }}
+      <form method="post" action="{{ .BasePath }}/p/{{ $v.Post.ID }}/archive"><button type="submit">Archive</button></form>
+      {{- end }}
+      <form method="post" action="{{ .BasePath }}/p/{{ $v.Post.ID }}/delete"
+            onsubmit="return confirm('Delete this post?')">
+        <button type="submit" class="blog-button-danger">Delete</button>
+      </form>
+    </p>
+    {{- end }}
+  </header>
+
+  <div class="blog-prose">{{ $v.BodyHTML }}</div>
+
+  {{- if $v.Post.Tags }}
+  <footer class="blog-post-tags">
+    {{ range $v.Post.Tags }}<a class="blog-chip" href="{{ $.BasePath }}/tags/{{ .Slug }}">{{ .Name }}</a>{{ end }}
+  </footer>
+  {{- end }}
+</article>
+{{ end }}

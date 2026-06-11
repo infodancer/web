@@ -1,0 +1,17 @@
+{{- /*
+  base.gohtml renders every full blog page through infodancer/ui's Layer 2
+  ui/document (chrome owned by ui, skinnable per request via Config.Chrome).
+  The page template supplies the content/title blocks; the embedded
+  ui.DocumentData on the view supplies ui/document's chrome fields.
+
+  The head block carries blog's per-scope feed autodiscovery links and, on
+  editor pages, mdedit's asset tags. Canonical URLs and JSON-LD ride
+  ui/meta via the Meta field.
+*/ -}}
+{{ define "head" }}
+{{ .FeedLinks }}
+{{- with .EditorHead }}
+  {{ . }}
+{{- end }}
+{{ end }}
+{{ template "ui/document" . }}

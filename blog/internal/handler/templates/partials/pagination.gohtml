@@ -1,0 +1,7 @@
+{{- /* Prev/next controls. Dot is a pagination view-model. */ -}}
+{{- if or .HasPrev .HasNext }}
+<nav class="blog-pagination" aria-label="pagination">
+  {{ if .HasPrev }}<a href="{{ .PrevURL }}">&larr; Newer</a>{{ else }}<span></span>{{ end }}
+  {{ if .HasNext }}<a href="{{ .NextURL }}">Older &rarr;</a>{{ else }}<span></span>{{ end }}
+</nav>
+{{- end }}

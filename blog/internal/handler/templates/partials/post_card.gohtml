@@ -1,0 +1,13 @@
+{{- /* One post in a listing. Dot is a postCard view-model. */ -}}
+<article class="blog-card">
+  <h2 class="blog-card-title"><a href="{{ .BasePath }}/p/{{ .Slug }}">{{ .Title }}</a></h2>
+  <p class="blog-card-meta">
+    {{- if .PublishedAt }}<time datetime="{{ .PublishedAt.Format "2006-01-02" }}">{{ .PublishedAt.Format "January 2, 2006" }}</time>{{ end }}
+    {{- if .AuthorName }} · <a href="{{ .BasePath }}/authors/{{ .AuthorSlug }}" rel="author">{{ .AuthorName }}</a>{{ end }}
+    {{- if .BlogSlug }} · <a class="blog-card-blog" href="{{ .BasePath }}/b/{{ .BlogSlug }}">{{ .BlogName }}</a>{{ end }}
+    {{- if and .Status (ne .Status "published") }} <span class="blog-badge blog-badge-{{ .Status }}">{{ .Status }}</span>{{ end }}
+  </p>
+  {{- if .Excerpt }}
+  <p class="blog-card-excerpt">{{ .Excerpt }}</p>
+  {{- end }}
+</article>

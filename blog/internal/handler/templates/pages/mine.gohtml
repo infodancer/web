@@ -1,0 +1,18 @@
+{{ define "title" }}My posts - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-mine">
+  <header class="blog-index-header">
+    <h1>My posts</h1>
+    <p class="blog-actions"><a class="blog-button" href="{{ .BasePath }}/new">Write a post</a></p>
+  </header>
+  {{- if $v.Posts }}
+  <section class="blog-card-list">
+    {{ range $v.Posts }}{{ template "partials/post_card.gohtml" . }}{{ end }}
+  </section>
+  {{- else }}
+  <p class="blog-empty">Nothing yet — write your first post.</p>
+  {{- end }}
+</div>
+{{ end }}

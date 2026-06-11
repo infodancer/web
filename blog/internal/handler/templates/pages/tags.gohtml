@@ -1,0 +1,17 @@
+{{ define "title" }}Tags - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-tags">
+  <h1>Tags</h1>
+  {{- if $v.Tags }}
+  <p class="blog-chip-cloud">
+    {{- range $v.Tags }}
+    <a class="blog-chip" href="{{ $.BasePath }}/tags/{{ .Slug }}">{{ .Name }} <span class="blog-hint">{{ .PostCount }}</span></a>
+    {{- end }}
+  </p>
+  {{- else }}
+  <p class="blog-empty">No tags yet.</p>
+  {{- end }}
+</div>
+{{ end }}
