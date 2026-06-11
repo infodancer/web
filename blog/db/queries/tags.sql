@@ -30,3 +30,10 @@ DELETE FROM blog_post_tags WHERE post_id = $1;
 INSERT INTO blog_post_tags (post_id, tag_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
+
+-- name: ListTagsForPostIDs :many
+SELECT pt.post_id, t.id, t.slug, t.name
+FROM blog_tags t
+JOIN blog_post_tags pt ON pt.tag_id = t.id
+WHERE pt.post_id = ANY(@post_ids::bigint[])
+ORDER BY t.name;

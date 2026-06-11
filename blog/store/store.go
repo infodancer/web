@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -444,7 +445,7 @@ func (s *Store) withTags(ctx context.Context, p *Post) (*Post, error) {
 // total count of published posts.
 func (s *Store) ListPublished(ctx context.Context, limit, offset int) ([]Post, int64, error) {
 	rows, err := s.q.ListPublishedPosts(ctx, db.ListPublishedPostsParams{
-		PageLimit: int32(limit), PageOffset: int32(offset),
+		PageLimit: pg32(limit), PageOffset: pg32(offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("blog store: list published: %w", err)
@@ -463,7 +464,7 @@ func (s *Store) ListPublished(ctx context.Context, limit, offset int) ([]Post, i
 // ListPublishedByBlog returns one page of a named blog's published posts.
 func (s *Store) ListPublishedByBlog(ctx context.Context, blogSlug string, limit, offset int) ([]Post, int64, error) {
 	rows, err := s.q.ListPublishedPostsByBlog(ctx, db.ListPublishedPostsByBlogParams{
-		BlogSlug: blogSlug, PageLimit: int32(limit), PageOffset: int32(offset),
+		BlogSlug: blogSlug, PageLimit: pg32(limit), PageOffset: pg32(offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("blog store: list by blog: %w", err)
@@ -482,7 +483,7 @@ func (s *Store) ListPublishedByBlog(ctx context.Context, blogSlug string, limit,
 // ListPublishedByAuthor returns one page of an author's published posts.
 func (s *Store) ListPublishedByAuthor(ctx context.Context, authorSlug string, limit, offset int) ([]Post, int64, error) {
 	rows, err := s.q.ListPublishedPostsByAuthor(ctx, db.ListPublishedPostsByAuthorParams{
-		AuthorSlug: authorSlug, PageLimit: int32(limit), PageOffset: int32(offset),
+		AuthorSlug: authorSlug, PageLimit: pg32(limit), PageOffset: pg32(offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("blog store: list by author: %w", err)
@@ -501,7 +502,7 @@ func (s *Store) ListPublishedByAuthor(ctx context.Context, authorSlug string, li
 // ListPublishedByTag returns one page of published posts carrying a tag.
 func (s *Store) ListPublishedByTag(ctx context.Context, tagSlug string, limit, offset int) ([]Post, int64, error) {
 	rows, err := s.q.ListPublishedPostsByTag(ctx, db.ListPublishedPostsByTagParams{
-		TagSlug: tagSlug, PageLimit: int32(limit), PageOffset: int32(offset),
+		TagSlug: tagSlug, PageLimit: pg32(limit), PageOffset: pg32(offset),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("blog store: list by tag: %w", err)
@@ -521,7 +522,7 @@ func (s *Store) ListPublishedByTag(ctx context.Context, tagSlug string, limit, o
 // status (the "my posts" authoring view), most recently updated first.
 func (s *Store) ListByAuthorKeyAnyStatus(ctx context.Context, authorKey string, limit, offset int) ([]Post, error) {
 	rows, err := s.q.ListPostsByAuthorKeyAnyStatus(ctx, db.ListPostsByAuthorKeyAnyStatusParams{
-		AuthorKey: authorKey, PageLimit: int32(limit), PageOffset: int32(offset),
+		AuthorKey: authorKey, PageLimit: pg32(limit), PageOffset: pg32(offset),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("blog store: list own posts: %w", err)
@@ -553,6 +554,21 @@ func (s *Store) SetPostTags(ctx context.Context, postID int64, tags []TagInput) 
 		}
 	}
 	return nil
+}
+
+// TagsForPosts returns the tags of every listed post in one query, keyed
+// by post id. Used by feed builders, which want categories without an N+1
+// per item.
+func (s *Store) TagsForPosts(ctx context.Context, postIDs []int64) (map[int64][]Tag, error) {
+	rows, err := s.q.ListTagsForPostIDs(ctx, postIDs)
+	if err != nil {
+		return nil, fmt.Errorf("blog store: tags for posts: %w", err)
+	}
+	out := make(map[int64][]Tag)
+	for _, r := range rows {
+		out[r.PostID] = append(out[r.PostID], Tag{ID: r.ID, Slug: r.Slug, Name: r.Name})
+	}
+	return out, nil
 }
 
 // GetTagBySlug returns one tag.
@@ -626,6 +642,19 @@ func pgText(v string) pgtype.Text {
 		return pgtype.Text{}
 	}
 	return pgtype.Text{String: v, Valid: true}
+}
+
+// pg32 bounds a pagination value into int32 range for the generated query
+// params. Callers pass small page-derived values; anything outside the
+// range clamps rather than wrapping.
+func pg32(v int) int32 {
+	if v < 0 {
+		return 0
+	}
+	if v > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(v)
 }
 
 // suffixed returns base for attempt 0 and "base-2", "base-3", … after.

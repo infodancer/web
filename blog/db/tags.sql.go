@@ -73,6 +73,46 @@ func (q *Queries) ListTagsForPost(ctx context.Context, postID int64) ([]BlogTag,
 	return items, nil
 }
 
+const listTagsForPostIDs = `-- name: ListTagsForPostIDs :many
+SELECT pt.post_id, t.id, t.slug, t.name
+FROM blog_tags t
+JOIN blog_post_tags pt ON pt.tag_id = t.id
+WHERE pt.post_id = ANY($1::bigint[])
+ORDER BY t.name
+`
+
+type ListTagsForPostIDsRow struct {
+	PostID int64  `json:"post_id"`
+	ID     int64  `json:"id"`
+	Slug   string `json:"slug"`
+	Name   string `json:"name"`
+}
+
+func (q *Queries) ListTagsForPostIDs(ctx context.Context, postIds []int64) ([]ListTagsForPostIDsRow, error) {
+	rows, err := q.db.Query(ctx, listTagsForPostIDs, postIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTagsForPostIDsRow{}
+	for rows.Next() {
+		var i ListTagsForPostIDsRow
+		if err := rows.Scan(
+			&i.PostID,
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTagsWithPublished = `-- name: ListTagsWithPublished :many
 SELECT t.id, t.slug, t.name, count(p.id) AS post_count
 FROM blog_tags t
