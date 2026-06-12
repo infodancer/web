@@ -20,6 +20,11 @@ resolver, and profiles are keyed by an opaque, host-supplied user key (e.g.
 the host's `users.id` as text). The host's users table stays the host's FK
 hub; webauth (or whatever IdP the host runs) keeps owning credentials.
 
+It also does not own a site's *additional* persona fields — sites are
+expected to extend profiles (home location, author-claim status, ...). See
+[DESIGN.md](DESIGN.md) for the extension model: host-owned sections placed
+by a single `Sections` hook, not template forks or a field registry.
+
 ## Mount contract
 
 ```go
