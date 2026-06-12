@@ -5,8 +5,8 @@ scope rationale lives in [#52](https://github.com/infodancer/web/issues/52).
 This document records the part that isn't obvious from the code: what belongs
 in profile versus in the host, and the model for site-specific extension
 (designed 2026-06-12, [#58](https://github.com/infodancer/web/issues/58)).
-The `Sections` hook described in §3 is designed but not yet implemented; it
-lands with its first consumer.*
+The `Sections` hook described in §3 shipped in
+[#60](https://github.com/infodancer/web/issues/60).*
 
 ## 1. Scope: the common denominator, not the whole persona
 
@@ -114,8 +114,9 @@ registry) maintained alongside for small cases.
 
 ## 4. Implementation status
 
-The `Sections` hook is not yet implemented. It lands with the first
-consumer — expected to be sf's author-claim surface, which is a good first
-test precisely because it is nothing like a generic field. Until then,
-hosts mount profile as-is; the hook is additive (a nil `Sections` changes
-nothing).
+The `Sections` hook is implemented
+([#60](https://github.com/infodancer/web/issues/60)); the first consumer is
+osg's port off its bespoke persona, whose host sections carry the gaming
+fields (home location, player tags) and the bestiary-contributor link.
+sf's author-claim surface remains a planned consumer. The hook is additive:
+a nil `Sections` changes nothing.

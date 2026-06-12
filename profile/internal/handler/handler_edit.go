@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/infodancer/ui/mdedit"
+
 	"github.com/infodancer/web/profile/profileuser"
 	"github.com/infodancer/web/profile/store"
 )
@@ -25,7 +27,9 @@ func (s *Server) handleEditForm(w http.ResponseWriter, r *http.Request) {
 	p, err := s.store.Get(r.Context(), u.Key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		p = &store.Profile{UserKey: u.Key, DisplayName: u.DisplayName}
+		// First visit: seed the form with the resolver's display name and
+		// the listed-by-default visibility the column default carries.
+		p = &store.Profile{UserKey: u.Key, DisplayName: u.DisplayName, IsPublic: true}
 	case err != nil:
 		s.log.Error("edit form: get profile", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -60,6 +64,10 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 	}
 	links, linkErrs := parseLinks(r.PostForm["link_label"], r.PostForm["link_url"])
 	errs = append(errs, linkErrs...)
+	// Checkbox semantics: present means listed, absent means unlisted. The
+	// form always renders the input, so an Upsert never accidentally
+	// preserves a stale value.
+	isPublic := r.PostFormValue("is_public") != ""
 
 	// Handle changes are validated against the current row before any write.
 	current, err := s.store.Get(r.Context(), u.Key)
@@ -88,6 +96,7 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 		DisplayName: displayName,
 		BioMD:       bio,
 		Links:       links,
+		IsPublic:    isPublic,
 	}
 	if current != nil {
 		submitted.AvatarURL = current.AvatarURL
@@ -106,6 +115,7 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 		DisplayName: displayName,
 		BioMD:       bio,
 		Links:       links,
+		IsPublic:    isPublic,
 	}); err != nil {
 		s.log.Error("edit save: upsert", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -133,6 +143,7 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s.notifyChange(r.Context(), u.Key)
 	http.Redirect(w, r, s.basePath+"/edit?saved=1", http.StatusSeeOther)
 }
 
@@ -150,7 +161,22 @@ func (s *Server) renderEditStatus(w http.ResponseWriter, r *http.Request, p *sto
 	v.AvatarUploads = s.ingestAvatar != nil
 	v.AvatarSrc = s.avatarSrc(p)
 	v.LinkRows = padLinkRows(p.Links)
-	s.renderPage(w, r, "edit.gohtml", status, v)
+	v.Sections = s.hostSections(r, u.Key, true)
+	// The bio rides in profile's own form via mdedit/field: no preview or
+	// upload endpoints, a comment-grade toolbar matching the markdown.Comment
+	// preset the bio renders through.
+	v.BioField = mdedit.Field{
+		ID:        "profile-bio",
+		Name:      "bio",
+		Markdown:  p.BioMD,
+		Label:     "About you",
+		Rows:      5,
+		MaxLength: bioMaxLen,
+		Toolbar:   "standard",
+	}
+	s.renderPageWith(w, r, "edit.gohtml", status, v, func(b *BaseView) {
+		b.EditorHead = mdedit.HeadTags(s.basePath + "/static/mdedit")
+	})
 }
 
 // padLinkRows appends blank rows after the saved links so the form always

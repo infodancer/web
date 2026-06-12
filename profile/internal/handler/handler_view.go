@@ -5,18 +5,31 @@ import (
 	"net/http"
 
 	"github.com/infodancer/web/profile/internal/identicon"
+	"github.com/infodancer/web/profile/profileuser"
 	"github.com/infodancer/web/profile/store"
 )
 
-// handleView renders the public profile page for a claimed handle.
+// handleView renders the public profile page for a claimed handle. Unlisted
+// profiles (is_public=false) 404 like an unclaimed handle -- visible only to
+// their owner and admins, so the owner can still preview the page.
 func (s *Server) handleView(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.profileForHandle(w, r)
 	if !ok {
 		return
 	}
-	s.renderPage(w, r, "profile.gohtml", http.StatusOK, profileView{
+	if !p.IsPublic {
+		u := profileuser.UserFromContext(r.Context())
+		if u == nil || (u.Key != p.UserKey && !u.Admin) {
+			http.NotFound(w, r)
+			return
+		}
+	}
+	s.renderPageWith(w, r, "profile.gohtml", http.StatusOK, profileView{
 		Profile:   p,
 		AvatarSrc: s.avatarSrc(p),
+		Sections:  s.hostSections(r, p.UserKey, false),
+	}, func(v *BaseView) {
+		s.applyProfileMeta(&v.Meta, p)
 	})
 }
 

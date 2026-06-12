@@ -13,18 +13,29 @@
     </div>
   </header>
 
-  {{ if $v.Profile.BioMD }}
-  <section class="profile-bio">{{ bio $v.Profile.BioMD }}</section>
+  {{ if or $v.Profile.BioMD $v.Profile.Links }}
+  <section class="profile-section profile-basics">
+    {{ if $v.Profile.BioMD }}
+    <div class="profile-bio">{{ bio $v.Profile.BioMD }}</div>
+    {{ end }}
+
+    {{ if $v.Profile.Links }}
+    <nav class="profile-link-list" aria-label="profile links">
+      <ul>
+        {{ range $v.Profile.Links }}
+        <li><a href="{{ .URL }}" rel="me nofollow ugc">{{ .Label }}</a></li>
+        {{ end }}
+      </ul>
+    </nav>
+    {{ end }}
+  </section>
   {{ end }}
 
-  {{ if $v.Profile.Links }}
-  <nav class="profile-link-list" aria-label="profile links">
-    <ul>
-      {{ range $v.Profile.Links }}
-      <li><a href="{{ .URL }}" rel="me nofollow ugc">{{ .Label }}</a></li>
-      {{ end }}
-    </ul>
-  </nav>
+  {{ range $v.Sections }}
+  <section class="profile-section">
+    {{ if .Title }}<h2>{{ .Title }}</h2>{{ end }}
+    {{ .HTML }}
+  </section>
   {{ end }}
 </article>
 {{ end }}

@@ -18,6 +18,7 @@ func seedProfile(t *testing.T, fs *fakeStore) {
 		DisplayName: "Alice",
 		BioMD:       "Likes *dice* and <script>alert(1)</script>",
 		Links:       []store.Link{{Label: "Blog", URL: "https://example.org/blog"}},
+		IsPublic:    true,
 	}); err != nil {
 		t.Fatal(err)
 	}

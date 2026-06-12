@@ -87,9 +87,9 @@ func TestModuleEndToEnd(t *testing.T) {
 
 	srv := mount(m)
 
-	// Save a profile with a handle.
+	// Save a profile with a handle, listed publicly.
 	rec := post(t, srv, basePath+"/edit",
-		"display_name=Alice&bio=Hello+*world*&handle=module-alice&link_label=Blog&link_url=https%3A%2F%2Fexample.org%2Fblog")
+		"display_name=Alice&bio=Hello+*world*&handle=module-alice&is_public=on&link_label=Blog&link_url=https%3A%2F%2Fexample.org%2Fblog")
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("save: got %d: %s", rec.Code, rec.Body.String())
 	}
@@ -129,6 +129,19 @@ func TestModuleEndToEnd(t *testing.T) {
 	// Identicon fallback serves.
 	if rec := get(t, srv, basePath+"/avatar/module-alice"); rec.Code != http.StatusOK {
 		t.Errorf("identicon: got %d", rec.Code)
+	}
+
+	// Unlisting (checkbox absent) hides the public page from anonymous
+	// visitors but not from the owner.
+	rec = post(t, srv, basePath+"/edit", "display_name=Alice&bio=Hello&handle=module-alice")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("unlist save: got %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec := get(t, mount(anon), basePath+"/module-alice"); rec.Code != http.StatusNotFound {
+		t.Errorf("unlisted profile for anonymous: got %d, want 404", rec.Code)
+	}
+	if rec := get(t, srv, basePath+"/module-alice"); rec.Code != http.StatusOK {
+		t.Errorf("unlisted profile for owner: got %d, want 200", rec.Code)
 	}
 
 	// Migrate is idempotent.

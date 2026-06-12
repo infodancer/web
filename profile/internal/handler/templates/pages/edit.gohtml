@@ -13,7 +13,7 @@
   </ul>
   {{ end }}
 
-  <section class="profile-avatar-section">
+  <section class="profile-section profile-avatar-section">
     <h2>Picture</h2>
     {{ if $v.AvatarSrc }}
     <img class="profile-avatar" src="{{ $v.AvatarSrc }}" alt="" width="64" height="64">
@@ -36,6 +36,8 @@
     {{ end }}
   </section>
 
+  <section class="profile-section">
+  <h2>Basics</h2>
   <form method="post" action="{{ $base }}/edit" class="profile-form">
     <label>Handle
       {{ if $v.HandleLocked }}
@@ -53,9 +55,14 @@
       <input type="text" name="display_name" value="{{ $v.Profile.DisplayName }}" maxlength="80">
     </label>
 
-    <label>About you
-      <textarea name="bio" rows="5" maxlength="2000"
-                placeholder="A short paragraph about yourself. Markdown is supported.">{{ $v.Profile.BioMD }}</textarea>
+    <div class="profile-bio-field">
+      {{ template "mdedit/field" $v.BioField }}
+    </div>
+
+    <label class="profile-visibility">
+      <input type="checkbox" name="is_public" value="on"{{ if $v.Profile.IsPublic }} checked{{ end }}>
+      List my profile publicly
+      <span class="profile-hint">Unlisted profiles are hidden from the public profile page and directories. Your name still appears next to content you publish.</span>
     </label>
 
     <fieldset class="profile-links">
@@ -70,6 +77,14 @@
 
     <button type="submit">Save profile</button>
   </form>
+  </section>
+
+  {{ range $v.Sections }}
+  <section class="profile-section">
+    {{ if .Title }}<h2>{{ .Title }}</h2>{{ end }}
+    {{ .HTML }}
+  </section>
+  {{ end }}
 
   {{ if $v.Profile.Handle }}
   <p><a href="{{ $base }}/{{ $v.Profile.Handle }}">View your public profile</a></p>

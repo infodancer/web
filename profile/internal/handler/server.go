@@ -11,6 +11,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 	"strings"
 
 	uiassets "github.com/infodancer/ui"
+	"github.com/infodancer/ui/mdedit"
 
 	"github.com/infodancer/web/profile/internal/render"
 	"github.com/infodancer/web/profile/profileuser"
@@ -46,6 +48,21 @@ type ProfileStore interface {
 // media.Ingest; tests substitute a fake. nil disables uploads.
 type IngestAvatar func(ctx context.Context, subject string, r io.Reader) (string, error)
 
+// Section is one host-owned block profile places on its pages without ever
+// parsing, validating, or storing its contents (DESIGN.md §3). The host
+// renders the markup itself; an empty ViewHTML or EditHTML omits the section
+// from that page.
+type Section struct {
+	Title    string
+	ViewHTML template.HTML
+	EditHTML template.HTML
+}
+
+// SectionsFunc supplies host-owned sections for one profile, called per
+// request with the profile owner's user key. The host gates per-viewer
+// visibility itself. nil means no host sections.
+type SectionsFunc func(ctx context.Context, r *http.Request, userKey string) []Section
+
 // Deps is everything the handler needs, built by the profile package from
 // its public Config.
 type Deps struct {
@@ -53,11 +70,14 @@ type Deps struct {
 	Resolver     profileuser.Resolver // required
 	Logger       *slog.Logger
 	BasePath     string // mount prefix, e.g. "/profile"
+	BaseURL      string // absolute site origin for canonical/JSON-LD; "" skips them
 	SignInURL    string
 	SiteName     string
 	HomeURL      string
 	LogoURL      string
 	Chrome       func(*http.Request) uiassets.DocumentData // per-request host chrome; nil uses the module default
+	Sections     SectionsFunc                              // host-owned page sections; nil means none
+	OnChange     func(ctx context.Context, userKey string) // fired once per successful write; nil means none
 	IngestAvatar IngestAvatar                              // nil disables avatar upload
 	Reserved     []string                                  // host additions to the reserved-handle set
 	CSRFDisabled bool
@@ -69,11 +89,14 @@ type Server struct {
 	resolver     profileuser.Resolver
 	log          *slog.Logger
 	basePath     string
+	baseURL      string
 	signInURL    string
 	siteName     string
 	homeURL      string
 	logoURL      string
 	chrome       func(*http.Request) uiassets.DocumentData
+	sections     SectionsFunc
+	onChange     func(ctx context.Context, userKey string)
 	ingestAvatar IngestAvatar
 	reserved     map[string]bool
 	csrfDisabled bool
@@ -97,7 +120,7 @@ func New(d Deps) (*Server, error) {
 		d.BasePath = "/profile"
 	}
 
-	tpls, err := render.New(templateFS, uiassets.PartialsFS(), d.Logger)
+	tpls, err := render.New(templateFS, uiassets.PartialsFS(), mdedit.PartialsFS(), d.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -119,11 +142,14 @@ func New(d Deps) (*Server, error) {
 		resolver:     d.Resolver,
 		log:          d.Logger,
 		basePath:     strings.TrimSuffix(d.BasePath, "/"),
+		baseURL:      strings.TrimSuffix(d.BaseURL, "/"),
 		signInURL:    d.SignInURL,
 		siteName:     d.SiteName,
 		homeURL:      d.HomeURL,
 		logoURL:      d.LogoURL,
 		chrome:       d.Chrome,
+		sections:     d.Sections,
+		onChange:     d.OnChange,
 		ingestAvatar: d.IngestAvatar,
 		reserved:     reserved,
 		csrfDisabled: d.CSRFDisabled,
@@ -156,6 +182,14 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /{handle}", s.handleView)
 }
 
+// notifyChange fires the host's OnChange hook, if any. Call exactly once per
+// request, after every write in the request has succeeded.
+func (s *Server) notifyChange(ctx context.Context, userKey string) {
+	if s.onChange != nil {
+		s.onChange(ctx, userKey)
+	}
+}
+
 // handleIndex sends signed-in users to their edit form; anonymous visitors
 // have nothing to see at the bare mount point.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -166,10 +200,15 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.basePath+"/edit", http.StatusSeeOther)
 }
 
-// renderPage renders a full page (templates/pages/<page>) wrapped in the base
-// view, which supplies ui chrome.
-func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string, status int, data any) {
-	out, err := s.templates.Execute("pages/"+page, s.baseView(r, data))
+// renderPageWith renders a full page (templates/pages/<page>) wrapped in the
+// base view, which supplies ui chrome. adjust (nilable) tweaks the assembled
+// BaseView (per-page meta, head additions) before execution.
+func (s *Server) renderPageWith(w http.ResponseWriter, r *http.Request, page string, status int, data any, adjust func(*BaseView)) {
+	view := s.baseView(r, data)
+	if adjust != nil {
+		adjust(&view)
+	}
+	out, err := s.templates.Execute("pages/"+page, view)
 	if err != nil {
 		s.log.Error("render page", "page", page, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -190,20 +229,24 @@ func cacheControl(value string, h http.Handler) http.Handler {
 	})
 }
 
-// withUIAssets serves infodancer/ui's assets under the "ui/" prefix in front
-// of profile's own embedded static files, so base.gohtml can link the shared
-// CSS at {BasePath}/static/ui/... without the host mounting ui itself.
+// withUIAssets serves infodancer/ui's assets under the "ui/" prefix and
+// mdedit's under "mdedit/", in front of profile's own embedded static files,
+// so base.gohtml can link the shared CSS at {BasePath}/static/ui/... and the
+// edit form can load the editor without the host mounting either itself.
 func withUIAssets(own fs.FS) fs.FS {
-	return uiRoutedFS{own: own, ui: uiassets.AssetsFS()}
+	return uiRoutedFS{own: own, ui: uiassets.AssetsFS(), mdedit: mdedit.AssetsFS()}
 }
 
 type uiRoutedFS struct {
-	own, ui fs.FS
+	own, ui, mdedit fs.FS
 }
 
 func (u uiRoutedFS) Open(name string) (fs.File, error) {
 	if name == "ui" || strings.HasPrefix(name, "ui/") {
 		return u.ui.Open(strings.TrimPrefix(strings.TrimPrefix(name, "ui"), "/"))
+	}
+	if name == "mdedit" || strings.HasPrefix(name, "mdedit/") {
+		return u.mdedit.Open(strings.TrimPrefix(strings.TrimPrefix(name, "mdedit"), "/"))
 	}
 	return u.own.Open(name)
 }
