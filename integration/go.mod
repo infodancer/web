@@ -34,8 +34,9 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/infodancer/ui v0.4.2 // indirect
+	github.com/infodancer/ui v0.6.0 // indirect
 	github.com/infodancer/ui/markdown v0.2.1 // indirect
+	github.com/infodancer/ui/mdedit v0.2.4 // indirect
 	github.com/matthewjhunter/go-embedding v0.4.6 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
@@ -49,6 +50,7 @@ require (
 )
 
 require (
+	github.com/infodancer/web/blog v0.0.0
 	github.com/infodancer/web/profile v0.0.0-00010101000000-000000000000
 	github.com/infodancer/web/timeline v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -67,3 +69,5 @@ replace github.com/infodancer/web/timeline => ../timeline
 replace github.com/infodancer/web/media => ../media
 
 replace github.com/infodancer/web/profile => ../profile
+
+replace github.com/infodancer/web/blog => ../blog

@@ -1,0 +1,292 @@
+/* blog component styles. Every value chains through --blog-* tokens that
+   read the host's --app-* vocabulary (infodancer/ui) with standalone
+   fallbacks, so the module inherits the site palette automatically and
+   still renders alone. */
+
+.blog {
+  --blog-color-fg:           var(--app-color-fg, #1a1a1a);
+  --blog-color-bg:           var(--app-color-bg, #fafafa);
+  --blog-color-bg-raised:    var(--app-color-bg-raised, #ffffff);
+  --blog-color-fg-muted:     var(--app-color-fg-muted, #5a5a5a);
+  --blog-color-border:       var(--app-color-border, rgba(0, 0, 0, 0.12));
+  --blog-color-accent:       var(--app-color-accent, #0b5394);
+  --blog-color-accent-hover: var(--app-color-accent-hover, #1a73b9);
+  --blog-color-prose-fg:     var(--app-color-prose-fg, var(--blog-color-fg));
+  --blog-color-danger:       var(--app-color-danger, #b3261e);
+  --blog-color-success:      var(--app-color-success, #1d7a3d);
+  --blog-font-body:          var(--app-font-body, system-ui, sans-serif);
+  --blog-font-display:       var(--app-font-display, var(--blog-font-body));
+  --blog-space:              var(--app-space, 16px);
+  --blog-space-sm:           var(--app-space-sm, 8px);
+  --blog-space-lg:           var(--app-space-lg, 32px);
+  --blog-radius:             var(--app-radius, 6px);
+  --blog-radius-pill:        var(--app-radius-pill, 9999px);
+  --blog-max-width-prose:    var(--app-max-width-prose, 65ch);
+
+  font-family: var(--blog-font-body);
+  color: var(--blog-color-fg);
+}
+
+/* --- listings --- */
+
+.blog-index-header h1,
+.blog-post-header h1 {
+  font-family: var(--blog-font-display);
+  margin-bottom: var(--blog-space-sm);
+}
+
+.blog-index-desc {
+  color: var(--blog-color-fg-muted);
+  margin-top: 0;
+}
+
+.blog-card-list {
+  display: grid;
+  gap: var(--blog-space);
+  margin-block: var(--blog-space-lg);
+}
+
+.blog-card {
+  background: var(--blog-color-bg-raised);
+  border: 1px solid var(--blog-color-border);
+  border-radius: var(--blog-radius);
+  padding: var(--blog-space);
+}
+
+.blog-card-title {
+  margin: 0 0 var(--blog-space-sm);
+  font-size: 1.25rem;
+}
+
+.blog-card-title a {
+  color: var(--blog-color-fg);
+  text-decoration: none;
+}
+
+.blog-card-title a:hover {
+  color: var(--blog-color-accent-hover);
+}
+
+.blog-card-meta,
+.blog-post-meta,
+.blog-author-meta {
+  color: var(--blog-color-fg-muted);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.blog-card-excerpt {
+  margin: var(--blog-space-sm) 0 0;
+  color: var(--blog-color-prose-fg);
+}
+
+.blog-empty {
+  color: var(--blog-color-fg-muted);
+}
+
+/* --- chips (tags, named blogs) --- */
+
+.blog-chip {
+  display: inline-block;
+  background: var(--blog-color-bg-raised);
+  border: 1px solid var(--blog-color-border);
+  border-radius: var(--blog-radius-pill);
+  color: var(--blog-color-fg-muted);
+  font-size: 0.8125rem;
+  padding: 2px 10px;
+  margin: 0 4px 4px 0;
+  text-decoration: none;
+}
+
+.blog-chip:hover {
+  border-color: var(--blog-color-accent);
+  color: var(--blog-color-accent);
+}
+
+.blog-streams {
+  margin-block: var(--blog-space);
+}
+
+/* --- badges --- */
+
+.blog-badge {
+  display: inline-block;
+  border-radius: var(--blog-radius-pill);
+  font-size: 0.75rem;
+  padding: 1px 8px;
+  border: 1px solid var(--blog-color-border);
+  color: var(--blog-color-fg-muted);
+}
+
+.blog-badge-published {
+  color: var(--blog-color-success);
+  border-color: var(--blog-color-success);
+}
+
+/* --- post page --- */
+
+.blog-post {
+  max-width: var(--blog-max-width-prose);
+}
+
+.blog-prose {
+  color: var(--blog-color-prose-fg);
+  line-height: 1.6;
+  margin-block: var(--blog-space-lg);
+}
+
+.blog-prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+.blog-post-tags {
+  border-top: 1px solid var(--blog-color-border);
+  padding-top: var(--blog-space);
+}
+
+/* --- forms --- */
+
+.blog-edit-form {
+  display: grid;
+  gap: var(--blog-space);
+  max-width: 48rem;
+}
+
+.blog-field {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.blog-field label {
+  font-weight: 600;
+}
+
+.blog-field input,
+.blog-field select {
+  padding: 6px 10px;
+  border: 1px solid var(--blog-color-border);
+  border-radius: var(--blog-radius);
+  background: var(--blog-color-bg-raised);
+  color: var(--blog-color-fg);
+}
+
+.blog-hint {
+  color: var(--blog-color-fg-muted);
+  font-weight: normal;
+  font-size: 0.8125rem;
+}
+
+.blog-errors {
+  border: 1px solid var(--blog-color-danger);
+  border-radius: var(--blog-radius);
+  background: var(--blog-color-bg-raised);
+  color: var(--blog-color-danger);
+  padding: var(--blog-space-sm) var(--blog-space);
+}
+
+.blog-errors ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+/* --- actions --- */
+
+.blog-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--blog-space-sm);
+  flex-wrap: wrap;
+}
+
+.blog-actions form {
+  display: inline;
+  margin: 0;
+}
+
+.blog-button,
+.blog-actions button {
+  display: inline-block;
+  border: 1px solid var(--blog-color-border);
+  border-radius: var(--blog-radius);
+  background: var(--blog-color-bg-raised);
+  color: var(--blog-color-fg);
+  padding: 4px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.9375rem;
+}
+
+.blog-button-primary {
+  background: var(--blog-color-accent);
+  border-color: var(--blog-color-accent);
+  color: var(--blog-color-bg-raised);
+}
+
+.blog-button-primary:hover {
+  background: var(--blog-color-accent-hover);
+}
+
+.blog-button-danger {
+  color: var(--blog-color-danger);
+  border-color: var(--blog-color-danger);
+}
+
+/* --- pagination & feed links --- */
+
+.blog-pagination {
+  display: flex;
+  justify-content: space-between;
+  margin-block: var(--blog-space-lg);
+}
+
+.blog-feeds-note {
+  color: var(--blog-color-fg-muted);
+  font-size: 0.875rem;
+  border-top: 1px solid var(--blog-color-border);
+  padding-top: var(--blog-space);
+}
+
+/* --- author page --- */
+
+.blog-author-header {
+  display: flex;
+  gap: var(--blog-space);
+  align-items: center;
+}
+
+.blog-avatar {
+  border-radius: 50%;
+}
+
+.blog-author-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--blog-space-sm);
+}
+
+/* --- admin --- */
+
+.blog-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: var(--blog-space);
+}
+
+.blog-admin-table th,
+.blog-admin-table td {
+  border-bottom: 1px solid var(--blog-color-border);
+  padding: var(--blog-space-sm);
+  text-align: left;
+}
+
+.blog-admin-table input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--blog-color-border);
+  border-radius: var(--blog-radius);
+  background: var(--blog-color-bg-raised);
+  color: var(--blog-color-fg);
+}

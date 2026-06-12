@@ -1,0 +1,61 @@
+{{ define "title" }}{{ if .Page.IsNew }}New post{{ else }}Edit: {{ .Page.TitleValue }}{{ end }} - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-edit">
+  <h1>{{ if $v.IsNew }}New post{{ else }}Edit post{{ end }}</h1>
+
+  {{- if $v.Errors }}
+  <div class="blog-errors" role="alert">
+    <ul>{{ range $v.Errors }}<li>{{ . }}</li>{{ end }}</ul>
+  </div>
+  {{- end }}
+
+  <form method="post" action="{{ .BasePath }}{{ if $v.IsNew }}/new{{ else }}/p/{{ $v.Post.ID }}/edit{{ end }}" class="blog-edit-form">
+    <p class="blog-field">
+      <label for="blog-title">Title</label>
+      <input id="blog-title" name="title" type="text" required maxlength="200" value="{{ $v.TitleValue }}">
+    </p>
+
+    <p class="blog-field">
+      <label for="blog-stream">Blog</label>
+      <select id="blog-stream" name="blog_id">
+        <option value="0">(none — site-wide only)</option>
+        {{- range $v.Blogs }}
+        <option value="{{ .ID }}"{{ if eq .ID $v.SelectedBlogID }} selected{{ end }}>{{ .Name }}</option>
+        {{- end }}
+      </select>
+    </p>
+
+    {{ template "mdedit/field" $v.Field }}
+
+    <p class="blog-field">
+      <label for="blog-tags">Tags <span class="blog-hint">(comma-separated)</span></label>
+      <input id="blog-tags" name="tags" type="text" value="{{ $v.TagsValue }}" placeholder="announcements, osr">
+    </p>
+
+    <p class="blog-field">
+      <label for="blog-excerpt">Excerpt <span class="blog-hint">(optional; derived from the body if empty)</span></label>
+      <input id="blog-excerpt" name="excerpt" type="text" maxlength="300" value="{{ $v.ExcerptValue }}">
+    </p>
+
+    {{- if and $v.CanOverrideSlug (not $v.IsNew) }}
+    <details class="blog-advanced">
+      <summary>Advanced</summary>
+      <p class="blog-field">
+        <label for="blog-slug">Slug <span class="blog-hint">(changing it breaks existing links)</span></label>
+        <input id="blog-slug" name="slug" type="text" value="{{ $v.SlugValue }}">
+      </p>
+    </details>
+    {{- end }}
+
+    <p class="blog-actions">
+      <button type="submit" name="action" value="draft">Save draft</button>
+      <button type="submit" name="action" value="publish" class="blog-button-primary">
+        {{ if and (not $v.IsNew) (eq $v.Post.Status "published") }}Save &amp; keep published{{ else }}Publish{{ end }}
+      </button>
+      {{- if not $v.IsNew }}<a href="{{ .BasePath }}/p/{{ $v.Post.Slug }}">Cancel</a>{{ end }}
+    </p>
+  </form>
+</div>
+{{ end }}

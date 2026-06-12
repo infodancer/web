@@ -13,6 +13,7 @@ import (
 	smoke "github.com/infodancer/smoke"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	blog "github.com/infodancer/web/blog"
 	contacthandler "github.com/infodancer/web/contact/handler"
 	"github.com/infodancer/web/contact/submissions"
 	"github.com/infodancer/web/faq"
@@ -51,6 +52,7 @@ func buildSmokeApp(t *testing.T, pool *pgxpool.Pool) *smokeApp {
 	reg := smoke.New()
 
 	mountSearch(t, ctx, pool, mux, reg)
+	mountBlog(t, ctx, pool, mux, reg)
 	mountFAQ(t, ctx, pool, mux, reg)
 	mountTimeline(t, ctx, pool, mux, reg)
 	mountMedia(t, ctx, pool, mux, reg)
@@ -76,6 +78,29 @@ func mountSearch(t *testing.T, ctx context.Context, pool *pgxpool.Pool, mux *htt
 	reg.Add("GET", "/search/")
 	reg.Add("GET", "/search/healthz")
 	reg.Add("GET", "/search/search") // HTMX results partial; empty query renders no results
+}
+
+func mountBlog(t *testing.T, ctx context.Context, pool *pgxpool.Pool, mux *http.ServeMux, reg *smoke.Registry) {
+	t.Helper()
+	m, err := blog.New(blog.Config{
+		DB:       pool,
+		BasePath: "/blog",
+		Resolver: blogStubResolver{}, // anonymous is enough for the read surface
+	})
+	if err != nil {
+		t.Fatalf("blog.New: %v", err)
+	}
+	if err := m.Migrate(ctx); err != nil {
+		t.Fatalf("blog migrate: %v", err)
+	}
+	mux.Handle("/blog/", http.StripPrefix("/blog", m.Routes()))
+	reg.Add("GET", "/blog/")
+	reg.Add("GET", "/blog/authors")
+	reg.Add("GET", "/blog/tags")
+	reg.Add("GET", "/blog/feed.xml")
+	reg.Add("GET", "/blog/feed.atom")
+	reg.Add("GET", "/blog/feed.json")
+	reg.Add("GET", "/blog/sitemap.xml")
 }
 
 func mountFAQ(t *testing.T, ctx context.Context, pool *pgxpool.Pool, mux *http.ServeMux, reg *smoke.Registry) {

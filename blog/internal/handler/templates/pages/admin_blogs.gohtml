@@ -1,0 +1,51 @@
+{{ define "title" }}Manage blogs - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-admin">
+  <h1>Named blogs</h1>
+  <p class="blog-hint">Each named blog is a distinct editorial stream with its own index page and feeds. Posts may also stand outside every named blog.</p>
+
+  {{- if $v.Errors }}
+  <div class="blog-errors" role="alert">
+    <ul>{{ range $v.Errors }}<li>{{ . }}</li>{{ end }}</ul>
+  </div>
+  {{- end }}
+
+  {{- if $v.Blogs }}
+  <table class="blog-admin-table">
+    <thead><tr><th>Name</th><th>Slug</th><th>Description</th><th>Posts</th><th></th></tr></thead>
+    <tbody>
+      {{- range $v.Blogs }}
+      <tr>
+        {{- /* The row's inputs bind to the row form (declared in the last
+               cell) via the HTML5 form attribute — forms can't wrap table
+               rows. */}}
+        <td><input form="blog-edit-{{ .ID }}" name="name" value="{{ .Name }}" required></td>
+        <td><input form="blog-edit-{{ .ID }}" name="slug" value="{{ .Slug }}"></td>
+        <td><input form="blog-edit-{{ .ID }}" name="description" value="{{ .Description }}"></td>
+        <td><a href="{{ $.BasePath }}/b/{{ .Slug }}">{{ .PostCount }}</a></td>
+        <td class="blog-actions">
+          <form id="blog-edit-{{ .ID }}" method="post" action="{{ $.BasePath }}/admin/blogs/{{ .ID }}">
+            <button type="submit">Save</button>
+          </form>
+          <form method="post" action="{{ $.BasePath }}/admin/blogs/{{ .ID }}/delete"
+                onsubmit="return confirm('Delete this blog?')">
+            <button type="submit" class="blog-button-danger"{{ if gt .PostCount 0 }} disabled title="still has posts"{{ end }}>Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{- end }}
+    </tbody>
+  </table>
+  {{- end }}
+
+  <h2>Create a blog</h2>
+  <form method="post" action="{{ .BasePath }}/admin/blogs" class="blog-edit-form">
+    <p class="blog-field"><label for="ab-name">Name</label><input id="ab-name" name="name" required placeholder="Admin Notes"></p>
+    <p class="blog-field"><label for="ab-slug">Slug <span class="blog-hint">(derived from the name if empty)</span></label><input id="ab-slug" name="slug" placeholder="admin-notes"></p>
+    <p class="blog-field"><label for="ab-desc">Description</label><input id="ab-desc" name="description"></p>
+    <p class="blog-actions"><button type="submit" class="blog-button-primary">Create</button></p>
+  </form>
+</div>
+{{ end }}

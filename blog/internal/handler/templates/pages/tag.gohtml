@@ -1,0 +1,16 @@
+{{ define "title" }}{{ .Page.Tag.Name }} - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-tag">
+  <h1>Tagged: {{ $v.Tag.Name }}</h1>
+  {{- if $v.Posts }}
+  <section class="blog-card-list">
+    {{ range $v.Posts }}{{ template "partials/post_card.gohtml" . }}{{ end }}
+  </section>
+  {{ template "partials/pagination.gohtml" $v.Pagination }}
+  {{- else }}
+  <p class="blog-empty">No published posts carry this tag.</p>
+  {{- end }}
+</div>
+{{ end }}

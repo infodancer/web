@@ -1,0 +1,40 @@
+{{ define "title" }}{{ .Page.Heading }} - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-index">
+  <header class="blog-index-header">
+    <h1>{{ $v.Heading }}</h1>
+    {{- if $v.Description }}<p class="blog-index-desc">{{ $v.Description }}</p>{{ end }}
+    {{- if and .User (or .User.Author .User.Admin) }}
+    <p class="blog-actions">
+      <a class="blog-button" href="{{ .BasePath }}/new">Write a post</a>
+      <a href="{{ .BasePath }}/mine">My posts</a>
+      {{- if .User.Admin }} · <a href="{{ .BasePath }}/admin/blogs">Manage blogs</a>{{ end }}
+    </p>
+    {{- end }}
+  </header>
+
+  {{- if and (not $v.Blog) $v.Blogs }}
+  <nav class="blog-streams" aria-label="blogs">
+    {{ range $v.Blogs }}{{ if gt .PostCount 0 }}<a class="blog-chip" href="{{ $.BasePath }}/b/{{ .Slug }}">{{ .Name }}</a>{{ end }}{{ end }}
+  </nav>
+  {{- end }}
+
+  {{- if $v.Posts }}
+  <section class="blog-card-list">
+    {{ range $v.Posts }}{{ template "partials/post_card.gohtml" . }}{{ end }}
+  </section>
+  {{ template "partials/pagination.gohtml" $v.Pagination }}
+  {{- else }}
+  <p class="blog-empty">No posts yet.</p>
+  {{- end }}
+
+  <p class="blog-feeds-note">
+    Subscribe:
+    <a href="{{ .BasePath }}{{ if $v.Blog }}/b/{{ $v.Blog.Slug }}{{ end }}/feed.xml">RSS</a> ·
+    <a href="{{ .BasePath }}{{ if $v.Blog }}/b/{{ $v.Blog.Slug }}{{ end }}/feed.atom">Atom</a> ·
+    <a href="{{ .BasePath }}{{ if $v.Blog }}/b/{{ $v.Blog.Slug }}{{ end }}/feed.json">JSON</a>
+  </p>
+</div>
+{{ end }}

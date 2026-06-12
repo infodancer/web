@@ -1,28 +1,101 @@
-# infodancer/blog
+# infodancer/web/blog
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A reusable Go module providing a database-backed blog / lightweight CMS for consumer sites in the infodancer / matthewjhunter web portfolio. Full-UI module: ships templates, CSS, and the authoring UX. Builds on three sibling modules — `infodancer/markdown` (render + sanitize), `infodancer/mdedit` (the editor component), and `infodancer/ui` (design tokens).
+A reusable Go module providing a site's authoritative editorial voice: a
+database-backed, multi-author blog with named editorial streams, a markdown
+authoring UX, the full feed matrix, JSON-LD, and a sitemap. Full-UI
+component of the [infodancer/web](https://github.com/infodancer/web)
+monorepo: ships templates, CSS, and the authoring surface, and mounts into
+a host Go service under a base path.
 
-> Private module, maintained for sites in the infodancer / matthewjhunter portfolio. Consumed by tagged version and vendored, not distributed publicly. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+## What it does
 
-## Status
-
-**Pre-implementation.** The repo currently contains [DESIGN.md](DESIGN.md) and the standard scaffolding. No Go code yet, no migrations, no templates. Implementation begins once the design is reviewed and the first integration (osg session-notes) is ready to drive it.
-
-## What it is
-
-A database-backed blog/CMS designed to replace GitHub-plus-Hugo as the authoring workflow for narrative content on portfolio sites. The motivating use case is the **osg session-notes workflow**: campaign players need to author session reports from their character's POV, and `git push`-based workflows are unworkable for non-developer contributors. blog gives them a real CMS.
-
-Full-UI module that mounts into a host Go service under a base path (e.g., `/blog` at osg). Consumer sites supply auth via a `UserResolver`, a database connection, and an optional `infodancer/ui` skin overlay. Markdown rendering/sanitizing is delegated to `infodancer/markdown`, and the authoring editor to `infodancer/mdedit` — blog reimplements neither.
+- **Named blogs.** One instance hosts several editorial streams ("Admin
+  Notes", a weekly column), each with its own index page and feeds, sharing
+  one author pool and tag namespace. Posts may also stand outside every
+  named blog.
+- **Multi-author, invitation-only.** Authoring rights are an
+  [infodancer/authz](https://github.com/infodancer/authz) role grant
+  (module `blog`, roles `author` and `admin`) via the bundled `blogauthz`
+  resolver adapter — no registration surface exists. The host's profile
+  component supplies author display identity through a hook.
+- **Feeds.** RSS 2.0, Atom 1.0, and JSON Feed 1.1, each at combined,
+  per-author, and per-named-blog scope, with `<link rel="alternate">`
+  autodiscovery on every HTML page.
+- **SEO.** JSON-LD (`Blog`, `BlogPosting`, `ProfilePage`), canonical URLs,
+  OpenGraph metadata via `infodancer/ui`'s meta partial, and
+  `/sitemap.xml`.
+- **Authoring.** A full-page post form embedding
+  [ui/mdedit](https://github.com/infodancer/ui)'s editor field: markdown
+  with a toolbar, local-file load, and drag-drop/paste image upload backed
+  by the sibling `media` component. Draft → publish → unpublish → archive
+  lifecycle with soft delete.
+- **Search.** Published posts index into the sibling `search` component
+  through a host-wired `Indexer` hook; drafts never do.
 
 ## Quickstart
 
-Pre-implementation; quickstart sketched in DESIGN.md §3 and will be finalized with the v0.1 implementation.
+```go
+import (
+    "github.com/infodancer/web/blog"
+    "github.com/infodancer/web/blog/blogauthz"
+)
+
+resolver := blogauthz.NewResolver(identify, authzStore, func(id *authz.Identity) string {
+    return lookupUserKey(id) // the host's stable user id, as profile uses
+})
+
+mod, err := blog.New(blog.Config{
+    DB:       pool,
+    Resolver: resolver,
+    BasePath: "/blog",
+    SiteName: "Old School Gamers",
+    BaseURL:  "https://oldschoolgamers.org", // absolute origin for feeds/JSON-LD/sitemap
+})
+if err != nil { ... }
+if err := mod.Migrate(ctx); err != nil { ... }
+mux.Handle("/blog/", http.StripPrefix("/blog", mod.Routes()))
+```
+
+Grant authorship (the "invitation"):
+
+```
+authzctl --driver postgres --dsn $DATABASE_URL grant ISSUER SUBJECT author --module blog
+```
+
+### Suite hooks (all optional)
+
+```go
+cfg.Authors = profileDirectory     // blog.AuthorDirectory over web/profile
+cfg.AuthorCard = profileMod.Card   // byline card on post pages
+cfg.Indexer = searchAdapter        // ~10 lines over web/search; see config.go
+cfg.Blobs, cfg.Objects = blobs, objects // web/media stores; enables image upload
+cfg.Media = media.Config{PublicBaseURL: "/media/blog"} // host's serving mount
+```
+
+The host serves uploaded bytes from its own media mount; blog only ingests.
+Call `mod.ReindexAll(ctx)` at boot to reconcile the search index.
+
+## HTTP surface
+
+Read (anonymous): `/`, `/p/{slug}`, `/b/{slug}`, `/authors`,
+`/authors/{slug}`, `/tags`, `/tags/{slug}`, `/sitemap.xml`, and the feed
+matrix `/feed.{xml,atom,json}`, `/authors/{slug}/feed.*`,
+`/b/{slug}/feed.*`.
+
+Write (author/admin role, CSRF-guarded): `/new`, `/mine`, `/p/{id}/edit`,
+`/p/{id}/{publish,unpublish,archive,delete}`, `/upload`.
+
+Admin: `/admin/blogs` (named-blog management).
 
 ## Design
 
-[DESIGN.md](DESIGN.md) is the source of truth: scope, data model, authoring UX, HTTP surface, templates and theming (`infodancer/ui` consumption), Hugo-bundle migration path, milestones.
+[DESIGN.md](DESIGN.md) is the design record: scope, data model, identity
+and roles, the feed matrix, SEO, hooks, and milestones. Conventions follow
+the monorepo's [CONVENTIONS.md](../CONVENTIONS.md) (Postgres + sqlc + pgx,
+goose migrations in `blog_goose_db_version`, `blog_*` table prefix, host
+owns the pool).
 
 ## License
 

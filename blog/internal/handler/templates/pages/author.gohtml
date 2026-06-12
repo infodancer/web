@@ -1,0 +1,36 @@
+{{ define "title" }}{{ .Page.Author.DisplayName }} - {{ .Meta.SiteName }}{{ end }}
+
+{{ define "content" }}
+{{- $v := .Page -}}
+<div class="blog blog-author">
+  <header class="blog-author-header">
+    {{- if and $v.Info $v.Info.AvatarURL }}
+    <img class="blog-avatar" src="{{ $v.Info.AvatarURL }}" alt="" width="96" height="96">
+    {{- end }}
+    <div>
+      <h1>{{ $v.Author.DisplayName }}</h1>
+      <p class="blog-author-meta">{{ $v.Author.PostCount }} post{{ if ne $v.Author.PostCount 1 }}s{{ end }}</p>
+    </div>
+  </header>
+
+  {{- if and $v.Info $v.Info.BioHTML }}
+  <section class="blog-author-bio">{{ $v.Info.BioHTML }}</section>
+  {{- end }}
+
+  {{- if $v.Posts }}
+  <section class="blog-card-list">
+    {{ range $v.Posts }}{{ template "partials/post_card.gohtml" . }}{{ end }}
+  </section>
+  {{ template "partials/pagination.gohtml" $v.Pagination }}
+  {{- else }}
+  <p class="blog-empty">No published posts.</p>
+  {{- end }}
+
+  <p class="blog-feeds-note">
+    Subscribe to {{ $v.Author.DisplayName }}:
+    <a href="{{ .BasePath }}/authors/{{ $v.Author.Slug }}/feed.xml">RSS</a> ·
+    <a href="{{ .BasePath }}/authors/{{ $v.Author.Slug }}/feed.atom">Atom</a> ·
+    <a href="{{ .BasePath }}/authors/{{ $v.Author.Slug }}/feed.json">JSON</a>
+  </p>
+</div>
+{{ end }}
