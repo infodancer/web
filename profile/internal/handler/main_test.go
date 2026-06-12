@@ -59,6 +59,7 @@ func (f *fakeStore) Upsert(_ context.Context, params store.UpsertParams) (*store
 	p.DisplayName = params.DisplayName
 	p.BioMD = params.BioMD
 	p.Links = params.Links
+	p.IsPublic = params.IsPublic
 	cp := *p
 	return &cp, nil
 }

@@ -60,6 +60,12 @@
                 placeholder="A short paragraph about yourself. Markdown is supported.">{{ $v.Profile.BioMD }}</textarea>
     </label>
 
+    <label class="profile-visibility">
+      <input type="checkbox" name="is_public" value="on"{{ if $v.Profile.IsPublic }} checked{{ end }}>
+      List my profile publicly
+      <span class="profile-hint">Unlisted profiles are hidden from the public profile page and directories. Your name still appears next to content you publish.</span>
+    </label>
+
     <fieldset class="profile-links">
       <legend>Links</legend>
       {{ range $v.LinkRows }}

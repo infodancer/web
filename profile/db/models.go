@@ -17,4 +17,5 @@ type ProfileProfile struct {
 	Links       []byte             `json:"links"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	IsPublic    bool               `json:"is_public"`
 }

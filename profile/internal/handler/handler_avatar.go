@@ -70,9 +70,12 @@ func (s *Server) setAvatarEnsuringRow(r *http.Request, u *profileuser.User, url 
 	if !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
+	// IsPublic true matches the column default: an avatar-first user gets
+	// the same listed-by-default profile a form-first user would.
 	if _, uerr := s.store.Upsert(r.Context(), store.UpsertParams{
 		UserKey:     u.Key,
 		DisplayName: u.DisplayName,
+		IsPublic:    true,
 	}); uerr != nil {
 		return uerr
 	}

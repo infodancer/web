@@ -25,7 +25,9 @@ func (s *Server) handleEditForm(w http.ResponseWriter, r *http.Request) {
 	p, err := s.store.Get(r.Context(), u.Key)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		p = &store.Profile{UserKey: u.Key, DisplayName: u.DisplayName}
+		// First visit: seed the form with the resolver's display name and
+		// the listed-by-default visibility the column default carries.
+		p = &store.Profile{UserKey: u.Key, DisplayName: u.DisplayName, IsPublic: true}
 	case err != nil:
 		s.log.Error("edit form: get profile", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -60,6 +62,10 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 	}
 	links, linkErrs := parseLinks(r.PostForm["link_label"], r.PostForm["link_url"])
 	errs = append(errs, linkErrs...)
+	// Checkbox semantics: present means listed, absent means unlisted. The
+	// form always renders the input, so an Upsert never accidentally
+	// preserves a stale value.
+	isPublic := r.PostFormValue("is_public") != ""
 
 	// Handle changes are validated against the current row before any write.
 	current, err := s.store.Get(r.Context(), u.Key)
@@ -88,6 +94,7 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 		DisplayName: displayName,
 		BioMD:       bio,
 		Links:       links,
+		IsPublic:    isPublic,
 	}
 	if current != nil {
 		submitted.AvatarURL = current.AvatarURL
@@ -106,6 +113,7 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 		DisplayName: displayName,
 		BioMD:       bio,
 		Links:       links,
+		IsPublic:    isPublic,
 	}); err != nil {
 		s.log.Error("edit save: upsert", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

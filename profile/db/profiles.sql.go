@@ -31,7 +31,7 @@ func (q *Queries) ClaimHandle(ctx context.Context, arg ClaimHandleParams) (int64
 }
 
 const getProfile = `-- name: GetProfile :one
-SELECT user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at FROM profile_profiles WHERE user_key = $1
+SELECT user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at, is_public FROM profile_profiles WHERE user_key = $1
 `
 
 func (q *Queries) GetProfile(ctx context.Context, userKey string) (ProfileProfile, error) {
@@ -46,12 +46,13 @@ func (q *Queries) GetProfile(ctx context.Context, userKey string) (ProfileProfil
 		&i.Links,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsPublic,
 	)
 	return i, err
 }
 
 const getProfileByHandle = `-- name: GetProfileByHandle :one
-SELECT user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at FROM profile_profiles WHERE handle = $1
+SELECT user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at, is_public FROM profile_profiles WHERE handle = $1
 `
 
 func (q *Queries) GetProfileByHandle(ctx context.Context, handle pgtype.Text) (ProfileProfile, error) {
@@ -66,8 +67,51 @@ func (q *Queries) GetProfileByHandle(ctx context.Context, handle pgtype.Text) (P
 		&i.Links,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsPublic,
 	)
 	return i, err
+}
+
+const listPublicProfiles = `-- name: ListPublicProfiles :many
+SELECT user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at, is_public FROM profile_profiles
+WHERE is_public AND handle IS NOT NULL
+ORDER BY updated_at DESC, user_key DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListPublicProfilesParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfilesParams) ([]ProfileProfile, error) {
+	rows, err := q.db.Query(ctx, listPublicProfiles, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProfileProfile{}
+	for rows.Next() {
+		var i ProfileProfile
+		if err := rows.Scan(
+			&i.UserKey,
+			&i.Handle,
+			&i.DisplayName,
+			&i.BioMd,
+			&i.AvatarUrl,
+			&i.Links,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsPublic,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const setAvatarURL = `-- name: SetAvatarURL :execrows
@@ -109,14 +153,15 @@ func (q *Queries) SetHandle(ctx context.Context, arg SetHandleParams) (int64, er
 }
 
 const upsertProfile = `-- name: UpsertProfile :one
-INSERT INTO profile_profiles (user_key, display_name, bio_md, links)
-VALUES ($1, $2, $3, $4)
+INSERT INTO profile_profiles (user_key, display_name, bio_md, links, is_public)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (user_key) DO UPDATE
 SET display_name = EXCLUDED.display_name,
     bio_md       = EXCLUDED.bio_md,
     links        = EXCLUDED.links,
+    is_public    = EXCLUDED.is_public,
     updated_at   = now()
-RETURNING user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at
+RETURNING user_key, handle, display_name, bio_md, avatar_url, links, created_at, updated_at, is_public
 `
 
 type UpsertProfileParams struct {
@@ -124,6 +169,7 @@ type UpsertProfileParams struct {
 	DisplayName string `json:"display_name"`
 	BioMd       string `json:"bio_md"`
 	Links       []byte `json:"links"`
+	IsPublic    bool   `json:"is_public"`
 }
 
 func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) (ProfileProfile, error) {
@@ -132,6 +178,7 @@ func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) (P
 		arg.DisplayName,
 		arg.BioMd,
 		arg.Links,
+		arg.IsPublic,
 	)
 	var i ProfileProfile
 	err := row.Scan(
@@ -143,6 +190,7 @@ func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) (P
 		&i.Links,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsPublic,
 	)
 	return i, err
 }
