@@ -4,7 +4,7 @@
 {{range .Events}}
 <li class="notify-event {{.SeverityClass}}">
   <span class="notify-event-sev">{{.Severity}}</span>
-  <span class="notify-event-title">{{.Title}}</span>
+  {{if .Link}}<a class="notify-event-title" href="{{.Link}}">{{.Title}}</a>{{else}}<span class="notify-event-title">{{.Title}}</span>{{end}}
   <span class="notify-event-meta">
     <span class="notify-event-type">{{.Type}}</span>
     {{- with .ActorLabel}}<span class="notify-event-actor">{{.}}</span>{{end}}

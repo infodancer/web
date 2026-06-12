@@ -98,6 +98,14 @@
 .notify-event-title {
   font-weight: 600;
 }
+a.notify-event-title {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+a.notify-event-title:hover {
+  color: var(--app-color-fg-muted);
+}
 .notify-event-meta {
   grid-column: 1 / -1;
   display: flex;

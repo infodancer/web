@@ -60,9 +60,12 @@ type eventVM struct {
 	Title         string
 	Severity      string
 	SeverityClass string
-	ActorLabel    string
-	CreatedAt     time.Time
-	RelTime       string
+	// Link is the event's click-through URL; empty renders the title as plain
+	// text. Validated absolute http(s) at the write path (Event.normalize).
+	Link       string
+	ActorLabel string
+	CreatedAt  time.Time
+	RelTime    string
 }
 
 // feed serves GET / — the admin event feed. Direct navigation gets the full
@@ -257,6 +260,7 @@ func (h *Handler) toEventVMs(events []notify.Event) []eventVM {
 			Title:         ev.Title,
 			Severity:      string(ev.Severity),
 			SeverityClass: "notify-sev-" + string(ev.Severity),
+			Link:          ev.Link,
 			CreatedAt:     ev.CreatedAt,
 			RelTime:       relTime(now, ev.CreatedAt),
 		}
