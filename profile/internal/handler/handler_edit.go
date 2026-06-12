@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/infodancer/ui/mdedit"
+
 	"github.com/infodancer/web/profile/profileuser"
 	"github.com/infodancer/web/profile/store"
 )
@@ -160,7 +162,21 @@ func (s *Server) renderEditStatus(w http.ResponseWriter, r *http.Request, p *sto
 	v.AvatarSrc = s.avatarSrc(p)
 	v.LinkRows = padLinkRows(p.Links)
 	v.Sections = s.hostSections(r, u.Key, true)
-	s.renderPage(w, r, "edit.gohtml", status, v)
+	// The bio rides in profile's own form via mdedit/field: no preview or
+	// upload endpoints, a comment-grade toolbar matching the markdown.Comment
+	// preset the bio renders through.
+	v.BioField = mdedit.Field{
+		ID:        "profile-bio",
+		Name:      "bio",
+		Markdown:  p.BioMD,
+		Label:     "About you",
+		Rows:      5,
+		MaxLength: bioMaxLen,
+		Toolbar:   "standard",
+	}
+	s.renderPageWith(w, r, "edit.gohtml", status, v, func(b *BaseView) {
+		b.EditorHead = mdedit.HeadTags(s.basePath + "/static/mdedit")
+	})
 }
 
 // padLinkRows appends blank rows after the saved links so the form always

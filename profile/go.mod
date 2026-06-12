@@ -3,8 +3,9 @@ module github.com/infodancer/web/profile
 go 1.26.4
 
 require (
-	github.com/infodancer/ui v0.4.2
+	github.com/infodancer/ui v0.6.1
 	github.com/infodancer/ui/markdown v0.2.1
+	github.com/infodancer/ui/mdedit v0.2.4
 	github.com/infodancer/web/media v0.1.3
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pressly/goose/v3 v3.27.1

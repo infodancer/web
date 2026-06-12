@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	uiassets "github.com/infodancer/ui"
+	"github.com/infodancer/ui/mdedit"
 
 	"github.com/infodancer/web/profile/internal/render"
 	"github.com/infodancer/web/profile/profileuser"
@@ -119,7 +120,7 @@ func New(d Deps) (*Server, error) {
 		d.BasePath = "/profile"
 	}
 
-	tpls, err := render.New(templateFS, uiassets.PartialsFS(), d.Logger)
+	tpls, err := render.New(templateFS, uiassets.PartialsFS(), mdedit.PartialsFS(), d.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -199,14 +200,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.basePath+"/edit", http.StatusSeeOther)
 }
 
-// renderPage renders a full page (templates/pages/<page>) wrapped in the base
-// view, which supplies ui chrome.
-func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string, status int, data any) {
-	s.renderPageWith(w, r, page, status, data, nil)
-}
-
-// renderPageWith is renderPage with a hook to adjust the assembled BaseView
-// (per-page meta, head additions) before execution.
+// renderPageWith renders a full page (templates/pages/<page>) wrapped in the
+// base view, which supplies ui chrome. adjust (nilable) tweaks the assembled
+// BaseView (per-page meta, head additions) before execution.
 func (s *Server) renderPageWith(w http.ResponseWriter, r *http.Request, page string, status int, data any, adjust func(*BaseView)) {
 	view := s.baseView(r, data)
 	if adjust != nil {
@@ -233,20 +229,24 @@ func cacheControl(value string, h http.Handler) http.Handler {
 	})
 }
 
-// withUIAssets serves infodancer/ui's assets under the "ui/" prefix in front
-// of profile's own embedded static files, so base.gohtml can link the shared
-// CSS at {BasePath}/static/ui/... without the host mounting ui itself.
+// withUIAssets serves infodancer/ui's assets under the "ui/" prefix and
+// mdedit's under "mdedit/", in front of profile's own embedded static files,
+// so base.gohtml can link the shared CSS at {BasePath}/static/ui/... and the
+// edit form can load the editor without the host mounting either itself.
 func withUIAssets(own fs.FS) fs.FS {
-	return uiRoutedFS{own: own, ui: uiassets.AssetsFS()}
+	return uiRoutedFS{own: own, ui: uiassets.AssetsFS(), mdedit: mdedit.AssetsFS()}
 }
 
 type uiRoutedFS struct {
-	own, ui fs.FS
+	own, ui, mdedit fs.FS
 }
 
 func (u uiRoutedFS) Open(name string) (fs.File, error) {
 	if name == "ui" || strings.HasPrefix(name, "ui/") {
 		return u.ui.Open(strings.TrimPrefix(strings.TrimPrefix(name, "ui"), "/"))
+	}
+	if name == "mdedit" || strings.HasPrefix(name, "mdedit/") {
+		return u.mdedit.Open(strings.TrimPrefix(strings.TrimPrefix(name, "mdedit"), "/"))
 	}
 	return u.own.Open(name)
 }

@@ -55,10 +55,9 @@
       <input type="text" name="display_name" value="{{ $v.Profile.DisplayName }}" maxlength="80">
     </label>
 
-    <label>About you
-      <textarea name="bio" rows="5" maxlength="2000"
-                placeholder="A short paragraph about yourself. Markdown is supported.">{{ $v.Profile.BioMD }}</textarea>
-    </label>
+    <div class="profile-bio-field">
+      {{ template "mdedit/field" $v.BioField }}
+    </div>
 
     <label class="profile-visibility">
       <input type="checkbox" name="is_public" value="on"{{ if $v.Profile.IsPublic }} checked{{ end }}>

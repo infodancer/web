@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	ui "github.com/infodancer/ui"
+	"github.com/infodancer/ui/mdedit"
 
 	"github.com/infodancer/web/profile/profileuser"
 	"github.com/infodancer/web/profile/store"
@@ -27,6 +28,9 @@ type BaseView struct {
 
 	// SignInURL is the host login URL, surfaced to anonymous visitors.
 	SignInURL string
+
+	// EditorHead carries mdedit's <head> tags on the edit page only.
+	EditorHead template.HTML
 
 	// Page is the page-specific payload.
 	Page any
@@ -94,6 +98,7 @@ type editView struct {
 	Saved         bool
 	LinkRows      []store.Link  // existing links padded with blank rows
 	Sections      []sectionView // host sections with edit markup
+	BioField      mdedit.Field  // the bio textarea, editor-enhanced
 }
 
 // profileView is the page payload for the public profile page.

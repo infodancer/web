@@ -40,8 +40,9 @@ type Templates struct {
 // New parses the embedded template set. uiPartials (nilable) supplies the
 // infodancer/ui partials (ui/document, ui/nav, ui/footer, ui/meta,
 // ui/analytics, ui/sidebar), parsed into every page tree so base.gohtml can
-// render through ui/document.
-func New(embedded fs.FS, uiPartials fs.FS, log *slog.Logger) (*Templates, error) {
+// render through ui/document. mdeditPartials (nilable) supplies the
+// ui/mdedit editor partials the edit form embeds for the bio field.
+func New(embedded fs.FS, uiPartials fs.FS, mdeditPartials fs.FS, log *slog.Logger) (*Templates, error) {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -76,22 +77,36 @@ func New(embedded fs.FS, uiPartials fs.FS, log *slog.Logger) (*Templates, error)
 	}
 	sort.Strings(partialNames)
 
-	uiSources, err := readUIPartials(uiPartials)
+	uiSources, err := readGlobPartials(uiPartials)
 	if err != nil {
 		return nil, fmt.Errorf("render: ui partials: %w", err)
+	}
+	mdeditSources, err := readGlobPartials(mdeditPartials)
+	if err != nil {
+		return nil, fmt.Errorf("render: mdedit partials: %w", err)
 	}
 
 	t := &Templates{pages: map[string]*template.Template{}, log: log}
 	funcs := template.FuncMap{"bio": Bio}
 
-	// Parse order per page tree: base, then ui partials (ui/document and
-	// friends define block defaults), then profile's own partials, then the
-	// page LAST so its {{define "content"}} wins over earlier block defaults.
+	// Parse order per page tree: ui + mdedit partials first (their {{block}}
+	// defaults, e.g. ui/document's empty "head", must lose to later
+	// definitions), then base (which defines the shared "head"), then
+	// profile's own partials, then the page LAST so its {{define "content"}}
+	// wins over every earlier block default.
 	parseInto := func(tpl *template.Template, page, src string) error {
 		for name, s := range uiSources {
 			if _, err := tpl.New("__ui__/" + name).Parse(s); err != nil {
 				return fmt.Errorf("render: parse ui partial %s for %s: %w", name, page, err)
 			}
+		}
+		for name, s := range mdeditSources {
+			if _, err := tpl.New("__mdedit__/" + name).Parse(s); err != nil {
+				return fmt.Errorf("render: parse mdedit partial %s for %s: %w", name, page, err)
+			}
+		}
+		if _, err := tpl.Parse(baseSrc); err != nil {
+			return fmt.Errorf("render: parse base for %s: %w", page, err)
 		}
 		for _, pn := range partialNames {
 			if _, err := tpl.New(pn).Parse(sources[pn]); err != nil {
@@ -109,9 +124,6 @@ func New(embedded fs.FS, uiPartials fs.FS, log *slog.Logger) (*Templates, error)
 			continue
 		}
 		tpl := template.New("base").Funcs(funcs)
-		if _, err := tpl.Parse(baseSrc); err != nil {
-			return nil, fmt.Errorf("render: parse base for %s: %w", n, err)
-		}
 		if err := parseInto(tpl, n, src); err != nil {
 			return nil, err
 		}
@@ -210,17 +222,19 @@ func readSource(name string, embedded fs.FS) (string, error) {
 	return string(b), nil
 }
 
-func readUIPartials(uiPartials fs.FS) (map[string]string, error) {
+// readGlobPartials reads every top-level .gohtml in a partials FS (the shape
+// ui.PartialsFS and mdedit.PartialsFS share). nil yields an empty set.
+func readGlobPartials(partials fs.FS) (map[string]string, error) {
 	out := map[string]string{}
-	if uiPartials == nil {
+	if partials == nil {
 		return out, nil
 	}
-	entries, err := fs.Glob(uiPartials, "*.gohtml")
+	entries, err := fs.Glob(partials, "*.gohtml")
 	if err != nil {
 		return nil, err
 	}
 	for _, name := range entries {
-		b, err := fs.ReadFile(uiPartials, name)
+		b, err := fs.ReadFile(partials, name)
 		if err != nil {
 			return nil, err
 		}
