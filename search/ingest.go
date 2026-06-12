@@ -120,6 +120,30 @@ func (s storeWriter) Hash(ctx context.Context, key index.Key) ([]byte, bool, err
 	return h, true, nil
 }
 
+// HasChunks reports whether the live document identified by key has at least
+// one row in search_chunks. Returns false (not an error) when the document does
+// not exist, has been soft-deleted, or when search_chunks does not yet exist
+// (no document has ever been embedded).
+func (s storeWriter) HasChunks(ctx context.Context, key index.Key) (bool, error) {
+	var n int64
+	err := s.q.Pool().QueryRow(ctx, `
+		SELECT count(c.id)
+		FROM search_documents d
+		JOIN search_chunks c ON c.document_id = d.id
+		WHERE d.source = $1 AND d.source_name = $2 AND d.source_key = $3
+		  AND d.deleted_at IS NULL`,
+		key.Source, key.SourceName, key.SourceKey,
+	).Scan(&n)
+	if err != nil {
+		// search_chunks does not exist yet (42P01): no document has been embedded.
+		if store.IsUndefinedTable(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("store: has chunks: %w", err)
+	}
+	return n > 0, nil
+}
+
 func (s storeWriter) Upsert(ctx context.Context, d index.StoredDoc) (int64, error) {
 	return s.q.UpsertDocument(ctx, store.UpsertDocumentParams{
 		Source:       d.Source,

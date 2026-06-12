@@ -54,9 +54,23 @@ type fakeWriter struct {
 	upserts int
 	deletes int
 	nextID  int64
+	// ids maps Key -> doc id so HasChunks can cross-reference the chunk store.
+	ids map[Key]int64
+	// chunks is the companion fakeChunkStore; HasChunks returns false when nil.
+	chunks *fakeChunkStore
 }
 
-func newFakeWriter() *fakeWriter { return &fakeWriter{docs: map[Key]StoredDoc{}} }
+func newFakeWriter() *fakeWriter {
+	return &fakeWriter{docs: map[Key]StoredDoc{}, ids: map[Key]int64{}}
+}
+
+// newFakeWriterWithChunks links the writer to a chunk store so HasChunks
+// reflects actual chunk state written by the Indexer.
+func newFakeWriterWithChunks(cs *fakeChunkStore) *fakeWriter {
+	w := newFakeWriter()
+	w.chunks = cs
+	return w
+}
 
 func (f *fakeWriter) Hash(_ context.Context, key Key) ([]byte, bool, error) {
 	d, ok := f.docs[key]
@@ -66,13 +80,28 @@ func (f *fakeWriter) Hash(_ context.Context, key Key) ([]byte, bool, error) {
 	return d.ContentHash, true, nil
 }
 
+// HasChunks returns true when the document exists and has at least one chunk
+// recorded in the linked fakeChunkStore.
+func (f *fakeWriter) HasChunks(_ context.Context, key Key) (bool, error) {
+	if f.chunks == nil {
+		return false, nil
+	}
+	id, ok := f.ids[key]
+	if !ok {
+		return false, nil
+	}
+	ch, ok := f.chunks.replaced[id]
+	return ok && len(ch) > 0, nil
+}
+
 func (f *fakeWriter) Upsert(_ context.Context, doc StoredDoc) (int64, error) {
 	f.upserts++
 	if _, ok := f.docs[doc.Key]; !ok {
 		f.nextID++
+		f.ids[doc.Key] = f.nextID
 	}
 	f.docs[doc.Key] = doc
-	return f.nextID, nil
+	return f.ids[doc.Key], nil
 }
 
 func (f *fakeWriter) SoftDelete(_ context.Context, key Key) (bool, error) {
@@ -355,9 +384,10 @@ func TestIndex_EmbedsSectionsAsChunks(t *testing.T) {
 }
 
 func TestIndex_SkippedContentDoesNotReembed(t *testing.T) {
-	w := newFakeWriter()
 	emb := &fakeEmbedder{}
 	cs := newFakeChunkStore()
+	// Link the writer to the chunk store so HasChunks reflects actual state.
+	w := newFakeWriterWithChunks(cs)
 	ix := New(w, emb, cs, nil)
 	doc := mdDoc("1", "# H\n\nBody.")
 
@@ -391,6 +421,60 @@ func TestIndex_EmbedFailureIsNonFatal(t *testing.T) {
 	}
 	if cs.calls != 0 {
 		t.Errorf("chunk store should not be written when embedding failed, got %d calls", cs.calls)
+	}
+}
+
+// TestIndex_BackfillsVectorsForFTSOnlyDoc verifies the core backfill scenario:
+// a doc indexed with no embedder (FTS-only) gets its chunks written when an
+// embedder is wired in and the same -- unchanged -- document is re-indexed.
+// The content hash must not be the gating factor for the embedding step.
+func TestIndex_BackfillsVectorsForFTSOnlyDoc(t *testing.T) {
+	cs := newFakeChunkStore()
+	w := newFakeWriterWithChunks(cs)
+	doc := mdDoc("1", "# Title\n\nBody text.")
+
+	// Phase 1: index with no embedder -- FTS-only.
+	ixFTS := New(w, nil, nil, nil)
+	res, err := ixFTS.Index(context.Background(), doc)
+	if err != nil {
+		t.Fatalf("FTS index: %v", err)
+	}
+	if !res.Created {
+		t.Fatalf("expected doc to be created, got %+v", res)
+	}
+	if cs.calls != 0 {
+		t.Errorf("no embedder: chunk store should not be written, got %d calls", cs.calls)
+	}
+
+	// Phase 2: re-index the same unchanged doc with an embedder now configured.
+	emb := &fakeEmbedder{dim: 3}
+	ixEmbed := New(w, emb, cs, quietLogger())
+	res2, err := ixEmbed.Index(context.Background(), doc)
+	if err != nil {
+		t.Fatalf("backfill index: %v", err)
+	}
+	if res2.Skipped {
+		t.Errorf("FTS-only doc with active embedder must not be skipped")
+	}
+	if emb.calls == 0 {
+		t.Errorf("embedder was never called during backfill")
+	}
+	chunks := cs.replaced[res2.DocID]
+	if len(chunks) == 0 {
+		t.Errorf("doc should now have chunks after backfill, got none")
+	}
+
+	// Phase 3: re-index once more -- now it has chunks, so it should be skipped.
+	callsBefore := emb.calls
+	res3, err := ixEmbed.Index(context.Background(), doc)
+	if err != nil {
+		t.Fatalf("third index: %v", err)
+	}
+	if !res3.Skipped {
+		t.Errorf("doc already has chunks and unchanged content: should be skipped, got %+v", res3)
+	}
+	if emb.calls != callsBefore {
+		t.Errorf("embedder should not be called again: %d before, %d after", callsBefore, emb.calls)
 	}
 }
 

@@ -71,13 +71,17 @@ func (s *Store) SearchChunksVector(ctx context.Context, vec []float32, metric st
 	return hits, nil
 }
 
-// undefinedTable reports whether err is Postgres "relation does not exist"
-// (42P01) — the case where no document has been embedded so search_chunks has
-// not been created yet.
-func undefinedTable(err error) bool {
+// IsUndefinedTable reports whether err is the Postgres "relation does not exist"
+// error (42P01). That is the expected condition when search_chunks has not been
+// created yet because no document has ever been embedded.
+func IsUndefinedTable(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }
+
+// undefinedTable is the package-internal alias kept for the existing callers in
+// this file.
+func undefinedTable(err error) bool { return IsUndefinedTable(err) }
 
 // VectorLiteral renders a float32 slice as a pgvector text literal "[a,b,c]" for
 // binding as a ::vector parameter.
