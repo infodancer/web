@@ -20,6 +20,7 @@ func userEvent(title string, recipients ...Identity) Event {
 		Source:     "osg",
 		Title:      title,
 		Audience:   AudienceUser,
+		Link:       "https://osg.example/campaigns/7",
 		Recipients: recipients,
 	}
 }
@@ -39,6 +40,7 @@ func TestEmitFansOutToRecipients(t *testing.T) {
 		require.Len(t, feed, 1)
 		require.Equal(t, id, feed[0].ID)
 		require.Equal(t, "Session added", feed[0].Title)
+		require.Equal(t, "https://osg.example/campaigns/7", feed[0].Link)
 		require.Nil(t, feed[0].ReadAt)
 		require.Nil(t, feed[0].DismissedAt)
 

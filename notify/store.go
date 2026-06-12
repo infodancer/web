@@ -54,6 +54,7 @@ func (s *Store) Insert(ctx context.Context, ev Event) (int64, error) {
 		Severity: string(ev.Severity),
 		Audience: string(ev.Audience),
 		Payload:  payload,
+		Link:     ev.Link,
 	}
 	if ev.Actor != nil {
 		params.ActorIssuer = nullStr(ev.Actor.Issuer)
@@ -273,6 +274,7 @@ func (s *Store) UserFeed(ctx context.Context, recipient Identity, f UserFilter) 
 				Title:     r.Title,
 				Severity:  Severity(r.Severity),
 				Audience:  Audience(r.Audience),
+				Link:      r.Link,
 				Actor:     ident(r.ActorIssuer, r.ActorSubject, r.ActorLabel),
 				Subject:   ident(r.SubjectIssuer, r.SubjectSubject, nil),
 				Payload:   payload,
@@ -362,6 +364,7 @@ func toEvent(r db.NotifyEvents) (Event, error) {
 		Title:     r.Title,
 		Severity:  Severity(r.Severity),
 		Audience:  Audience(r.Audience),
+		Link:      r.Link,
 		Actor:     ident(r.ActorIssuer, r.ActorSubject, r.ActorLabel),
 		Subject:   ident(r.SubjectIssuer, r.SubjectSubject, nil),
 		Payload:   payload,

@@ -33,7 +33,7 @@ const adminFeed = `-- name: AdminFeed :many
 SELECT
     id, source, type, title, severity, audience,
     actor_issuer, actor_subject, actor_label,
-    subject_issuer, subject_subject, payload, created_at
+    subject_issuer, subject_subject, payload, created_at, link
 FROM notify_events
 WHERE ($1::bool OR audience = 'admin')
   AND ($2::text   IS NULL OR source   = $2)
@@ -94,6 +94,7 @@ func (q *Queries) AdminFeed(ctx context.Context, arg AdminFeedParams) ([]NotifyE
 			&i.SubjectSubject,
 			&i.Payload,
 			&i.CreatedAt,
+			&i.Link,
 		); err != nil {
 			return nil, err
 		}
@@ -165,11 +166,11 @@ const insertEvent = `-- name: InsertEvent :one
 INSERT INTO notify_events (
     source, type, title, severity, audience,
     actor_issuer, actor_subject, actor_label,
-    subject_issuer, subject_subject, payload
+    subject_issuer, subject_subject, payload, link
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8,
-    $9, $10, $11
+    $9, $10, $11, $12
 )
 RETURNING id, created_at
 `
@@ -186,6 +187,7 @@ type InsertEventParams struct {
 	SubjectIssuer  *string
 	SubjectSubject *string
 	Payload        []byte
+	Link           string
 }
 
 type InsertEventRow struct {
@@ -208,6 +210,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (Inser
 		arg.SubjectIssuer,
 		arg.SubjectSubject,
 		arg.Payload,
+		arg.Link,
 	)
 	var i InsertEventRow
 	err := row.Scan(&i.ID, &i.CreatedAt)
@@ -257,7 +260,7 @@ const userFeed = `-- name: UserFeed :many
 SELECT
     e.id, e.source, e.type, e.title, e.severity, e.audience,
     e.actor_issuer, e.actor_subject, e.actor_label,
-    e.subject_issuer, e.subject_subject, e.payload, e.created_at,
+    e.subject_issuer, e.subject_subject, e.payload, e.created_at, e.link,
     n.read_at, n.dismissed_at
 FROM notify_user_notifications n
 JOIN notify_events e ON e.id = n.event_id
@@ -289,6 +292,7 @@ type UserFeedRow struct {
 	SubjectSubject *string
 	Payload        []byte
 	CreatedAt      time.Time
+	Link           string
 	ReadAt         *time.Time
 	DismissedAt    *time.Time
 }
@@ -325,6 +329,7 @@ func (q *Queries) UserFeed(ctx context.Context, arg UserFeedParams) ([]UserFeedR
 			&i.SubjectSubject,
 			&i.Payload,
 			&i.CreatedAt,
+			&i.Link,
 			&i.ReadAt,
 			&i.DismissedAt,
 		); err != nil {

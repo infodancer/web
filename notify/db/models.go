@@ -29,6 +29,7 @@ type NotifyEvents struct {
 	SubjectSubject *string
 	Payload        []byte
 	CreatedAt      time.Time
+	Link           string
 }
 
 type NotifyUserNotifications struct {
