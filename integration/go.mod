@@ -34,7 +34,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/infodancer/ui v0.6.0 // indirect
+	github.com/infodancer/ui v0.6.1 // indirect
 	github.com/infodancer/ui/markdown v0.2.1 // indirect
 	github.com/infodancer/ui/mdedit v0.2.4 // indirect
 	github.com/matthewjhunter/go-embedding v0.4.6 // indirect
