@@ -75,6 +75,7 @@ type Deps struct {
 	LogoURL      string
 	Chrome       func(*http.Request) uiassets.DocumentData // per-request host chrome; nil uses the module default
 	Sections     SectionsFunc                              // host-owned page sections; nil means none
+	OnChange     func(ctx context.Context, userKey string) // fired once per successful write; nil means none
 	IngestAvatar IngestAvatar                              // nil disables avatar upload
 	Reserved     []string                                  // host additions to the reserved-handle set
 	CSRFDisabled bool
@@ -92,6 +93,7 @@ type Server struct {
 	logoURL      string
 	chrome       func(*http.Request) uiassets.DocumentData
 	sections     SectionsFunc
+	onChange     func(ctx context.Context, userKey string)
 	ingestAvatar IngestAvatar
 	reserved     map[string]bool
 	csrfDisabled bool
@@ -143,6 +145,7 @@ func New(d Deps) (*Server, error) {
 		logoURL:      d.LogoURL,
 		chrome:       d.Chrome,
 		sections:     d.Sections,
+		onChange:     d.OnChange,
 		ingestAvatar: d.IngestAvatar,
 		reserved:     reserved,
 		csrfDisabled: d.CSRFDisabled,
@@ -173,6 +176,14 @@ func (s *Server) registerRoutes() {
 	// Literal routes above win over the handle wildcard; the reserved-handle
 	// set additionally guarantees no claimable handle collides with a route.
 	s.mux.HandleFunc("GET /{handle}", s.handleView)
+}
+
+// notifyChange fires the host's OnChange hook, if any. Call exactly once per
+// request, after every write in the request has succeeded.
+func (s *Server) notifyChange(ctx context.Context, userKey string) {
+	if s.onChange != nil {
+		s.onChange(ctx, userKey)
+	}
 }
 
 // handleIndex sends signed-in users to their edit form; anonymous visitors

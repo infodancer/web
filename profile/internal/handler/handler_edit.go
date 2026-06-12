@@ -141,6 +141,7 @@ func (s *Server) handleEditSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s.notifyChange(r.Context(), u.Key)
 	http.Redirect(w, r, s.basePath+"/edit?saved=1", http.StatusSeeOther)
 }
 

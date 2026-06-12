@@ -35,6 +35,7 @@ func (s *Server) handleAvatarUpload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		s.notifyChange(r.Context(), u.Key)
 		http.Redirect(w, r, s.basePath+"/edit?saved=1", http.StatusSeeOther)
 		return
 	}
@@ -60,6 +61,7 @@ func (s *Server) handleAvatarUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.notifyChange(r.Context(), u.Key)
 	http.Redirect(w, r, s.basePath+"/edit?saved=1", http.StatusSeeOther)
 }
 

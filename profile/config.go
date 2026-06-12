@@ -63,6 +63,13 @@ type Config struct {
 	// host gates per-viewer visibility itself. nil means no host sections.
 	Sections func(ctx context.Context, r *http.Request, userKey string) []Section
 
+	// OnChange is called once after any successful profile write -- form
+	// save (including handle claims), avatar upload or removal -- with the
+	// affected user's key. Hosts hang search reindexing and notifications
+	// here; the hook runs synchronously on the request path, so hosts
+	// needing slow work should dispatch internally. nil means no callback.
+	OnChange func(ctx context.Context, userKey string)
+
 	// Blobs and Objects are the media stores avatar uploads are written to.
 	// Both optional, but avatar upload is enabled only when both are set;
 	// without them profiles fall back to the generated identicon.
