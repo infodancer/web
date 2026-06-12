@@ -11,6 +11,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -46,6 +47,21 @@ type ProfileStore interface {
 // media.Ingest; tests substitute a fake. nil disables uploads.
 type IngestAvatar func(ctx context.Context, subject string, r io.Reader) (string, error)
 
+// Section is one host-owned block profile places on its pages without ever
+// parsing, validating, or storing its contents (DESIGN.md §3). The host
+// renders the markup itself; an empty ViewHTML or EditHTML omits the section
+// from that page.
+type Section struct {
+	Title    string
+	ViewHTML template.HTML
+	EditHTML template.HTML
+}
+
+// SectionsFunc supplies host-owned sections for one profile, called per
+// request with the profile owner's user key. The host gates per-viewer
+// visibility itself. nil means no host sections.
+type SectionsFunc func(ctx context.Context, r *http.Request, userKey string) []Section
+
 // Deps is everything the handler needs, built by the profile package from
 // its public Config.
 type Deps struct {
@@ -58,6 +74,7 @@ type Deps struct {
 	HomeURL      string
 	LogoURL      string
 	Chrome       func(*http.Request) uiassets.DocumentData // per-request host chrome; nil uses the module default
+	Sections     SectionsFunc                              // host-owned page sections; nil means none
 	IngestAvatar IngestAvatar                              // nil disables avatar upload
 	Reserved     []string                                  // host additions to the reserved-handle set
 	CSRFDisabled bool
@@ -74,6 +91,7 @@ type Server struct {
 	homeURL      string
 	logoURL      string
 	chrome       func(*http.Request) uiassets.DocumentData
+	sections     SectionsFunc
 	ingestAvatar IngestAvatar
 	reserved     map[string]bool
 	csrfDisabled bool
@@ -124,6 +142,7 @@ func New(d Deps) (*Server, error) {
 		homeURL:      d.HomeURL,
 		logoURL:      d.LogoURL,
 		chrome:       d.Chrome,
+		sections:     d.Sections,
 		ingestAvatar: d.IngestAvatar,
 		reserved:     reserved,
 		csrfDisabled: d.CSRFDisabled,

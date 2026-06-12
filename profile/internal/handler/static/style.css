@@ -7,6 +7,41 @@
   max-width: 40rem;
 }
 
+/* The section vocabulary (DESIGN.md §3): profile's own basics and every
+   host-supplied section share these classes, so host blocks sit
+   pixel-consistent with the block above them without sharing templates.
+   Host section markup should use profile-section-row for labelled fields
+   and profile-section-save on its save affordance. */
+
+.profile-section {
+  margin-block: 1.5rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--app-border, color-mix(in srgb, currentColor 18%, transparent));
+}
+
+.profile-section > h2 {
+  font-size: 1.1em;
+  margin-block: 0 0.75rem;
+}
+
+.profile-section-row {
+  display: block;
+  margin-block: 1rem;
+}
+
+.profile-section-row input[type="text"],
+.profile-section-row input[type="url"],
+.profile-section-row textarea,
+.profile-section-row select {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-section-save {
+  margin-block-start: 0.5rem;
+}
+
 .profile-flash {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--app-accent, #2a7);

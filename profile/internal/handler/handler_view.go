@@ -17,6 +17,7 @@ func (s *Server) handleView(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, r, "profile.gohtml", http.StatusOK, profileView{
 		Profile:   p,
 		AvatarSrc: s.avatarSrc(p),
+		Sections:  s.hostSections(r, p.UserKey, false),
 	})
 }
 

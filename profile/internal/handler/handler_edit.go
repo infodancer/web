@@ -150,6 +150,7 @@ func (s *Server) renderEditStatus(w http.ResponseWriter, r *http.Request, p *sto
 	v.AvatarUploads = s.ingestAvatar != nil
 	v.AvatarSrc = s.avatarSrc(p)
 	v.LinkRows = padLinkRows(p.Links)
+	v.Sections = s.hostSections(r, u.Key, true)
 	s.renderPage(w, r, "edit.gohtml", status, v)
 }
 

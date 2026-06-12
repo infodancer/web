@@ -82,6 +82,7 @@ func New(cfg Config) (*Module, error) {
 		HomeURL:      cfg.HomeURL,
 		LogoURL:      cfg.LogoURL,
 		Chrome:       cfg.Chrome,
+		Sections:     cfg.Sections,
 		IngestAvatar: avatarIngester(cfg),
 		Reserved:     cfg.ReservedHandles,
 		CSRFDisabled: cfg.CSRF.Disable,

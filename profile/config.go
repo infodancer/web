@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -9,8 +10,17 @@ import (
 	ui "github.com/infodancer/ui"
 
 	"github.com/infodancer/web/media"
+	"github.com/infodancer/web/profile/internal/handler"
 	"github.com/infodancer/web/profile/profileuser"
 )
+
+// Section is one host-owned block profile places on its pages: a title plus
+// view and/or edit markup the host rendered itself. Per DESIGN.md §3 each
+// section is a self-contained island — its forms post to host endpoints, its
+// data lives in host tables, and profile never parses, validates, or stores
+// its contents. An empty ViewHTML omits the section from the public page; an
+// empty EditHTML omits it from the edit page.
+type Section = handler.Section
 
 // Config captures everything the host application supplies to [New]. Only DB
 // and Resolver are required; the rest have sensible defaults.
@@ -46,6 +56,12 @@ type Config struct {
 	// the SiteName/HomeURL-derived default, so a standalone mount still
 	// renders a complete page.
 	Chrome func(*http.Request) ui.DocumentData
+
+	// Sections supplies host-owned profile sections, rendered after
+	// profile's own basics on the public page (ViewHTML) and the edit page
+	// (EditHTML). Called per request with the profile owner's user key; the
+	// host gates per-viewer visibility itself. nil means no host sections.
+	Sections func(ctx context.Context, r *http.Request, userKey string) []Section
 
 	// Blobs and Objects are the media stores avatar uploads are written to.
 	// Both optional, but avatar upload is enabled only when both are set;

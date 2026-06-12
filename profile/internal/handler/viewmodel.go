@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"html/template"
 	"net/http"
 
 	ui "github.com/infodancer/ui"
@@ -91,13 +92,44 @@ type editView struct {
 	AvatarSrc     string // current picture: upload or identicon fallback
 	Errors        []string
 	Saved         bool
-	LinkRows      []store.Link // existing links padded with blank rows
+	LinkRows      []store.Link  // existing links padded with blank rows
+	Sections      []sectionView // host sections with edit markup
 }
 
 // profileView is the page payload for the public profile page.
 type profileView struct {
 	Profile   *store.Profile
 	AvatarSrc string
+	Sections  []sectionView // host sections with view markup
+}
+
+// sectionView is one host section resolved for a specific page: the markup
+// for that page's mode (view or edit) plus the title. Sections whose markup
+// is empty for the mode are dropped before this type is built.
+type sectionView struct {
+	Title string
+	HTML  template.HTML
+}
+
+// hostSections resolves the host's Sections hook for one profile and keeps
+// the blocks that carry markup for the requested mode. A nil hook yields
+// nil — the templates render nothing.
+func (s *Server) hostSections(r *http.Request, userKey string, edit bool) []sectionView {
+	if s.sections == nil {
+		return nil
+	}
+	var out []sectionView
+	for _, sec := range s.sections(r.Context(), r, userKey) {
+		html := sec.ViewHTML
+		if edit {
+			html = sec.EditHTML
+		}
+		if html == "" {
+			continue
+		}
+		out = append(out, sectionView{Title: sec.Title, HTML: html})
+	}
+	return out
 }
 
 // cardView is the payload for the embeddable card partial.
