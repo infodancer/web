@@ -41,6 +41,12 @@ type Config struct {
 	// Used for link generation. Defaults to "/profile".
 	BasePath string
 
+	// BaseURL is the site's absolute origin (e.g. "https://example.org", no
+	// trailing slash). When set, public profile pages emit a canonical link,
+	// a Person JSON-LD graph, and absolute social-card image URLs. Empty
+	// skips the absolute-URL markup.
+	BaseURL string
+
 	// SignInURL is the host's login URL, surfaced to anonymous visitors. The
 	// module owns no login flow.
 	SignInURL string

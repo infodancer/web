@@ -69,6 +69,7 @@ type Deps struct {
 	Resolver     profileuser.Resolver // required
 	Logger       *slog.Logger
 	BasePath     string // mount prefix, e.g. "/profile"
+	BaseURL      string // absolute site origin for canonical/JSON-LD; "" skips them
 	SignInURL    string
 	SiteName     string
 	HomeURL      string
@@ -87,6 +88,7 @@ type Server struct {
 	resolver     profileuser.Resolver
 	log          *slog.Logger
 	basePath     string
+	baseURL      string
 	signInURL    string
 	siteName     string
 	homeURL      string
@@ -139,6 +141,7 @@ func New(d Deps) (*Server, error) {
 		resolver:     d.Resolver,
 		log:          d.Logger,
 		basePath:     strings.TrimSuffix(d.BasePath, "/"),
+		baseURL:      strings.TrimSuffix(d.BaseURL, "/"),
 		signInURL:    d.SignInURL,
 		siteName:     d.SiteName,
 		homeURL:      d.HomeURL,
@@ -199,7 +202,17 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 // renderPage renders a full page (templates/pages/<page>) wrapped in the base
 // view, which supplies ui chrome.
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string, status int, data any) {
-	out, err := s.templates.Execute("pages/"+page, s.baseView(r, data))
+	s.renderPageWith(w, r, page, status, data, nil)
+}
+
+// renderPageWith is renderPage with a hook to adjust the assembled BaseView
+// (per-page meta, head additions) before execution.
+func (s *Server) renderPageWith(w http.ResponseWriter, r *http.Request, page string, status int, data any, adjust func(*BaseView)) {
+	view := s.baseView(r, data)
+	if adjust != nil {
+		adjust(&view)
+	}
+	out, err := s.templates.Execute("pages/"+page, view)
 	if err != nil {
 		s.log.Error("render page", "page", page, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

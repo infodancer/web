@@ -77,6 +77,7 @@ func New(cfg Config) (*Module, error) {
 		Resolver:     cfg.Resolver,
 		Logger:       cfg.Logger,
 		BasePath:     cfg.BasePath,
+		BaseURL:      cfg.BaseURL,
 		SignInURL:    cfg.SignInURL,
 		SiteName:     cfg.SiteName,
 		HomeURL:      cfg.HomeURL,

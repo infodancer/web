@@ -24,10 +24,12 @@ func (s *Server) handleView(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.renderPage(w, r, "profile.gohtml", http.StatusOK, profileView{
+	s.renderPageWith(w, r, "profile.gohtml", http.StatusOK, profileView{
 		Profile:   p,
 		AvatarSrc: s.avatarSrc(p),
 		Sections:  s.hostSections(r, p.UserKey, false),
+	}, func(v *BaseView) {
+		s.applyProfileMeta(&v.Meta, p)
 	})
 }
 
