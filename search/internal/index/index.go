@@ -102,6 +102,11 @@ type Writer interface {
 	// Hash returns the stored content hash for a key. found is false when the
 	// document has never been indexed.
 	Hash(ctx context.Context, key Key) (hash []byte, found bool, err error)
+	// HasChunks reports whether a live document already has at least one chunk
+	// (i.e. was previously embedded). Returns false when the document does not
+	// exist or has no chunks. The pipeline uses this to detect FTS-only docs
+	// that need backfill when an embedder is wired in after initial indexing.
+	HasChunks(ctx context.Context, key Key) (bool, error)
 	// Upsert persists doc and returns its row id.
 	Upsert(ctx context.Context, doc StoredDoc) (int64, error)
 	// SoftDelete marks one document deleted; deleted is false when there was
@@ -172,8 +177,13 @@ type Result struct {
 }
 
 // Index validates, extracts, hashes, and upserts a single document. When the
-// content hash matches what is stored, it skips the write entirely — the hash is
-// the incremental-indexing cache (DESIGN §5.1).
+// content hash matches what is stored, it skips the write entirely -- the hash
+// is the incremental-indexing cache (DESIGN §5.1).
+//
+// Exception: when an embedder is configured and the existing document has no
+// chunks (was indexed FTS-only before the embedder was wired in), the embedding
+// step runs even though the content is unchanged. The upsert is still skipped --
+// only the chunk backfill is applied.
 func (ix *Indexer) Index(ctx context.Context, doc Document) (Result, error) {
 	sd, sections, err := ix.project(doc)
 	if err != nil {
@@ -184,8 +194,37 @@ func (ix *Indexer) Index(ctx context.Context, doc Document) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("index: read hash: %w", err)
 	}
-	if found && bytesEqual(stored, sd.ContentHash) {
+
+	hashMatch := found && bytesEqual(stored, sd.ContentHash)
+
+	// When the hash matches and no embedder is active, nothing to do.
+	if hashMatch && (ix.emb == nil || ix.chunks == nil) {
 		return Result{Skipped: true}, nil
+	}
+
+	// When the hash matches but an embedder is configured, check whether this
+	// doc already has chunks. If it does, it is fully up-to-date and can be
+	// skipped. If it doesn't, it was indexed FTS-only and needs a chunk backfill
+	// even though the content hasn't changed.
+	if hashMatch {
+		hasChunks, err := ix.w.HasChunks(ctx, sd.Key)
+		if err != nil {
+			return Result{}, fmt.Errorf("index: check chunks: %w", err)
+		}
+		if hasChunks {
+			return Result{Skipped: true}, nil
+		}
+		// FTS-only doc with an active embedder: fetch the doc id from the store
+		// so we can write chunks without re-upserting the (unchanged) document.
+		id, err := ix.w.Upsert(ctx, sd)
+		if err != nil {
+			return Result{}, fmt.Errorf("index: upsert (chunk backfill): %w", err)
+		}
+		if err := ix.embedDocument(ctx, id, sd.Title, sections); err != nil {
+			ix.log.Warn("index: embedding failed; document remains FTS-only until re-indexed",
+				"source", sd.Source, "key", sd.SourceKey, "err", err)
+		}
+		return Result{DocID: id, Created: false}, nil
 	}
 
 	id, err := ix.w.Upsert(ctx, sd)
