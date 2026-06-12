@@ -108,6 +108,7 @@ func (s *Server) feedLinks(scopeName, authorSlug, blogSlug string) template.HTML
 	var b strings.Builder
 	add := func(title, rel string) {
 		for _, f := range feedFormats {
+			//nolint:gosec // G705: title is HTML-escaped here; every other part is module config
 			fmt.Fprintf(&b, "  <link rel=\"alternate\" type=%q title=\"%s (%s)\" href=%q>\n",
 				f.mime, template.HTMLEscapeString(title), f.label, s.absURL(rel+"/"+f.file))
 		}
