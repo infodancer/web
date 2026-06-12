@@ -88,6 +88,7 @@ func TestInsertAndFeedRoundTrip(t *testing.T) {
 		Source:   "osg",
 		Title:    "New account: Ada",
 		Severity: SeverityNotice,
+		Link:     "https://osg.example/users/ada",
 		Actor:    &Identity{Issuer: "https://idp", Subject: "sub-9", Label: "ada@osg"},
 		Payload:  map[string]any{"handle": "ada", "verified": true},
 	}
@@ -105,6 +106,7 @@ func TestInsertAndFeedRoundTrip(t *testing.T) {
 	require.Equal(t, "osg", got.Source)
 	require.Equal(t, SeverityNotice, got.Severity)
 	require.Equal(t, AudienceAdmin, got.Audience) // defaulted
+	require.Equal(t, "https://osg.example/users/ada", got.Link)
 	require.NotNil(t, got.Actor)
 	require.Equal(t, "ada@osg", got.Actor.Label)
 	require.Equal(t, "ada", got.Payload["handle"])

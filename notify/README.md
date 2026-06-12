@@ -37,6 +37,7 @@ _ = emitter.Emit(ctx, notify.Event{
     Type:   "user.created",
     Source: "osg",
     Title:  "New account: " + name,
+    Link:   "https://osg.example/admin/users/" + handle,
     Actor:  &notify.Identity{Issuer: iss, Subject: sub, Label: email},
     Payload: map[string]any{"handle": handle},
 })
@@ -45,6 +46,11 @@ _ = emitter.Emit(ctx, notify.Event{
 The default async emitter is **best-effort**: it never blocks the request path
 and a delivery failure is logged, not returned. Use `NewSyncEmitter` only when
 you want the write in your own request path or transaction.
+
+`Link` is the optional click-through target: the feed renders the title as an
+anchor to it. It must be an **absolute** `http(s)` URL (producers and feeds may
+live on different origins); anything else is rejected at the write path with
+`ErrInvalidLink`. Leave it empty when the event has nothing to link to.
 
 ## Reading (admin)
 

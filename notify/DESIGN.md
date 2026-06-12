@@ -31,7 +31,10 @@ First consumer: **osg** (`old-school-gamers/osg`).
    `created_at`) are typed; everything site-specific goes in a free-form `JSONB`
    `payload`. Payload is not indexed in v1 (add a GIN index only if a real query
    pattern justifies it); keep `Title` informative so the feed is useful without
-   payload queries.
+   payload queries. The click-through target is also typed: `link` is an
+   optional absolute `http(s)` URL the feed wraps the title in, validated at
+   the write path so a producer cannot plant a `javascript:` href. It is a
+   typed column, not a payload convention, because the renderer depends on it.
 
 4. **Opaque identity, no host foreign keys.** Actors and subjects are recorded
    as `(issuer, subject)` strings with a point-in-time `label` cache — never a

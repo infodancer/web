@@ -114,6 +114,31 @@ func TestFeedFullPageVsFragment(t *testing.T) {
 	}
 }
 
+func TestFeedRendersLinkAsAnchor(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{feed: []notify.Event{
+		{ID: 2, Type: "session.added", Source: "osg", Title: "Session added",
+			Severity: notify.SeverityInfo, Link: "https://osg.example/campaigns/7", CreatedAt: time.Now()},
+		{ID: 1, Type: "user.created", Source: "osg", Title: "New account",
+			Severity: notify.SeverityInfo, CreatedAt: time.Now()},
+	}}
+	h := newHandler(t, store, allow)
+
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	body := rr.Body.String()
+
+	if !strings.Contains(body, `<a class="notify-event-title" href="https://osg.example/campaigns/7">Session added</a>`) {
+		t.Error("linked event not rendered as anchor")
+	}
+	if !strings.Contains(body, `<span class="notify-event-title">New account</span>`) {
+		t.Error("linkless event should stay a plain span")
+	}
+}
+
 func TestFeedParsesFilters(t *testing.T) {
 	t.Parallel()
 	store := &fakeStore{}

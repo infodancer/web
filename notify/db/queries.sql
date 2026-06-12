@@ -4,11 +4,11 @@
 INSERT INTO notify_events (
     source, type, title, severity, audience,
     actor_issuer, actor_subject, actor_label,
-    subject_issuer, subject_subject, payload
+    subject_issuer, subject_subject, payload, link
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8,
-    $9, $10, $11
+    $9, $10, $11, $12
 )
 RETURNING id, created_at;
 
@@ -21,7 +21,7 @@ RETURNING id, created_at;
 SELECT
     id, source, type, title, severity, audience,
     actor_issuer, actor_subject, actor_label,
-    subject_issuer, subject_subject, payload, created_at
+    subject_issuer, subject_subject, payload, created_at, link
 FROM notify_events
 WHERE (sqlc.arg('all_audiences')::bool OR audience = 'admin')
   AND (sqlc.narg('source')::text   IS NULL OR source   = sqlc.narg('source'))
@@ -71,7 +71,7 @@ ON CONFLICT (event_id, recipient_issuer, recipient_subject) DO NOTHING;
 SELECT
     e.id, e.source, e.type, e.title, e.severity, e.audience,
     e.actor_issuer, e.actor_subject, e.actor_label,
-    e.subject_issuer, e.subject_subject, e.payload, e.created_at,
+    e.subject_issuer, e.subject_subject, e.payload, e.created_at, e.link,
     n.read_at, n.dismissed_at
 FROM notify_user_notifications n
 JOIN notify_events e ON e.id = n.event_id

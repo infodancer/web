@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -67,6 +68,13 @@ type Event struct {
 	Severity Severity // defaults to SeverityInfo
 	Audience Audience // defaults to AudienceAdmin
 
+	// Link is the click-through target: where a reader lands when they click
+	// the notification. Optional; empty renders the title as plain text. When
+	// set it must be an absolute http or https URL — producers and feeds may
+	// live on different origins, and rejecting other schemes at the write path
+	// keeps a producer from planting javascript: in an href.
+	Link string
+
 	Actor   *Identity // who caused the event; nil means system/anonymous
 	Subject *Identity // who or what the event concerns; optional
 
@@ -94,6 +102,7 @@ var (
 	ErrInvalidSeverity = errors.New("notify: invalid event Severity")
 	ErrInvalidAudience = errors.New("notify: invalid event Audience")
 	ErrInvalidPayload  = errors.New("notify: event Payload is not JSON-marshalable")
+	ErrInvalidLink     = errors.New("notify: event Link must be an absolute http(s) URL")
 )
 
 // normalize trims the string fields, applies defaults, and validates. It is
@@ -124,6 +133,17 @@ func (e *Event) normalize() error {
 	}
 	if !e.Audience.valid() {
 		return fmt.Errorf("%w: %q", ErrInvalidAudience, e.Audience)
+	}
+
+	e.Link = strings.TrimSpace(e.Link)
+	if e.Link != "" {
+		u, err := url.Parse(e.Link)
+		if err != nil {
+			return fmt.Errorf("%w: %q: %w", ErrInvalidLink, e.Link, err)
+		}
+		if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("%w: %q", ErrInvalidLink, e.Link)
+		}
 	}
 	return nil
 }
