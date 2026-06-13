@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -16,15 +15,10 @@ import (
 	"github.com/infodancer/web/timeline/timelineuser"
 )
 
-// newPool connects to TEST_DATABASE_URL, skipping the test when it is unset so a
-// plain `go test` without a database passes; CI sets it to the Postgres service.
+// newPool connects to the package's testcontainers Postgres (see TestMain).
 func newPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping Postgres test")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
+	pool, err := pgxpool.New(context.Background(), testDSN)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

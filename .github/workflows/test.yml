@@ -12,31 +12,17 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ci]
     # Each module builds against its own go.mod; the repo go.work is a
-    # local-dev convenience only. A single Postgres service backs the
-    # DB-backed modules.
+    # local-dev convenience only. DB-backed modules spin their own Postgres
+    # via testcontainers, so no Actions service container is needed -- service
+    # containers fail on the LXC-based self-hosted runners.
     env:
       GOWORK: "off"
-      TEST_DATABASE_URL: postgres://web:web@localhost:5432/web_test?sslmode=disable
     strategy:
       fail-fast: false
       matrix:
         module: [search, notify, blog, contact, newsletter, media, faq, timeline, profile, integration, paging, sitemap]
-    services:
-      postgres:
-        image: pgvector/pgvector:pg17
-        env:
-          POSTGRES_USER: web
-          POSTGRES_PASSWORD: web
-          POSTGRES_DB: web_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U web"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v6
 

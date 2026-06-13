@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/infodancer/web/contact/submissions"
@@ -10,16 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// newTestPool connects to the Postgres named by TEST_DATABASE_URL. The suite is
-// skipped when it is unset, so a plain `go test` without a database passes; CI
-// sets it to the workflow's Postgres service.
+// newTestPool connects to the suite's testcontainers Postgres (see TestMain).
+// The suite shares one database across components by design; each test
+// truncates its own tables.
 func newTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping Postgres integration test")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
+	pool, err := pgxpool.New(context.Background(), testDSN)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
