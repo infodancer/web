@@ -78,7 +78,7 @@ func get(t *testing.T, h http.Handler, target string) (*http.Response, string) {
 	h.ServeHTTP(rec, req)
 	res := rec.Result()
 	body, _ := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close()
 	return res, string(body)
 }
 

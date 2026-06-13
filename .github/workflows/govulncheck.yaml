@@ -12,13 +12,13 @@ permissions:
 jobs:
   govulncheck:
     name: Run govulncheck
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ci]
     env:
       GOWORK: "off"
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging]
+        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging, sitemap]
     steps:
       - uses: actions/checkout@v6
 

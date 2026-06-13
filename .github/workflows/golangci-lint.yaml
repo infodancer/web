@@ -12,13 +12,13 @@ permissions:
 jobs:
   golangci:
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ci]
     env:
       GOWORK: "off"
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging]
+        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging, sitemap]
     steps:
       - uses: actions/checkout@v6
 
@@ -31,3 +31,7 @@ jobs:
         with:
           version: v2.10.1
           working-directory: ${{ matrix.module }}
+          # The self-hosted ci runners share one host cache, so concurrent
+          # matrix jobs collide on golangci-lint's lock ("parallel golangci-lint
+          # is running"). This makes a job wait for the lock instead of failing.
+          args: --allow-parallel-runners
