@@ -266,11 +266,34 @@ So the build order is **extract, then adopt**:
    (urlset + auto-paginated sub-index) and `Index` (sitemapindex over child
    refs), parameterized by `Source` and `BaseURL` instead of faq's store.
 2. Refactor faq to mount the shared `Leaf` over a `faq.SitemapSource()` adapter
-   and delete its bespoke `handler_sitemap.go`. faq's behavior (including subsite
-   scoping, expressed as multiple sources or one source emitting all variants)
-   is preserved; the XML writer is no longer faq's to maintain.
+   and delete its bespoke `handler_sitemap.go`. **Deferred** -- see the finding
+   below.
 3. New consumers (sf catalog, blog, osg bestiary) mount leaves over their own
    sources.
+
+### Finding: faq's subsite model does not adopt cleanly (v0.1)
+
+Implementation surfaced a real mismatch. faq's sitemap is not a single source
+served as one leaf: it is a per-request **index over a dynamic set of subsites**
+(`ListSubsites` queried at request time), served through one `GET /sitemap/{name}`
+route that dispatches by parsing the name (`{N}` for the global corpus,
+`subsite-{slug}-{N}` for a subsite). The shared module's leaf has a fixed `Name`
+and fixed routes, and the shared index takes a static `Children` list at
+construction. Neither represents a runtime-varying family of sub-sitemaps.
+
+A faithful adoption needs two generalizations the v0.1 module deliberately does
+not have: a **dynamic children provider** on `Index` (a `func(ctx) ([]ChildRef,
+error)`), and a **parameterized leaf family** (one logical leaf addressing many
+runtime keys through a single dispatched route). Both are reasonable additions,
+but they are a design step, not a mechanical refactor, and adding them now would
+either bloat the module for one consumer's edge case or leave faq half-migrated.
+
+Crucially, **nothing downstream needs the faq refactor**: a host's root index
+just references faq's existing `/faq/sitemap.xml`, which faq already serves
+correctly. So faq adoption is decoupled from every other consumer and is held
+for a v0.2 design pass (tracked in infodancer/web#70). The module's `Leaf`/
+`Index` are still extractions of faq's proven XML output and pagination -- the
+global-corpus case maps directly; only the dynamic subsite layer is deferred.
 
 Every module that already feeds search has the enumeration a source needs --
 `blog.ReindexAll`, sf's `ListBooksForIndex` / `ListAuthorsForIndex` /
@@ -290,11 +313,14 @@ growing its own XML writer.
   smoke-probed routes (see section 4).
 - **Optional search projection.** Re-evaluate exposing the search index as an
   opt-in source for sites that genuinely want "everything indexed -> sitemap."
+- **faq subsite adoption.** The dynamic children + parameterized leaf
+  generalization from the section 5 finding (infodancer/web#70).
 
 ## 7. First consumer
 
 speculativefiction.org: a catalog leaf (`/sitemap-catalog.xml`) over the
-existing index queries, faq and blog leaves from their modules, and a root index
-at `/sitemap.xml`. Tracked in speculativefiction/sf#39. Cleaning up the stale
-2022 GSC sitemap and adding the robots.txt `Sitemap:` directive are deployment
-steps in that issue, outside this module.
+existing index queries, a blog leaf, faq's existing `/faq/sitemap.xml` referenced
+as-is (faq is not yet refactored onto the module -- see section 5), and a root
+index at `/sitemap.xml` listing all three. Tracked in speculativefiction/sf#39.
+Cleaning up the stale 2022 GSC sitemap and adding the robots.txt `Sitemap:`
+directive are deployment steps in that issue, outside this module.
