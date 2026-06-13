@@ -31,3 +31,7 @@ jobs:
         with:
           version: v2.10.1
           working-directory: ${{ matrix.module }}
+          # The self-hosted ci runners share one host cache, so concurrent
+          # matrix jobs collide on golangci-lint's lock ("parallel golangci-lint
+          # is running"). This makes a job wait for the lock instead of failing.
+          args: --allow-parallel-runners
