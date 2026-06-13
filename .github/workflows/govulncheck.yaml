@@ -12,7 +12,7 @@ permissions:
 jobs:
   govulncheck:
     name: Run govulncheck
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ci]
     env:
       GOWORK: "off"
     strategy:

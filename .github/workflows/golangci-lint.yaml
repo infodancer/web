@@ -12,7 +12,7 @@ permissions:
 jobs:
   golangci:
     name: lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ci]
     env:
       GOWORK: "off"
     strategy:
