@@ -5,7 +5,7 @@ version: '3'
 # within the module directory.
 
 vars:
-  MODULES: search notify blog contact newsletter media media/cmd/media-import faq timeline profile integration paging
+  MODULES: search notify blog contact newsletter media media/cmd/media-import faq timeline profile integration paging sitemap obs
 
 env:
   GOWORK: 'off'

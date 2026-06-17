@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging, sitemap]
+        module: [search, notify, blog, contact, newsletter, media, faq, timeline, integration, paging, sitemap, obs]
     steps:
       - uses: actions/checkout@v6
 

@@ -9,6 +9,7 @@ use (
 	./media/cmd/media-import
 	./newsletter
 	./notify
+	./obs
 	./paging
 	./profile
 	./search
