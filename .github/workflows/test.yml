@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [search, notify, blog, contact, newsletter, media, faq, timeline, profile, integration, paging, sitemap, obs]
+        module: [search, notify, blog, contact, newsletter, media, faq, timeline, profile, integration, paging, sitemap, obs, errnotice]
     steps:
       - uses: actions/checkout@v6
 
