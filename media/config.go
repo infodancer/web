@@ -1,7 +1,9 @@
 package media
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 )
 
@@ -102,6 +104,18 @@ type Config struct {
 	// thumbnails — the original is the only stored object. Validated by
 	// [NewHandler] and [Process]; see [ThumbnailSpec].
 	Thumbnails []ThumbnailSpec
+
+	// Logger receives structured logs for storage failures at the HTTP
+	// boundary. Defaults to [slog.Default]. Library code below the handler
+	// (the blob and metadata stores) stays silent and returns wrapped errors;
+	// the handler logs each failure once, here, then serves a sanitized 500.
+	Logger *slog.Logger
+
+	// RequestID extracts a correlation id from the request context for log
+	// lines, so a media failure ties to the same request across components. A
+	// host injects it (e.g. obs.RequestID); a nil extractor logs an empty id.
+	// media never requires a specific middleware.
+	RequestID func(ctx context.Context) string
 }
 
 // validThumbName reports whether s is a usable thumbnail spec name: the same

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -23,9 +24,11 @@ type objectStore interface {
 // content address to retrieve it. Build one with [NewHandler] and mount
 // [Handler.Routes] under a host-chosen path.
 type Handler struct {
-	store objectStore
-	blobs BlobStore
-	cfg   Config
+	store     objectStore
+	blobs     BlobStore
+	cfg       Config
+	log       *slog.Logger
+	requestID func(ctx context.Context) string
 }
 
 // NewHandler wires a metadata store, a blob store, and config into a handler.
@@ -36,7 +39,29 @@ func NewHandler(store objectStore, blobs BlobStore, cfg Config) (*Handler, error
 	if err := validateConfig(cfg); err != nil {
 		return nil, fmt.Errorf("media: NewHandler: %w", err)
 	}
-	return &Handler{store: store, blobs: blobs, cfg: cfg}, nil
+	log := cfg.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	requestID := cfg.RequestID
+	if requestID == nil {
+		requestID = func(context.Context) string { return "" }
+	}
+	return &Handler{store: store, blobs: blobs, cfg: cfg, log: log, requestID: requestID}, nil
+}
+
+// logFailure records a storage failure at the HTTP boundary with correlation
+// context. It is the single place media logs an error: the blob and metadata
+// stores stay silent and return wrapped errors, and the caller writes a
+// sanitized response after logging. hash is the object's content address (the
+// original or a variant), or "" when none is known yet.
+func (h *Handler) logFailure(ctx context.Context, op, hash string, err error) {
+	h.log.Error("media: "+op+" failed",
+		"err", err,
+		"request_id", h.requestID(ctx),
+		"category", h.cfg.Category,
+		"hash", hash,
+	)
 }
 
 // validateConfig checks the parts of Config that every storage entry point
@@ -126,6 +151,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	if err := h.blobs.Put(ctx, h.cfg.Category, processed.SHA256, processed.ContentType, processed.Bytes); err != nil {
+		h.logFailure(ctx, "blob put", processed.SHA256, err)
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
@@ -140,6 +166,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   time.Now().UTC(),
 	}
 	if err := h.store.Put(ctx, meta); err != nil {
+		h.logFailure(ctx, "metadata put", processed.SHA256, err)
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
@@ -151,6 +178,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	for _, t := range processed.Thumbnails {
 		if err := h.blobs.Put(ctx, h.cfg.Category, t.SHA256, t.ContentType, t.Bytes); err != nil {
+			h.logFailure(ctx, "variant blob put", t.SHA256, err)
 			http.Error(w, "storage error", http.StatusInternalServerError)
 			return
 		}
@@ -166,6 +194,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:   now,
 		}
 		if err := h.store.PutVariant(ctx, variant); err != nil {
+			h.logFailure(ctx, "variant metadata put", t.SHA256, err)
 			http.Error(w, "storage error", http.StatusInternalServerError)
 			return
 		}
@@ -200,6 +229,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		h.logFailure(r.Context(), "blob get", hash, err)
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}

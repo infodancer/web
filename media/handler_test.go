@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -276,6 +278,62 @@ func TestHandler_UploadStoreErrorIs500(t *testing.T) {
 	h.Routes().ServeHTTP(rec, uploadRequest(t, "image", pngBytes(t, 8, 8)))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+}
+
+type ridKey struct{}
+
+// A storage failure at the boundary must emit one structured ERROR log line
+// with correlation context (request id, category, hash, err) -- the gap this
+// module had before: a 500 with zero operator visibility.
+func TestHandler_StorageFailureLogs(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+	cfg := Config{
+		Category: "campaign",
+		Logger:   logger,
+		RequestID: func(ctx context.Context) string {
+			id, _ := ctx.Value(ridKey{}).(string)
+			return id
+		},
+	}
+	h, store, _ := newHandler(t, cfg)
+	store.putErr = errors.New("db down")
+
+	req := uploadRequest(t, "image", pngBytes(t, 8, 8))
+	req = req.WithContext(context.WithValue(req.Context(), ridKey{}, "rid-xyz"))
+	rec := httptest.NewRecorder()
+	h.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+	if buf.Len() == 0 {
+		t.Fatal("storage failure produced no log line")
+	}
+
+	line := bytes.SplitN(buf.Bytes(), []byte("\n"), 2)[0]
+	var entry map[string]any
+	if err := json.Unmarshal(line, &entry); err != nil {
+		t.Fatalf("log line not JSON: %v (%s)", err, line)
+	}
+	if entry["level"] != "ERROR" {
+		t.Errorf("level = %v, want ERROR", entry["level"])
+	}
+	if msg, _ := entry["msg"].(string); !strings.HasPrefix(msg, "media: ") {
+		t.Errorf("msg = %q, want a \"media: \" prefix", msg)
+	}
+	if entry["request_id"] != "rid-xyz" {
+		t.Errorf("request_id = %v, want rid-xyz", entry["request_id"])
+	}
+	if entry["category"] != "campaign" {
+		t.Errorf("category = %v, want campaign", entry["category"])
+	}
+	if h, _ := entry["hash"].(string); h == "" {
+		t.Error("hash field missing; want the object content address")
+	}
+	if entry["err"] == nil {
+		t.Error("err field missing")
 	}
 }
 
