@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -17,7 +16,7 @@ type indexData struct {
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	timelines, err := s.store.ListPublicTimelines(r.Context())
 	if err != nil {
-		log.Printf("list timelines: %v", err)
+		s.logger(r).Error("list timelines", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -93,6 +92,7 @@ func assignLanes(categories []db.TimelineCategory) ([]laneAssignment, int, int) 
 }
 
 func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger(r)
 	slug := r.PathValue("slug")
 
 	tl, err := s.store.GetTimeline(r.Context(), slug)
@@ -107,21 +107,23 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 
 	categories, err := s.store.ListCategories(r.Context(), tl.ID)
 	if err != nil {
-		log.Printf("list categories: %v", err)
+		logger.Error("list categories", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	eventCount, err := s.store.CountEventsByTimeline(r.Context(), tl.ID)
 	if err != nil {
-		log.Printf("count events: %v", err)
+		logger.Error("count events", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	bounds, err := s.store.GetTimelineDateBounds(r.Context(), tl.ID)
 	if err != nil {
-		log.Printf("get date bounds: %v", err)
+		// Degraded: missing bounds fall back to a default start date; the page
+		// still renders.
+		logger.Warn("get date bounds", "err", err)
 	}
 
 	var minDateStr, maxDateStr string
@@ -142,14 +144,15 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 		MaxResults:     50,
 	})
 	if err != nil {
-		log.Printf("list initial events: %v", err)
+		logger.Error("list initial events", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	tags, err := s.store.ListTags(r.Context(), tl.ID)
 	if err != nil {
-		log.Printf("list tags: %v", err)
+		// Degraded: the timeline renders without its tag filter list.
+		logger.Warn("list tags", "err", err)
 	}
 
 	lanes, leftCount, rightCount := assignLanes(categories)

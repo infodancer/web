@@ -7,6 +7,7 @@
 package handler
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -38,8 +39,9 @@ type Deps struct {
 	Store     *store.Store              // required
 	Resolver  timelineuser.UserResolver // required
 	Logger    *slog.Logger
-	BasePath  string // mount prefix, e.g. "/timeline"
-	BaseURL   string // public base URL for absolute SEO links
+	RequestID func(context.Context) string // extracts a correlation id for log lines; nil logs an empty id
+	BasePath  string                       // mount prefix, e.g. "/timeline"
+	BaseURL   string                       // public base URL for absolute SEO links
 	SignInURL string
 	SiteName  string
 	HomeURL   string
@@ -54,6 +56,7 @@ type Server struct {
 	store     *store.Store
 	resolver  timelineuser.UserResolver
 	log       *slog.Logger
+	requestID func(context.Context) string
 	basePath  string
 	baseURL   string
 	signInURL string
@@ -79,6 +82,10 @@ func New(d Deps) (*Server, error) {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
+	requestID := d.RequestID
+	if requestID == nil {
+		requestID = func(context.Context) string { return "" }
+	}
 	if d.BasePath == "" {
 		d.BasePath = "/timeline"
 	}
@@ -96,6 +103,7 @@ func New(d Deps) (*Server, error) {
 		store:     d.Store,
 		resolver:  d.Resolver,
 		log:       d.Logger,
+		requestID: requestID,
 		basePath:  d.BasePath,
 		baseURL:   d.BaseURL,
 		signInURL: d.SignInURL,
@@ -117,6 +125,13 @@ func New(d Deps) (*Server, error) {
 // middleware. Mount it at the configured BasePath with http.StripPrefix.
 func (s *Server) Routes() http.Handler {
 	return s.resolveUserMiddleware(s.mux)
+}
+
+// logger returns a request-scoped logger carrying the request's correlation id,
+// so every line for one request shares a request_id across components. The id
+// comes from the injected extractor (empty when the host sets nothing).
+func (s *Server) logger(r *http.Request) *slog.Logger {
+	return s.log.With("request_id", s.requestID(r.Context()))
 }
 
 func (s *Server) registerRoutes() {

@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -26,6 +27,12 @@ type Config struct {
 	// Logger is used for module-level structured logging. Defaults to
 	// [slog.Default].
 	Logger *slog.Logger
+
+	// RequestID extracts a correlation id from the request context for handler
+	// log lines, so a timeline failure ties to the same request across the
+	// components a host mounts. A host injects it (e.g. obs.RequestID); a nil
+	// extractor logs an empty id. timeline never requires a specific middleware.
+	RequestID func(ctx context.Context) string
 
 	// BasePath is the URL prefix the module is mounted at (e.g. "/timeline").
 	// Used for link generation. Defaults to "/timeline".

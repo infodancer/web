@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/infodancer/web/timeline/db"
@@ -38,7 +37,8 @@ func (s *Server) handlePersonProfile(w http.ResponseWriter, r *http.Request) {
 
 	events, err := s.store.ListPersonEvents(r.Context(), person.ID)
 	if err != nil {
-		log.Printf("list person events: %v", err)
+		// Degraded: the profile renders without the person's event list.
+		s.logger(r).Warn("list person events", "err", err)
 	}
 
 	s.renderPage(w, r, "person_profile.gohtml", personProfileData{
@@ -68,7 +68,7 @@ func (s *Server) handlePeopleList(w http.ResponseWriter, r *http.Request) {
 
 	people, err := s.store.ListPeople(r.Context(), tl.ID)
 	if err != nil {
-		log.Printf("list people: %v", err)
+		s.logger(r).Error("list people", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

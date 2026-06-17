@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -72,7 +71,7 @@ func (s *Server) handleEventRange(w http.ResponseWriter, r *http.Request) {
 		pgd := pgtype.Date{Time: d, Valid: true}
 		events, err = s.fetchEventsBefore(ctx, tl.ID, pgd, cursorSort, limit, categoryID, tagID)
 		if err != nil {
-			log.Printf("list events before: %v", err)
+			s.logger(r).Error("list events before", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -89,7 +88,7 @@ func (s *Server) handleEventRange(w http.ResponseWriter, r *http.Request) {
 		pgd := pgtype.Date{Time: d, Valid: true}
 		events, err = s.fetchEventsAfter(ctx, tl.ID, pgd, cursorSort, limit, categoryID, tagID)
 		if err != nil {
-			log.Printf("list events after: %v", err)
+			s.logger(r).Error("list events after", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -125,24 +124,27 @@ func (s *Server) handleEventDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Each related list below is best-effort: a failure logs and the detail
+	// page still renders with whatever loaded.
+	logger := s.logger(r)
 	tags, err := s.store.ListEventTags(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list event tags: %v", err)
+		logger.Warn("list event tags", "err", err)
 	}
 
 	people, err := s.store.ListEventPeople(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list event people: %v", err)
+		logger.Warn("list event people", "err", err)
 	}
 
 	linkedEvents, err := s.store.ListLinkedEvents(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list linked events: %v", err)
+		logger.Warn("list linked events", "err", err)
 	}
 
 	sources, err := s.store.ListEventSources(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list event sources: %v", err)
+		logger.Warn("list event sources", "err", err)
 	}
 
 	s.renderPage(w, r, "event_detail.gohtml", eventDetailData{
@@ -179,24 +181,27 @@ func (s *Server) handleEventInline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Each related list below is best-effort: a failure logs and the inline
+	// fragment still renders with whatever loaded.
+	logger := s.logger(r)
 	tags, err := s.store.ListEventTags(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list event tags: %v", err)
+		logger.Warn("list event tags", "err", err)
 	}
 
 	people, err := s.store.ListEventPeople(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list event people: %v", err)
+		logger.Warn("list event people", "err", err)
 	}
 
 	linkedEvents, err := s.store.ListLinkedEvents(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list linked events: %v", err)
+		logger.Warn("list linked events", "err", err)
 	}
 
 	sources, err := s.store.ListEventSources(r.Context(), event.ID)
 	if err != nil {
-		log.Printf("list event sources: %v", err)
+		logger.Warn("list event sources", "err", err)
 	}
 
 	s.renderPartial(w, "event_inline.gohtml", eventDetailData{
