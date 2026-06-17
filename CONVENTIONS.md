@@ -67,6 +67,87 @@ and mount path from the host.
 - Components are visibly secure by design — CSRF protection on state-changing
   form posts, anti-abuse on public intake, no secrets in the repo.
 
+## Logging and error reporting
+
+Several components mount into one site and share a single log stream, so they
+log the same way or the stream is useless. The rules:
+
+- **`log/slog` only.** No stdlib `log`, no `fmt.Print*` for diagnostics. A
+  component never calls `slog.Default()` directly in its logic -- it takes a
+  `*slog.Logger` on its `Config` and falls back to `slog.Default()` once, in the
+  constructor, if the host passed nil.
+- **Inject, don't reach.** The host owns logger setup (handler, level, output).
+  Components receive the logger through `Config`/`Deps` and pass it down to
+  sub-components; no package-level or ad-hoc logger fields.
+- **Log at the boundary, wrap below it.** Library and store code returns wrapped
+  errors (`fmt.Errorf("component: doing x: %w", err)`) and stays silent. The
+  HTTP handler -- the boundary -- is where an error gets logged, exactly once,
+  then turned into a sanitized client response. Don't log-and-return the same
+  error at multiple layers; that produces duplicate lines for one failure.
+- **Structured fields, never interpolation.** `s.log.Error("save submission",
+  "err", err, "ip", ip)`, not `log.Printf("save failed for %s: %v", ip, err)`.
+  The message is a short stable operation name; everything variable is a
+  key/value field so it is filterable in aggregation.
+- **Levels mean something.**
+  - `ERROR` -- the request failed or a write was lost; an operator needs to know.
+  - `WARN` -- degraded but the request still succeeded (a best-effort sync
+    failed, a confirmation email bounced, a buffer dropped an event). Comment the
+    intentional swallow at the call site.
+  - `INFO` -- notable operational or security events (honeypot trip, delivery
+    success), not routine per-request chatter.
+- **Every handler log carries the request id.** Handlers derive a scoped logger
+  at entry (`logger := s.log.With("request_id", reqID)`) so every line for one
+  request shares an id across components. A component reads the id from the
+  request context through an injectable extractor (`func(context.Context)
+  string`) defaulting to a documented key -- it never requires a specific
+  middleware. If the host sets nothing, the id is empty and everything still
+  works. This is the only request-scoped contract a reusable component carries.
+- **Never leak internals to the client.** The client gets a generic message and,
+  where practical, the request id (so "I got a 500, id abc123" maps to the log
+  line). Error detail, SQL, and stack context stay in the log.
+- **Sanctioned swallows are explicit.** `defer func() { _ = tx.Rollback(ctx) }()`
+  and `_ = w.Write(body)` after headers are sent are fine. Any other ignored
+  error needs a comment saying why.
+
+Domain-level sentinel errors (`ErrNotFound`, `ErrSlugTaken`, ...) live in the
+store package and are matched with `errors.Is`; handlers branch on them to pick
+a status code rather than string-matching messages.
+
+### Beyond logs: error notices and alerting
+
+Logs that nobody reads do not tell a solo operator the site is throwing 500s.
+Recording a failure and waking someone up about it are separate jobs with
+separate mechanisms. Crucially, **none of this lives in a component.** A
+reusable component depends only on its injected logger and db; it logs
+structured `ERROR` at its boundary and is done. Everything below is opt-in host
+glue -- a consumer who just mounts the handler gets full logs and owes nothing.
+
+Three tiers, dependencies pointing inward only:
+
+1. **The component (reusable).** Logger + db injected, returns an
+   `http.Handler`. Logs structured `ERROR` with operation, error, and request id.
+   Knows nothing of reporters, the `notify` module, `error_notices`, ntfy, or
+   Prometheus. Mountable standalone in any third-party site.
+2. **Shared obs middleware (suite glue, optional for outsiders).** A separate
+   package -- not any component's `Config`. It owns the request-id assignment,
+   the `recover()` + response-status capture that wraps a mounted handler, the
+   Prometheus request counter, and the `ErrorReporter` *interface*. A 5xx or
+   panic is the trigger -- the status code is ground truth, so no component has
+   to decide what is "report-worthy." A consumer opts in by wrapping the
+   handler; a third party can use it, substitute their own, or skip it.
+3. **Suite reporter implementation (ours alone).** An `ErrorReporter` that
+   UPSERTs an `error_notices` row keyed by a fingerprint
+   (`hash(component, operation, normalized error)`) -- so a crash loop is one row
+   with a rising count, not thousands -- and emits a `notify` event so the admin
+   feed surfaces recent errors in-app. Lives in the host site, never visible to a
+   component.
+
+Alerting stays out of process entirely: the tier-2 counter feeds a Prometheus
+alert on the 5xx rate, routed through Alertmanager to a push transport
+(ntfy/Pushover). Throttling, grouping, and inhibition are Alertmanager's job --
+nothing here hand-rolls alert rate limiting. The push says "web is 500ing"; the
+`error_notices` row (joined by request id) is where you triage.
+
 ## Presentation
 
 Page chrome comes from [`infodancer/ui`](https://github.com/infodancer/ui).
