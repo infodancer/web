@@ -12,7 +12,12 @@ conventions.
 - **Build tool**: [Task](https://taskfile.dev/). Root `Taskfile.yml` fans out
   across modules; module-specific tasks live in the module's own `Taskfile.yml`.
 - **Lint**: `golangci-lint` v2.10.1 (pinned in CI). Build it with a Go toolchain
-  at least as new as the module's `go` directive.
+  at least as new as the module's `go` directive. **One config governs the whole
+  suite**: a single root `.golangci.yml` (golangci-lint discovers it by walking
+  up from each module dir). Do not add per-module `.golangci.yml` files -- tune
+  the root one so every module lints identically. The enabled set includes
+  `gosec` everywhere; the rationale for any disabled rule or exclusion lives in
+  that file.
 - **Vulnerabilities**: `govulncheck` on every module.
 - **Migrations**: [goose](https://github.com/pressly/goose). Each component owns
   a **distinct goose version table** (`<component>_goose_db_version`) so multiple

@@ -77,7 +77,7 @@ func TestMain(m *testing.M) {
 
 func runMigrations(pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	goose.SetBaseFS(os.DirFS("../../migrations"))
 	goose.SetLogger(goose.NopLogger())
@@ -142,7 +142,7 @@ func pgDate(year int, month time.Month, day int) time.Time {
 // withStderrLogger swaps the test's discardLogger for one that writes
 // to stderr. Use sparingly — bare freshServer should stay quiet so test
 // output isn't polluted; pass this option when debugging a 500.
-func withStderrLogger(t *testing.T) func(*handler.Deps) {
+func withStderrLogger(t *testing.T) func(*handler.Deps) { //nolint:unused // documented debug helper, kept for diagnosing a 500 in tests
 	t.Helper()
 	return func(d *handler.Deps) {
 		d.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))

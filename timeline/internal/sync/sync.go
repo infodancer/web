@@ -259,7 +259,7 @@ func findSiblingImage(cuePath string) string {
 // blob store keyed by content hash, records metadata, and returns the URL the
 // handler serves it from.
 func (r *Runner) processPersonImage(tlID int64, personSlug, imgPath string) (string, error) {
-	f, err := os.Open(imgPath)
+	f, err := os.Open(imgPath) //nolint:gosec // G304: imgPath comes from an operator-authored CUE import tree, not request input
 	if err != nil {
 		return "", err
 	}
@@ -451,7 +451,7 @@ func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map
 // ---- Helpers ----
 
 func readCUEFile(cctx *cue.Context, path string) ([]byte, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: path comes from an operator-authored CUE import tree, not request input
 	if err != nil {
 		return nil, err
 	}

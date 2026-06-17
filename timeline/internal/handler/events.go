@@ -31,7 +31,7 @@ func (s *Server) handleEventRange(w http.ResponseWriter, r *http.Request) {
 
 	limit := int32(50)
 	if limitStr != "" {
-		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 200 {
+		if n, err := strconv.ParseInt(limitStr, 10, 32); err == nil && n > 0 && n <= 200 {
 			limit = int32(n)
 		}
 	}
@@ -54,7 +54,7 @@ func (s *Server) handleEventRange(w http.ResponseWriter, r *http.Request) {
 	cursorSortStr := q.Get("cursor_sort")
 	cursorSort := int32(0)
 	if cursorSortStr != "" {
-		if n, err := strconv.Atoi(cursorSortStr); err == nil {
+		if n, err := strconv.ParseInt(cursorSortStr, 10, 32); err == nil {
 			cursorSort = int32(n)
 		}
 	}

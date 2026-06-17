@@ -1,0 +1,61 @@
+# Single source of truth for the whole infodancer/web suite. golangci-lint is
+# run per module in CI (each module builds against its own go.mod with
+# GOWORK=off), and a root config is discovered by walking up from the module
+# dir -- so this one file governs every module. Do not add per-module
+# .golangci.yml files; tune here.
+version: "2"
+
+run:
+  timeout: 5m
+  # Lint integration-tagged files too, so issues there can't slip past CI. The
+  # tag is harmless for modules without integration-tagged files.
+  build-tags:
+    - integration
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - revive
+  settings:
+    gosec:
+      excludes:
+        # G706 (log-injection taint): low severity (diagnostic-log fields are
+        # already %q-escaped so control chars can't forge log lines) and its
+        # taint pass is noisy and non-deterministic -- it surfaces a different
+        # subset of call sites each run, which makes per-line nolint flaky.
+        - G706
+    revive:
+      rules:
+        # unused-parameter is idiomatic noise: interface implementations and
+        # http.HandlerFunc signatures legitimately carry parameters they don't
+        # use. Disable suite-wide rather than rename dozens to _.
+        - name: unused-parameter
+          disabled: true
+  # prealloc is intentionally not enabled: low-value micro-optimization.
+  exclusions:
+    rules:
+      # bodyclose targets long-running production response-body leaks; in test
+      # code the process is ephemeral, and test request helpers routinely hand
+      # back an already-drained *http.Response that the analyzer flags anyway.
+      # Keep bodyclose strict for production code; exempt tests.
+      - linters:
+          - bodyclose
+        path: _test\.go
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

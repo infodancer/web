@@ -172,7 +172,7 @@ func (s *Server) handlePortrait(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) //nolint:gosec // G705: data is a stored, content-typed asset (portrait bytes), not request-derived HTML
 }
 
 // renderPage renders a full page (templates/pages/<page>) wrapped in the base

@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 
 func runMigrations(pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	goose.SetBaseFS(os.DirFS("../migrations"))
 	goose.SetLogger(goose.NopLogger())

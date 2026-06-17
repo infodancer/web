@@ -48,7 +48,7 @@ func (s *Server) handleIdenticon(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	_, _ = w.Write(identicon.Generate(p.Handle))
+	_, _ = w.Write(identicon.Generate(p.Handle)) //nolint:gosec // G705: identicon PNG bytes served with nosniff + restrictive CSP, not request-derived HTML
 }
 
 // profileForHandle resolves the {handle} path value to a profile, writing a
