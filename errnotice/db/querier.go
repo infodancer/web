@@ -11,7 +11,7 @@ import (
 type Querier interface {
 	// The admin "recent errors" view: the most recently active failures first,
 	// index-backed by error_notices_last_seen_idx.
-	ListRecent(ctx context.Context, limit int32) ([]ListRecentRow, error)
+	ListRecent(ctx context.Context, limit int32) ([]ErrorNotices, error)
 	// Record one occurrence of a failure. The first occurrence inserts the row;
 	// repeats (same fingerprint) bump count and advance last_seen, refreshing the
 	// last-occurrence fields (request_id, status, method, path, panic_value, stack)

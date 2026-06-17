@@ -18,32 +18,17 @@ ORDER BY last_seen DESC, id DESC
 LIMIT $1
 `
 
-type ListRecentRow struct {
-	ID          int64
-	Fingerprint string
-	RequestID   string
-	Component   string
-	Method      string
-	Path        string
-	Status      int32
-	PanicValue  string
-	Stack       string
-	FirstSeen   time.Time
-	LastSeen    time.Time
-	Count       int64
-}
-
 // The admin "recent errors" view: the most recently active failures first,
 // index-backed by error_notices_last_seen_idx.
-func (q *Queries) ListRecent(ctx context.Context, limit int32) ([]ListRecentRow, error) {
+func (q *Queries) ListRecent(ctx context.Context, limit int32) ([]ErrorNotices, error) {
 	rows, err := q.db.Query(ctx, listRecent, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListRecentRow
+	var items []ErrorNotices
 	for rows.Next() {
-		var i ListRecentRow
+		var i ErrorNotices
 		if err := rows.Scan(
 			&i.ID,
 			&i.Fingerprint,
