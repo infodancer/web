@@ -216,7 +216,7 @@ func (s *Server) renderPageWith(w http.ResponseWriter, r *http.Request, page str
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	if _, err := w.Write(out); err != nil {
+	if _, err := w.Write(out); err != nil { //nolint:gosec // G705: out is server-rendered template HTML, not request-derived markup
 		s.log.Warn("render: write", "page", page, "err", err)
 	}
 }

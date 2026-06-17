@@ -134,7 +134,7 @@ func Import(ctx context.Context, q *db.Queries, slug string, data TimelineExport
 			Slug:       c.Slug,
 			Name:       c.Name,
 			Color:      color,
-			SortOrder:  int32(c.SortOrder),
+			SortOrder:  int32(c.SortOrder), //nolint:gosec // G115: SortOrder is operator-authored import data, inherently small
 		})
 		if err != nil {
 			return stats, fmt.Errorf("category %q: %w", c.Slug, err)
@@ -204,7 +204,7 @@ func Import(ctx context.Context, q *db.Queries, slug string, data TimelineExport
 			EventDate:     pgtype.Date{Time: d, Valid: true},
 			EventEndDate:  parseDate(ev.EndDate),
 			DatePrecision: precision,
-			SortOrder:     int32(ev.SortOrder),
+			SortOrder:     int32(ev.SortOrder), //nolint:gosec // G115: SortOrder is operator-authored import data, inherently small
 		}
 		if ev.Category != "" {
 			if catID, ok := catMap[ev.Category]; ok {

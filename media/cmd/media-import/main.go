@@ -237,7 +237,7 @@ func fetchURL(ctx context.Context, rawURL string, timeout time.Duration) (io.Rea
 		cancel()
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: URL is an operator-supplied CLI argument (scheme already validated); this is an admin import tool, not a network-facing handler
 	if err != nil {
 		cancel()
 		return nil, err
