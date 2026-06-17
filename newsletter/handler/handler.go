@@ -79,6 +79,14 @@ func (h *Subscribe) logger(ctx context.Context) *slog.Logger {
 	return log.With("request_id", reqID)
 }
 
+// writeMessage writes a fixed HTML response fragment. The Msg* fields are set
+// at construction from trusted operator config, never from request input, so
+// they are safe to write to a text/html response (the submitted email is never
+// echoed back). Centralized so the one gosec G705 taint suppression lives here.
+func writeMessage(w http.ResponseWriter, msg string) {
+	_, _ = w.Write([]byte(msg)) //nolint:gosec // G705: static operator-configured message constant, not request-derived
+}
+
 func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -97,7 +105,7 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	email := r.FormValue("email")
 	if email == "" {
-		_, _ = w.Write([]byte(h.MsgEmpty))
+		writeMessage(w, h.MsgEmpty)
 		return
 	}
 
@@ -106,14 +114,14 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// usable mail domain. INFO so an operator can spot abuse patterns without
 		// it polluting the error stream.
 		log.Info("mx validation rejected", "email", email, "err", err)
-		_, _ = w.Write([]byte(h.MsgInvalidDomain))
+		writeMessage(w, h.MsgInvalidDomain)
 		return
 	}
 
 	isNew, err := h.Store.Insert(email)
 	if err != nil {
 		log.Error("insert subscriber", "email", email, "err", err)
-		_, _ = w.Write([]byte(h.MsgError))
+		writeMessage(w, h.MsgError)
 		return
 	}
 
@@ -131,9 +139,9 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !isNew {
-		_, _ = w.Write([]byte(h.MsgDupe))
+		writeMessage(w, h.MsgDupe)
 		return
 	}
 
-	_, _ = w.Write([]byte(h.MsgSuccess))
+	writeMessage(w, h.MsgSuccess)
 }
