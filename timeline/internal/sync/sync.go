@@ -20,7 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,6 +46,7 @@ type Runner struct {
 	blobs    media.BlobStore // optional; nil disables portrait ingestion
 	objects  *media.Store    // optional; portrait metadata
 	basePath string          // mount prefix, used to build portrait URLs
+	log      *slog.Logger
 	ctx      context.Context
 	dir      string
 	stats    Stats
@@ -62,9 +63,13 @@ type Stats struct {
 	Images     int
 }
 
-// New constructs a Runner over the given queries and optional media stores.
-func New(queries *db.Queries, blobs media.BlobStore, objects *media.Store, basePath string) *Runner {
-	return &Runner{queries: queries, blobs: blobs, objects: objects, basePath: basePath}
+// New constructs a Runner over the given queries and optional media stores. A
+// nil logger falls back to [slog.Default]; sync owns no package-level logger.
+func New(queries *db.Queries, blobs media.BlobStore, objects *media.Store, basePath string, logger *slog.Logger) *Runner {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Runner{queries: queries, blobs: blobs, objects: objects, basePath: basePath, log: logger}
 }
 
 // Run reads the CUE tree at dir and upserts it.
@@ -77,7 +82,7 @@ func (r *Runner) Run(ctx context.Context, dir string) (Stats, error) {
 	if err != nil {
 		return r.stats, fmt.Errorf("sync timeline: %w", err)
 	}
-	log.Printf("sync: timeline %q (id=%d)", tl.Slug, tl.ID)
+	r.log.Info("sync timeline", "slug", tl.Slug, "id", tl.ID)
 
 	catMap, err := r.syncCategories(cctx, tl.ID)
 	if err != nil {
@@ -141,12 +146,14 @@ func (r *Runner) syncCategories(cctx *cue.Context, tlID int64) (map[string]int64
 	for _, f := range files {
 		data, err := readCUEFile(cctx, f)
 		if err != nil {
-			log.Printf("sync: skip %s: %v", f, err)
+			// Best-effort: skip an unreadable file and continue the run.
+			r.log.Warn("sync skip file", "file", f, "err", err)
 			continue
 		}
 		var c categoryCUE
 		if err := json.Unmarshal(data, &c); err != nil {
-			log.Printf("sync: skip %s: %v", f, err)
+			// Best-effort: skip a malformed category and continue the run.
+			r.log.Warn("sync skip file", "file", f, "err", err)
 			continue
 		}
 		if c.Color == "" {
@@ -160,7 +167,8 @@ func (r *Runner) syncCategories(cctx *cue.Context, tlID int64) (map[string]int64
 			SortOrder:  c.SortOrder,
 		})
 		if err != nil {
-			log.Printf("sync: category %s: %v", c.Slug, err)
+			// Best-effort: skip a category that fails to upsert and continue.
+			r.log.Warn("sync upsert category", "slug", c.Slug, "err", err)
 			continue
 		}
 		catMap[c.Slug] = cat.ID
@@ -187,12 +195,14 @@ func (r *Runner) syncPeople(cctx *cue.Context, tlID int64) (map[string]int64, er
 	for _, f := range files {
 		data, err := readCUEFile(cctx, f)
 		if err != nil {
-			log.Printf("sync: skip %s: %v", f, err)
+			// Best-effort: skip an unreadable file and continue the run.
+			r.log.Warn("sync skip file", "file", f, "err", err)
 			continue
 		}
 		var p personCUE
 		if err := json.Unmarshal(data, &p); err != nil {
-			log.Printf("sync: skip %s: %v", f, err)
+			// Best-effort: skip a malformed person and continue the run.
+			r.log.Warn("sync skip file", "file", f, "err", err)
 			continue
 		}
 
@@ -203,7 +213,9 @@ func (r *Runner) syncPeople(cctx *cue.Context, tlID int64) (map[string]int64, er
 			if imgPath := findSiblingImage(f); imgPath != "" {
 				photoURL, err := r.processPersonImage(tlID, p.Slug, imgPath)
 				if err != nil {
-					log.Printf("sync: image for %s: %v", p.Slug, err)
+					// Best-effort: a portrait that fails to process leaves the
+					// person's existing photo_url untouched; the sync continues.
+					r.log.Warn("sync person image", "slug", p.Slug, "err", err)
 				} else {
 					p.PhotoURL = photoURL
 				}
@@ -221,7 +233,8 @@ func (r *Runner) syncPeople(cctx *cue.Context, tlID int64) (map[string]int64, er
 			PhotoUrl:   p.PhotoURL,
 		})
 		if err != nil {
-			log.Printf("sync: person %s: %v", p.Slug, err)
+			// Best-effort: skip a person that fails to upsert and continue.
+			r.log.Warn("sync upsert person", "slug", p.Slug, "err", err)
 			continue
 		}
 		personMap[p.Slug] = person.ID
@@ -330,12 +343,14 @@ func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map
 	for _, f := range files {
 		data, err := readCUEFile(cctx, f)
 		if err != nil {
-			log.Printf("sync: skip %s: %v", f, err)
+			// Best-effort: skip an unreadable file and continue the run.
+			r.log.Warn("sync skip file", "file", f, "err", err)
 			continue
 		}
 		var e eventCUE
 		if err := json.Unmarshal(data, &e); err != nil {
-			log.Printf("sync: skip %s: %v", f, err)
+			// Best-effort: skip a malformed event and continue the run.
+			r.log.Warn("sync skip file", "file", f, "err", err)
 			continue
 		}
 		if e.DatePrecision == "" {
@@ -362,7 +377,8 @@ func (r *Runner) syncEvents(cctx *cue.Context, tlID int64, catMap, personMap map
 			CategoryID:    catID,
 		})
 		if err != nil {
-			log.Printf("sync: event %s: %v", e.Slug, err)
+			// Best-effort: skip an event that fails to upsert and continue.
+			r.log.Warn("sync upsert event", "slug", e.Slug, "err", err)
 			continue
 		}
 		eventMap[e.Slug] = evt.ID

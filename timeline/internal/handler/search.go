@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"strings"
 
@@ -43,7 +42,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		MaxResults: 50,
 	})
 	if err != nil {
-		log.Printf("search events: %v", err)
+		s.logger(r).Error("search events", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

@@ -1,7 +1,10 @@
 package timeline_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -199,6 +202,77 @@ func TestExportForbiddenForAnonymous(t *testing.T) {
 	}
 	if _, code := get(t, srv, basePath+"/t/test/export"); code != http.StatusUnauthorized {
 		t.Errorf("anon export: code=%d, want 401", code)
+	}
+}
+
+// ridKey types the request-id context value the test injects, standing in for a
+// host's obs middleware.
+type ridKey struct{}
+
+// TestHandlerErrorLogsAreStructured proves a handler failure logs a structured
+// slog ERROR carrying the operation name and the injected request_id, per the
+// suite logging conventions. It forces the failure by closing the pool out from
+// under a query, then asserts the captured JSON log line.
+func TestHandlerErrorLogsAreStructured(t *testing.T) {
+	// Own the pool directly: this test closes it mid-flight to force a query
+	// error, so it must not also be closed by newPool's t.Cleanup (pgxpool
+	// panics on a double close).
+	pool, err := pgxpool.New(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	m, err := timeline.New(timeline.Config{
+		DB:       pool,
+		Resolver: resolver{u: nil},
+		BasePath: basePath,
+		Logger:   logger,
+		RequestID: func(ctx context.Context) string {
+			id, _ := ctx.Value(ridKey{}).(string)
+			return id
+		},
+		AutoMigrate: true,
+	})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+
+	// Close the pool so the next query fails: ListPublicTimelines errors and the
+	// index handler logs once, then serves a 500.
+	pool.Close()
+
+	srv := mount(m)
+	req := httptest.NewRequest(http.MethodGet, basePath+"/", nil)
+	req = req.WithContext(context.WithValue(req.Context(), ridKey{}, "rid-xyz"))
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+	if buf.Len() == 0 {
+		t.Fatal("handler failure produced no log line")
+	}
+
+	line := bytes.SplitN(buf.Bytes(), []byte("\n"), 2)[0]
+	var entry map[string]any
+	if err := json.Unmarshal(line, &entry); err != nil {
+		t.Fatalf("log line not JSON: %v (%s)", err, line)
+	}
+	if entry["level"] != "ERROR" {
+		t.Errorf("level = %v, want ERROR", entry["level"])
+	}
+	if entry["msg"] != "list timelines" {
+		t.Errorf("msg = %v, want \"list timelines\"", entry["msg"])
+	}
+	if entry["request_id"] != "rid-xyz" {
+		t.Errorf("request_id = %v, want rid-xyz", entry["request_id"])
+	}
+	if entry["err"] == nil {
+		t.Error("err field missing")
 	}
 }
 

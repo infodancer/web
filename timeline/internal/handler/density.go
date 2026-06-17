@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 )
 
@@ -27,7 +26,7 @@ func (s *Server) handleDensity(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := s.store.GetEventDensityByYear(r.Context(), tl.ID)
 	if err != nil {
-		log.Printf("get density: %v", err)
+		s.logger(r).Error("get density", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -47,6 +46,8 @@ func (s *Server) handleDensity(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	if err := json.NewEncoder(w).Encode(buckets); err != nil {
-		log.Printf("encode density: %v", err)
+		// Response already started (200 + headers written); nothing to recover,
+		// so record it and move on.
+		s.logger(r).Warn("encode density", "err", err)
 	}
 }

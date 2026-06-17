@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 // handleExport streams a timeline as the JSON interchange document. Admin-only:
 // the route is registered behind requireAdmin.
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger(r)
 	slug := r.PathValue("slug")
 	ctx := r.Context()
 
@@ -27,7 +27,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 
 	categories, err := s.store.ListCategories(ctx, tl.ID)
 	if err != nil {
-		log.Printf("export categories: %v", err)
+		logger.Error("export categories", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -50,7 +50,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		MaxResults:     100000,
 	})
 	if err != nil {
-		log.Printf("export events: %v", err)
+		logger.Error("export events", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -103,7 +103,8 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 
 	allPeople, err := s.store.ListPeople(ctx, tl.ID)
 	if err != nil {
-		log.Printf("export people: %v", err)
+		// Degraded: the export omits people rather than failing the download.
+		logger.Warn("export people", "err", err)
 	}
 	var peopleJSON []transfer.Person
 	for _, p := range allPeople {
@@ -159,6 +160,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(export); err != nil {
-		log.Printf("export encode: %v", err)
+		// Response already started (headers written); record and move on.
+		logger.Warn("export encode", "err", err)
 	}
 }

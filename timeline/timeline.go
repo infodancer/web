@@ -65,6 +65,7 @@ func New(cfg Config) (*Module, error) {
 		Store:     m.store,
 		Resolver:  cfg.Resolver,
 		Logger:    cfg.Logger,
+		RequestID: cfg.RequestID,
 		BasePath:  cfg.BasePath,
 		BaseURL:   cfg.BaseURL,
 		SignInURL: cfg.SignInURL,
@@ -113,7 +114,7 @@ func (m *Module) Migrate(ctx context.Context) error {
 // timeline it describes. Sibling portrait images are stored through the
 // configured media blob store. See the [sync] package for the directory layout.
 func (m *Module) Sync(ctx context.Context, dir string) (sync.Stats, error) {
-	runner := sync.New(m.store.Queries, m.cfg.Blobs, m.cfg.Objects, m.cfg.BasePath)
+	runner := sync.New(m.store.Queries, m.cfg.Blobs, m.cfg.Objects, m.cfg.BasePath, m.cfg.Logger)
 	return runner.Run(ctx, dir)
 }
 

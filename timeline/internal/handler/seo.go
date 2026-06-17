@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/xml"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -27,6 +26,7 @@ type sitemapIndex struct {
 }
 
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger(r)
 	slug := r.PathValue("slug")
 	ctx := r.Context()
 
@@ -63,7 +63,8 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		MaxResults:     100000,
 	})
 	if err != nil {
-		log.Printf("sitemap events: %v", err)
+		// Degraded: the sitemap omits events rather than failing the response.
+		logger.Warn("sitemap events", "err", err)
 	}
 	for _, e := range events {
 		sitemap.URLs = append(sitemap.URLs, sitemapURL{
@@ -75,7 +76,8 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	// All people
 	people, err := s.store.ListPeople(ctx, tl.ID)
 	if err != nil {
-		log.Printf("sitemap people: %v", err)
+		// Degraded: the sitemap omits people rather than failing the response.
+		logger.Warn("sitemap people", "err", err)
 	}
 	for _, p := range people {
 		sitemap.URLs = append(sitemap.URLs, sitemapURL{
@@ -95,7 +97,8 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := xml.NewEncoder(w).Encode(sitemap); err != nil {
-		log.Printf("encode sitemap: %v", err)
+		// Response already started (headers + xml.Header written); record it.
+		logger.Warn("encode sitemap", "err", err)
 	}
 }
 
@@ -138,6 +141,7 @@ type atomCat struct {
 }
 
 func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger(r)
 	slug := r.PathValue("slug")
 	ctx := r.Context()
 
@@ -164,7 +168,7 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 		MaxResults:     50,
 	})
 	if err != nil {
-		log.Printf("feed events: %v", err)
+		logger.Error("feed events", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -212,6 +216,7 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := xml.NewEncoder(w).Encode(feed); err != nil {
-		log.Printf("encode feed: %v", err)
+		// Response already started (headers + xml.Header written); record it.
+		logger.Warn("encode feed", "err", err)
 	}
 }
