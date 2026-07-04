@@ -33,6 +33,14 @@ linters:
         # taint pass is noisy and non-deterministic -- it surfaces a different
         # subset of call sites each run, which makes per-line nolint flaky.
         - G706
+        # G705 (XSS taint): same non-deterministic SSA taint pass as G706 (it
+        # fires on a different subset of writes each run, and not at all on some
+        # linter versions). Every flagged sink writes xml.Marshal output -- all
+        # element/attribute content is escaped -- served as application/xml with
+        # X-Content-Type-Options: nosniff, so a browser can't render it as HTML.
+        # gosec has no XML sanitizer in its model, so no honest code change
+        # clears it; suppress the class here rather than scatter flaky nolints.
+        - G705
     revive:
       rules:
         # unused-parameter is idiomatic noise: interface implementations and
