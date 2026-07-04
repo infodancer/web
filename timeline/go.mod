@@ -7,7 +7,7 @@ require (
 	github.com/infodancer/ui v0.4.2
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
-	golang.org/x/image v0.39.0
+	golang.org/x/image v0.43.0
 )
 
 require (
@@ -86,8 +86,8 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
