@@ -19,6 +19,21 @@ jobs:
     # containers fail on the LXC-based self-hosted runners.
     env:
       GOWORK: "off"
+      # Disable the shared Ryuk reaper. testcontainers-go names one reaper
+      # per `go test` session (reaper_<sessionID>, sessionID hashed from the
+      # go-test parent pid), shared across every package binary in the run.
+      # Reaper startup is check-then-create, so a module whose `go test ./...`
+      # boots containers in two packages at once (faq: faq/store +
+      # faq/internal/handler) races: both see no reaper, both create the
+      # same-named container, and the loser dies on a Docker 409 conflict.
+      # The DB-backed tests already terminate their own containers on the
+      # normal path, so Ryuk only mattered for a killed/timed-out run leaking
+      # a container on the persistent runner -- the always() reap step below
+      # covers that deterministically, by label, with no create-race. Each
+      # matrix module is its own job on its own LXC runner (isolated dockerd,
+      # one job per runner), so the label filter only ever sees this job's
+      # containers.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
     strategy:
       fail-fast: false
       matrix:
@@ -33,3 +48,12 @@ jobs:
       - name: Test ${{ matrix.module }}
         working-directory: ${{ matrix.module }}
         run: go test -race -count=1 ./...
+
+      # Reap any testcontainers a killed, panicked, or timed-out run left
+      # behind. With Ryuk disabled nothing else cleans these up on the
+      # persistent runner, so do it deterministically by testcontainers' own
+      # label. Runs even when the test step fails; -r keeps it a no-op when the
+      # normal path already terminated everything.
+      - name: Reap leftover testcontainers
+        if: always()
+        run: docker ps -aq --filter label=org.testcontainers=true | xargs -r docker rm -f
