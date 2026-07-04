@@ -68,6 +68,8 @@ func (i *Index) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	// See Leaf.write: xml.Marshal output, served as XML with sniffing forbidden.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(body)
 }
 

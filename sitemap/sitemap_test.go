@@ -99,6 +99,9 @@ func TestLeafSingleURLSet(t *testing.T) {
 	if ct := res.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/xml") {
 		t.Errorf("content-type %q", ct)
 	}
+	if xcto := res.Header.Get("X-Content-Type-Options"); xcto != "nosniff" {
+		t.Errorf("X-Content-Type-Options %q, want nosniff", xcto)
+	}
 	if !strings.Contains(body, "<urlset") {
 		t.Errorf("expected <urlset>, got:\n%s", body)
 	}

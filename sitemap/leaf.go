@@ -210,6 +210,10 @@ func (l *Leaf) write(w http.ResponseWriter, body []byte, err error) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	// Serve as XML and forbid MIME sniffing: the body is xml.Marshal output
+	// (all element/attribute content escaped), so it can't carry active markup,
+	// and nosniff stops a browser from re-interpreting application/xml as HTML.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(body)
 }
 
