@@ -1,0 +1,30 @@
+name: CI
+
+# Thin caller for the shared Go CI (test + vet + fmt + lint + govulncheck),
+# which lives in infodancer/workflows. Every job fans out over the module
+# matrix below with GOWORK=off, so each module builds against its own go.mod
+# and the repo's local go.work is ignored -- matching how the suite runs.
+#
+# go_version and govulncheck_go_version default to "stable": the suite tracks
+# the current Go release, so stdlib advisories fixed in a newer patch resolve
+# on the next run instead of pinning every module's go.mod. Dependency
+# advisories still gate on reachability (the reusable govulncheck job fails
+# only on a called symbol). run_tests is left on -- the shared test job already
+# runs `go test -race -count=1 ./...` per module with the testcontainers Ryuk
+# reaper disabled and a deterministic label-based reap, which is exactly what
+# this suite needs (see infodancer/web#90).
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  checks:
+    uses: infodancer/workflows/.github/workflows/go-ci.yml@v0
+    with:
+      # media/cmd/media-import is intentionally omitted -- it is not part of
+      # the checked module set today; add it here when it should be covered.
+      modules: >-
+        ["search", "notify", "blog", "contact", "newsletter", "media", "faq",
+         "timeline", "profile", "integration", "paging", "sitemap", "obs",
+         "errnotice"]
