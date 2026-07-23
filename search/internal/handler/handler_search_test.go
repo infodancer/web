@@ -116,9 +116,25 @@ func TestSearchFrag_NonHTMX_FallsBackToFullPage(t *testing.T) {
 
 func TestSearch_EngineError_Returns500(t *testing.T) {
 	s := newTestServer(t, &fakeEngine{err: errors.New("boom")})
-	code, _ := do(t, s, http.MethodGet, "/?q=foo", false)
+	code, body := do(t, s, http.MethodGet, "/?q=foo", false)
 	if code != http.StatusInternalServerError {
 		t.Errorf("status = %d, want 500", code)
+	}
+	// A full-page error is chrome-wrapped, not bare text/plain.
+	if !strings.Contains(strings.ToLower(body), "<!doctype html") {
+		t.Errorf("page-level 500 should be a chrome-wrapped document, got:\n%s", body)
+	}
+}
+
+func TestSearch_EngineError_HTMXFragment_StaysStatusOnly(t *testing.T) {
+	s := newTestServer(t, &fakeEngine{err: errors.New("boom")})
+	code, body := do(t, s, http.MethodGet, "/search?q=foo", true)
+	if code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500", code)
+	}
+	// An htmx fragment error must NOT swap a full document into the target.
+	if strings.Contains(strings.ToLower(body), "<!doctype html") {
+		t.Errorf("htmx fragment error should stay status-only, got a document:\n%s", body)
 	}
 }
 
@@ -132,8 +148,12 @@ func TestHealthz(t *testing.T) {
 
 func TestUnknownPath_404(t *testing.T) {
 	s := newTestServer(t, &fakeEngine{})
-	code, _ := do(t, s, http.MethodGet, "/nope", false)
+	code, body := do(t, s, http.MethodGet, "/nope", false)
 	if code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", code)
+	}
+	// The 404 is a chrome-wrapped page, not a bare text/plain "404 page not found".
+	if !strings.Contains(strings.ToLower(body), "<!doctype html") {
+		t.Errorf("unknown-path 404 should be a chrome-wrapped document, got:\n%s", body)
 	}
 }

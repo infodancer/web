@@ -78,6 +78,25 @@ func (s *Server) baseView(r *http.Request, page any) BaseView {
 	}
 }
 
+// renderError writes a chrome-wrapped page-level error via ui.RenderError. It
+// is the fallback for the module's own not_found/error templates: when a host
+// doesn't ship those pages (or in standalone default-chrome mode), a 404/500
+// still renders through the site chrome instead of dropping to bare
+// text/plain. It is for navigational HTML responses only -- form/POST, htmx
+// fragment, and auth errors keep their status-only responses.
+func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, title, msg string) {
+	doc := s.baseView(r, nil).DocumentData
+	if err := uiassets.RenderError(w, uiassets.ErrorData{
+		DocumentData: doc,
+		Status:       status,
+		Title:        title,
+		Message:      msg,
+	}); err != nil {
+		s.deps.Logger.Error("render error page", "err", err)
+		http.Error(w, title, status)
+	}
+}
+
 // defaultChrome is the standalone chrome used when no host Chrome hook is set:
 // the ui CSS + htmx served from the module's own /static/ui mount, and a brand
 // nav/footer from SiteName/HomeURL.

@@ -2,6 +2,7 @@ package admin_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,7 @@ import (
 // fakeStore records what the handlers ask of it.
 type fakeStore struct {
 	feed       []notify.Event
+	feedErr    error
 	unread     int
 	lastFilter notify.Filter
 	markCalls  int
@@ -23,7 +25,7 @@ type fakeStore struct {
 
 func (f *fakeStore) AdminFeed(_ context.Context, flt notify.Filter) ([]notify.Event, error) {
 	f.lastFilter = flt
-	return f.feed, nil
+	return f.feed, f.feedErr
 }
 
 func (f *fakeStore) AdminUnreadCount(context.Context, notify.Identity) (int, error) {
@@ -73,6 +75,34 @@ func TestFeedForbiddenWhenResolverDenies(t *testing.T) {
 	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", rr.Code)
+	}
+}
+
+func TestFeedError_FullPage_ChromeWrapped(t *testing.T) {
+	t.Parallel()
+	h := newHandler(t, &fakeStore{feedErr: errors.New("boom")}, allow)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "<!doctype html>") {
+		t.Errorf("full-page feed error should be a chrome-wrapped document, got:\n%s", rr.Body.String())
+	}
+}
+
+func TestFeedError_HTMXFragment_StatusOnly(t *testing.T) {
+	t.Parallel()
+	h := newHandler(t, &fakeStore{feedErr: errors.New("boom")}, allow)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("HX-Request", "true")
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rr.Code)
+	}
+	if strings.Contains(rr.Body.String(), "<!doctype html>") {
+		t.Errorf("htmx fragment error should stay status-only, got a document:\n%s", rr.Body.String())
 	}
 }
 

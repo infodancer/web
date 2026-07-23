@@ -3,7 +3,7 @@ module github.com/infodancer/web/faq
 go 1.26.5
 
 require (
-	github.com/infodancer/ui v0.4.2
+	github.com/infodancer/ui v0.4.6
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/pressly/goose/v3 v3.27.1

@@ -263,7 +263,8 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 		s.deps.Templates.Render(w, "pages/not_found.gohtml", s.baseView(r, nil))
 		return
 	}
-	http.Error(w, "not found", http.StatusNotFound)
+	s.renderError(w, r, http.StatusNotFound, "Not found",
+		"The page you are looking for does not exist.")
 }
 
 // internalError renders a 500 with the canonical template, logging the
@@ -276,7 +277,8 @@ func (s *Server) internalError(w http.ResponseWriter, r *http.Request, where str
 		s.deps.Templates.Render(w, "pages/error.gohtml", s.baseView(r, nil))
 		return
 	}
-	http.Error(w, "internal error", http.StatusInternalServerError)
+	s.renderError(w, r, http.StatusInternalServerError, "Something went wrong",
+		"An unexpected error occurred. Please try again.")
 }
 
 // pathID parses a {id} path value as int64 and emits 404 if it doesn't
