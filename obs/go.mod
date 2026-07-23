@@ -1,3 +1,3 @@
 module github.com/infodancer/web/obs
 
-go 1.26.4
+go 1.26.5

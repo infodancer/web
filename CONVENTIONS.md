@@ -8,7 +8,7 @@ conventions.
 
 ## Toolchain
 
-- **Go** `1.26.4` (suite standard). Bump in lockstep across modules.
+- **Go** `1.26.5` (suite standard). Bump in lockstep across modules.
 - **Build tool**: [Task](https://taskfile.dev/). Root `Taskfile.yml` fans out
   across modules; module-specific tasks live in the module's own `Taskfile.yml`.
 - **Lint**: `golangci-lint` v2.10.1 (pinned in CI). Build it with a Go toolchain
