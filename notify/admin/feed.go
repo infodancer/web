@@ -82,7 +82,15 @@ func (h *Handler) feed(w http.ResponseWriter, r *http.Request) {
 	events, err := h.store.AdminFeed(ctx, f)
 	if err != nil {
 		h.log.Error("admin: feed", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		if uiassets.IsRequest(r) && !uiassets.IsBoosted(r) {
+			// htmx fragment: an error stays a status-only response, not a
+			// full chrome-wrapped document swapped into the feed target.
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		} else {
+			// Full-page navigation: render the error through the site chrome.
+			h.renderError(w, r, http.StatusInternalServerError, "Something went wrong",
+				"The notifications feed could not be loaded. Please try again.")
+		}
 		return
 	}
 
@@ -202,6 +210,24 @@ func (h *Handler) buildView(r *http.Request, title string, data feedData) view {
 		BasePath:     h.basePath,
 		PageTitle:    title,
 		Page:         data,
+	}
+}
+
+// renderError writes a page-level error through the host chrome (or the module
+// default) via ui.RenderError, so a failed feed *page* matches the site around
+// it instead of a bare text/plain error. It is for full-page navigational
+// responses only -- htmx fragments and POST actions keep their status-only
+// responses. buildView resolves the same chrome the feed page uses.
+func (h *Handler) renderError(w http.ResponseWriter, r *http.Request, status int, title, msg string) {
+	v := h.buildView(r, title, feedData{})
+	if err := uiassets.RenderError(w, uiassets.ErrorData{
+		DocumentData: v.DocumentData,
+		Status:       status,
+		Title:        title,
+		Message:      msg,
+	}); err != nil {
+		h.log.Error("admin: render error page", "err", err)
+		http.Error(w, title, status)
 	}
 }
 
