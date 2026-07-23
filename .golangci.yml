@@ -11,6 +11,14 @@ run:
   # tag is harmless for modules without integration-tagged files.
   build-tags:
     - integration
+  # The self-hosted CI runners pack several matrix lint jobs onto one host,
+  # and golangci-lint's run-lock lives in a host-shared temp path (not the
+  # per-job GOLANGCI_LINT_CACHE the CI workflow sets), so concurrent jobs
+  # otherwise abort with "parallel golangci-lint is running". The workflow's
+  # per-job cache already isolates analysis state, so letting the runs proceed
+  # in parallel is safe. This is the fleet convention -- config-level, not a
+  # workflow arg -- so it holds whichever workflow invokes the linter.
+  allow-parallel-runners: true
 
 linters:
   default: none

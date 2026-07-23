@@ -9,9 +9,16 @@ import (
 )
 
 // avatarFormMemory is the in-memory budget for parsing the multipart upload;
-// larger files spill to temp storage. The actual size cap is enforced by the
-// media pipeline behind IngestAvatar (Config.Avatar.MaxUploadBytes).
+// larger files spill to temp storage. The actual per-image size cap is
+// enforced by the media pipeline behind IngestAvatar (Config.Avatar.MaxUploadBytes).
 const avatarFormMemory = 4 << 20
+
+// avatarBodyLimit is a coarse ceiling on the whole multipart request, applied
+// with http.MaxBytesReader before ParseMultipartForm so a client cannot
+// exhaust memory or temp disk by streaming an unbounded body. It sits well
+// above any legitimate avatar upload; the precise per-image cap lives
+// downstream in the media pipeline.
+const avatarBodyLimit = 12 << 20
 
 // handleAvatarUpload ingests a new profile picture through the media pipeline
 // (re-encode, metadata strip, content-address) and records its canonical URL.
@@ -24,6 +31,10 @@ func (s *Server) handleAvatarUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	u := profileuser.UserFromContext(r.Context())
 
+	// Bound the request body before parsing so an unbounded upload can't
+	// exhaust memory or temp disk; the media pipeline enforces the precise
+	// per-image cap once the file is in hand.
+	r.Body = http.MaxBytesReader(w, r.Body, avatarBodyLimit)
 	if err := r.ParseMultipartForm(avatarFormMemory); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
