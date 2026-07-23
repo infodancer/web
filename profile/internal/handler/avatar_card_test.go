@@ -55,6 +55,26 @@ func TestAvatarUploadDisabledWithoutIngest(t *testing.T) {
 	}
 }
 
+func TestAvatarUploadRejectsOversizedBody(t *testing.T) {
+	ingestCalled := false
+	h := newServer(t, newFakeStore(), alice, withIngest(func(_ context.Context, _ string, r io.Reader) (string, error) {
+		ingestCalled = true
+		_, _ = io.ReadAll(r)
+		return "/media/avatar/x.webp", nil
+	}))
+
+	// A body past avatarBodyLimit must be rejected by the MaxBytesReader cap
+	// before ParseMultipartForm can buffer it -- and before ingest runs.
+	oversized := make([]byte, avatarBodyLimit+(1<<20)) // ~13 MiB
+	rec := postAvatar(t, h, nil, oversized)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("oversized upload: got %d, want 400", rec.Code)
+	}
+	if ingestCalled {
+		t.Error("ingest ran for an over-limit body; the cap did not apply")
+	}
+}
+
 func TestAvatarUploadStoresCanonicalURL(t *testing.T) {
 	fs := newFakeStore()
 	var gotSubject string
