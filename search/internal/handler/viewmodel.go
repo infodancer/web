@@ -33,12 +33,7 @@ type pageView struct {
 // from SiteName/HomeURL so a standalone `search serve` still renders fully.
 func (s *Server) newPageView(r *http.Request, title, q string, results []query.Result, searched bool) pageView {
 	d := s.deps
-	var doc ui.DocumentData
-	if d.Chrome != nil {
-		doc = d.Chrome(r)
-	} else {
-		doc = s.defaultChrome()
-	}
+	doc := s.resolveChrome(r)
 	doc.Meta.Title = title
 	if doc.Meta.SiteName == "" {
 		doc.Meta.SiteName = d.SiteName
@@ -50,6 +45,44 @@ func (s *Server) newPageView(r *http.Request, title, q string, results []query.R
 		Searched:     searched,
 		Results:      results,
 	}
+}
+
+// resolveChrome returns the host-supplied document chrome for a request, or
+// the module default when no Chrome hook is set. It is the single place both
+// the page view and the error page pull chrome from, so an error page matches
+// the pages around it.
+func (s *Server) resolveChrome(r *http.Request) ui.DocumentData {
+	if s.deps.Chrome != nil {
+		return s.deps.Chrome(r)
+	}
+	return s.defaultChrome()
+}
+
+// renderError writes a page-level error through the host chrome (or the module
+// default) via ui.RenderError, so a missing or failed *page* looks like the
+// site around it instead of a bare text/plain error. It is for navigational
+// HTML responses only -- htmx fragment and API/form errors keep their
+// status-only responses. On a render failure it falls back to a plain error so
+// the client still gets the status.
+func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, title, msg string) {
+	doc := s.resolveChrome(r)
+	if doc.Meta.SiteName == "" {
+		doc.Meta.SiteName = s.deps.SiteName
+	}
+	if err := ui.RenderError(w, ui.ErrorData{
+		DocumentData: doc,
+		Status:       status,
+		Title:        title,
+		Message:      msg,
+	}); err != nil {
+		s.deps.Logger.Error("render error page", "err", err)
+		http.Error(w, title, status)
+	}
+}
+
+// notFound is the module's chrome-wrapped 404 for unknown navigational paths.
+func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
+	s.renderError(w, r, http.StatusNotFound, "Not found", "The page you are looking for does not exist.")
 }
 
 // defaultChrome is the standalone chrome used when no host Chrome hook is set:

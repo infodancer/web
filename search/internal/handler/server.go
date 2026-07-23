@@ -114,9 +114,7 @@ func (s *Server) registerRoutes() {
 		s.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(s.deps.Static)))
 	}
 
-	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.NotFound(w, r)
-	})
+	s.mux.HandleFunc("/", s.notFound)
 }
 
 // maxBodyBytes caps request bodies. Search is read-only (GET), so this only

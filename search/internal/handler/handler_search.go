@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -12,9 +13,13 @@ import (
 // without JavaScript and a /?q=… link is shareable.
 func (s *Server) searchPage(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	results, searched, ok := s.run(w, r, q)
-	if !ok {
-		return // run already wrote an error response
+	results, searched, err := s.run(r.Context(), q)
+	if err != nil {
+		s.deps.Logger.Error("search failed", "q", q, "err", err)
+		// A full-page request: render the error through the site chrome.
+		s.renderError(w, r, http.StatusInternalServerError, "Search failed",
+			"Something went wrong running your search. Please try again.")
+		return
 	}
 	view := s.newPageView(r, s.pageTitle(q), q, results, searched)
 	s.deps.Templates.Render(w, "pages/search.gohtml", view)
@@ -29,28 +34,30 @@ func (s *Server) searchFrag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	results, searched, ok := s.run(w, r, q)
-	if !ok {
+	results, searched, err := s.run(r.Context(), q)
+	if err != nil {
+		s.deps.Logger.Error("search failed", "q", q, "err", err)
+		// htmx fragment: an error here stays a status-only response, not a
+		// full chrome-wrapped document swapped into the results target.
+		http.Error(w, "search failed", http.StatusInternalServerError)
 		return
 	}
 	view := s.newPageView(r, s.pageTitle(q), q, results, searched)
 	s.deps.Templates.Render(w, "partials/results.gohtml", view)
 }
 
-// run executes the query when non-blank. ok is false when an error response has
-// already been written and the caller must stop. searched reports whether a
-// (non-blank) query was actually run.
-func (s *Server) run(w http.ResponseWriter, r *http.Request, q string) (results []query.Result, searched, ok bool) {
+// run executes the query when non-blank and returns the results. searched
+// reports whether a (non-blank) query was actually run; the caller decides how
+// to render an error, since a full page and an htmx fragment differ.
+func (s *Server) run(ctx context.Context, q string) (results []query.Result, searched bool, err error) {
 	if q == "" {
-		return nil, false, true
+		return nil, false, nil
 	}
-	res, err := s.deps.Engine.Search(r.Context(), q, s.deps.PageSize)
+	res, err := s.deps.Engine.Search(ctx, q, s.deps.PageSize)
 	if err != nil {
-		s.deps.Logger.Error("search failed", "q", q, "err", err)
-		http.Error(w, "search failed", http.StatusInternalServerError)
-		return nil, false, false
+		return nil, false, err
 	}
-	return res, true, true
+	return res, true, nil
 }
 
 func (s *Server) pageTitle(q string) string {
