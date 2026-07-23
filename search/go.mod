@@ -1,6 +1,6 @@
 module github.com/infodancer/web/search
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
@@ -28,6 +28,6 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 )
