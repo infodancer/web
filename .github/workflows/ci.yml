@@ -25,6 +25,6 @@ jobs:
       # media/cmd/media-import is intentionally omitted -- it is not part of
       # the checked module set today; add it here when it should be covered.
       modules: >-
-        ["search", "notify", "blog", "contact", "newsletter", "media", "faq",
+        ["search", "notify", "blog", "claim", "contact", "newsletter", "media", "faq",
          "timeline", "profile", "integration", "paging", "sitemap", "obs",
          "errnotice"]
