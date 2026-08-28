@@ -73,3 +73,69 @@ func TestNormalizeIdempotent(t *testing.T) {
 		}
 	}
 }
+
+// safeSlugRune reports whether r is one of the characters Normalize is allowed
+// to emit.
+func safeSlugRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-'
+}
+
+// Normalize's output is spliced into redirect targets as a trailing path
+// segment (`{BasePath}/q/{id}/{slug}`), so it must never be able to introduce
+// URL structure. That property is what makes those redirects safe despite
+// carrying user-submitted titles, and it is why the suite excludes gosec's
+// G710 taint rule (see .golangci.yml and infodancer/web#102) -- so it is
+// asserted here rather than left as a comment on the exclusion.
+//
+// A leading hyphen is included: a segment starting with "-" is harmless in a
+// URL, but the guarantee callers rely on is the whole allowlist, and pinning
+// the shape of the output keeps a future rewrite honest.
+func TestNormalizeEmitsNoURLStructure(t *testing.T) {
+	hostile := []string{
+		"//evil.example.com",
+		"https://evil.example.com/pwned",
+		"/../../etc/passwd",
+		`\\evil.example.com\share`,
+		"javascript:alert(1)",
+		"?next=https://evil.example.com",
+		"#fragment",
+		"a/b/c",
+		"a:b",
+		"%2f%2fevil.example.com",
+		"\x00/evil",
+		"\r\nLocation: https://evil.example.com",
+		"  //evil  ",
+		"ⓗttps://evil.example.com",
+	}
+	for _, in := range hostile {
+		t.Run(in, func(t *testing.T) {
+			got := Normalize(in)
+			for i, r := range got {
+				if !safeSlugRune(r) {
+					t.Errorf("Normalize(%q) = %q: rune %q at %d is outside [a-z0-9-]", in, got, r, i)
+				}
+			}
+			if strings.HasPrefix(got, "-") {
+				t.Errorf("Normalize(%q) = %q, must not begin with a hyphen", in, got)
+			}
+		})
+	}
+}
+
+// The same guarantee, over arbitrary input rather than a fixed list.
+func FuzzNormalizeEmitsNoURLStructure(f *testing.F) {
+	for _, seed := range []string{"", "//evil", "a/b", "Café", "ﬁnding", "\x00", "----"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, in string) {
+		got := Normalize(in)
+		for i, r := range got {
+			if !safeSlugRune(r) {
+				t.Errorf("Normalize(%q) = %q: rune %q at %d is outside [a-z0-9-]", in, got, r, i)
+			}
+		}
+		if strings.HasPrefix(got, "-") {
+			t.Errorf("Normalize(%q) = %q, must not begin with a hyphen", in, got)
+		}
+	})
+}
