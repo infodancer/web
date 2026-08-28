@@ -92,6 +92,7 @@ func New(cfg Config) (*Module, error) {
 			chunks = &chunkStore{
 				pool:    cfg.IndexerDB,
 				model:   cfg.Embedder.Model(),
+				recipe:  documentRecipe(cfg.Embedder.Model(), cfg.ChunkTokens),
 				metric:  cfg.EmbedMetric,
 				reembed: cfg.ReembedOnMismatch,
 				log:     cfg.Logger,

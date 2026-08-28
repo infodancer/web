@@ -108,20 +108,32 @@ func (q *Queries) GetDocumentsByIDs(ctx context.Context, ids []int64) ([]GetDocu
 }
 
 const getIndexMeta = `-- name: GetIndexMeta :one
-SELECT id, embed_model, embed_dim, embed_metric, fts_config, base_url, last_index_at
+SELECT id, embed_model, embed_dim, embed_recipe, embed_metric, fts_config, base_url, last_index_at
 FROM search_index_meta
 WHERE id = 1
 `
 
+type GetIndexMetaRow struct {
+	ID          int32
+	EmbedModel  *string
+	EmbedDim    *int32
+	EmbedRecipe *string
+	EmbedMetric string
+	FtsConfig   string
+	BaseUrl     string
+	LastIndexAt pgtype.Timestamptz
+}
+
 // GetIndexMeta returns the singleton index-meta row (DESIGN §3.3), read on
 // server open and every index run.
-func (q *Queries) GetIndexMeta(ctx context.Context) (SearchIndexMeta, error) {
+func (q *Queries) GetIndexMeta(ctx context.Context) (GetIndexMetaRow, error) {
 	row := q.db.QueryRow(ctx, getIndexMeta)
-	var i SearchIndexMeta
+	var i GetIndexMetaRow
 	err := row.Scan(
 		&i.ID,
 		&i.EmbedModel,
 		&i.EmbedDim,
+		&i.EmbedRecipe,
 		&i.EmbedMetric,
 		&i.FtsConfig,
 		&i.BaseUrl,

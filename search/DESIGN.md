@@ -215,6 +215,7 @@ CREATE TABLE search_index_meta (
     id            int PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     embed_model   text,                              -- embedding.Fingerprint.Model
     embed_dim     int,                               -- embedding.Fingerprint.Dim (0 until first embed)
+    embed_recipe  text,                              -- embedding.Fingerprint.Recipe (NULL until recorded; §5.3)
     embed_metric  text NOT NULL DEFAULT 'cosine',    -- 'cosine' | 'ip' | 'l2'; selects the HNSW ops class
     fts_config    text NOT NULL DEFAULT 'english',
     base_url      text NOT NULL DEFAULT '',          -- Hugo baseURL used for URL derivation
@@ -479,16 +480,37 @@ failed chunk fails its whole document -- a partially embedded document reads as
 keep a permanent hole. The distance operator follows the configured
 `embed_metric` (default cosine `<=>`; see §3.2).
 
-**Fingerprint + dimension bootstrap.** `embedding.Fingerprint{Model, Dim}` is
-persisted in `search_index_meta`. `Dim` is 0 until the first successful `Embed`, so:
+**Fingerprint + dimension bootstrap.** `embedding.Fingerprint{Model, Dim, Recipe}`
+is persisted in `search_index_meta`. `Dim` is 0 until the first successful `Embed`, so:
 
 1. First-ever index run: do one probe `Embed`, learn `Dim`, write
-   `embed_model`/`embed_dim`, then `ALTER` `search_chunks.embedding` to `vector(Dim)`
-   and build the HNSW index.
-2. Every subsequent run: `embedding.CheckFingerprint(stored, current)`. A mismatch
-   (model swap, version/tag change, dim change) means the stored vectors are
-   incompatible garbage — the run **refuses** unless `--reembed` is passed, which
-   drops and recomputes all embeddings.
+   `embed_model`/`embed_dim`/`embed_recipe`, then `ALTER` `search_chunks.embedding`
+   to `vector(Dim)` and build the HNSW index.
+2. Every subsequent run: `embedding.Reconcile(stored, current)`, which compares
+   only what both sides know and returns the fingerprint to persist. A field only
+   one side knows is adopted, so a corpus written before recipes were recorded
+   adopts its recipe silently and the *next* change is caught.
+
+The **recipe** covers what model and dimension do not: the task prefix, the chunk
+target, and the header layout rendered into each chunk. Change one of those and
+the model and dimension are unchanged, so the corpus keeps serving old-recipe
+vectors against new-recipe queries — strictly worse than either recipe used
+consistently, and nothing reported it. Packaging deliberately does not move it:
+an Ollama tag or a `-GGUF` suffix names the same weights, so a serving-side
+rename must not force a re-embed.
+
+The three mismatches are handled differently because they are not the same event:
+
+| mismatch | means | remedy |
+|---|---|---|
+| model / dimension | something moved *underneath* the deployment | **refuse** unless `ReembedOnMismatch` (`--reembed`) |
+| recipe only | a deliberate config edit | clear the vectors; the backfill rebuilds |
+
+Dropping a corpus automatically on a model swap would hide the mistake that
+caused it. A recipe change follows an edit someone made on purpose and clearing
+is the whole remedy, so it does not need to ask. The distinction has to be asked
+as the *absence* of the other two (`embedding.RecipeOnly`): a model swap usually
+moves the recipe as well.
 
 If no embedder is configured, indexing skips the embed step and the corpus is
 FTS-only. Embeddings can be added later by running with an embedder (a full embed

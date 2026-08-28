@@ -44,7 +44,7 @@ WHERE deleted_at IS NULL;
 -- server open and every index run.
 --
 -- name: GetIndexMeta :one
-SELECT id, embed_model, embed_dim, embed_metric, fts_config, base_url, last_index_at
+SELECT id, embed_model, embed_dim, embed_recipe, embed_metric, fts_config, base_url, last_index_at
 FROM search_index_meta
 WHERE id = 1;
 

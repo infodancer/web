@@ -40,4 +40,5 @@ type SearchIndexMeta struct {
 	FtsConfig   string
 	BaseUrl     string
 	LastIndexAt pgtype.Timestamptz
+	EmbedRecipe *string
 }

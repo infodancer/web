@@ -154,6 +154,24 @@ func estimateTokens(model string, bytes int) int {
 	return bytes * probe / perProbe
 }
 
+// documentHeaderVersion marks the layout renderDocument produces -- the title
+// slot plus a "section" field. Bump it when that layout changes, so a corpus
+// embedded under the old one is rebuilt rather than mixed with the new.
+const documentHeaderVersion = "doc-header-v1"
+
+// documentRecipe fingerprints everything besides the model and vector dimension
+// that determines a stored vector: the task, whether the model resolves to task
+// prefixes at all, the chunk target, and the header layout (DESIGN §5.3).
+//
+// The *configured* token target is hashed, not the byte budget it resolves to.
+// BudgetForTokens moves as calibration accumulates, so hashing the resolved
+// figure would make the recipe drift during normal operation and clear the
+// corpus for no reason.
+func documentRecipe(model string, chunkTokens int) string {
+	return embedding.RecipeFingerprint(model, embedding.TaskRetrievalDocument,
+		embedding.SplitOptions{MaxTokens: chunkTokens}, documentHeaderVersion)
+}
+
 // EmbedPieces embeds every piece of one document, batched.
 //
 // Splitting multiplies the piece count -- one long article becomes dozens --
@@ -191,6 +209,7 @@ func (e embedAdapter) EmbedPieces(ctx context.Context, title string, pieces []in
 type chunkStore struct {
 	pool    *pgxpool.Pool
 	model   string
+	recipe  string
 	metric  string
 	reembed bool
 	log     *slog.Logger
@@ -268,13 +287,15 @@ func (c *chunkStore) bootstrap(ctx context.Context, dim int) error {
 		return fmt.Errorf("search: bootstrap lock: %w", err)
 	}
 
-	var storedModel *string
+	var storedModel, storedRecipe *string
 	var storedDim *int32
 	if err := tx.QueryRow(ctx,
-		"SELECT embed_model, embed_dim FROM search_index_meta WHERE id = 1",
-	).Scan(&storedModel, &storedDim); err != nil {
+		"SELECT embed_model, embed_dim, embed_recipe FROM search_index_meta WHERE id = 1",
+	).Scan(&storedModel, &storedDim, &storedRecipe); err != nil {
 		return fmt.Errorf("search: read index meta: %w", err)
 	}
+
+	current := embedding.Fingerprint{Model: c.model, Dim: dim, Recipe: c.recipe}
 
 	switch {
 	case storedDim == nil || *storedDim == 0:
@@ -282,29 +303,34 @@ func (c *chunkStore) bootstrap(ctx context.Context, dim int) error {
 		if err := c.createChunkSchema(ctx, tx, dim, opclass); err != nil {
 			return err
 		}
-		if err := c.writeMeta(ctx, tx, dim); err != nil {
+		if err := c.writeMeta(ctx, tx, current); err != nil {
 			return err
 		}
-		c.log.Info("search: embedding bootstrap complete", "model", c.model, "dim", dim, "metric", c.metric)
+		c.log.Info("search: embedding bootstrap complete",
+			"model", c.model, "dim", dim, "recipe", c.recipe, "metric", c.metric)
 
 	default:
-		// Already bootstrapped: refuse a model/dimension change unless re-embedding.
 		stored := embedding.Fingerprint{Dim: int(*storedDim)}
 		if storedModel != nil {
 			stored.Model = *storedModel
 		}
-		current := embedding.Fingerprint{Model: c.model, Dim: dim}
-		if ferr := embedding.CheckFingerprint(stored, current); ferr != nil {
-			if !c.reembed {
-				return fmt.Errorf("search: embedding fingerprint mismatch (%w); set Config.ReembedOnMismatch to drop and recompute all embeddings", ferr)
-			}
+		if storedRecipe != nil {
+			stored.Recipe = *storedRecipe
+		}
+
+		fp, clear, err := reconcileFingerprint(stored, current, c.reembed)
+		if err != nil {
+			return err
+		}
+		if clear {
 			if err := c.reembedSchema(ctx, tx, dim, opclass); err != nil {
 				return err
 			}
-			if err := c.writeMeta(ctx, tx, dim); err != nil {
-				return err
-			}
-			c.log.Warn("search: re-embedding under new fingerprint; existing embeddings dropped", "model", c.model, "dim", dim)
+			c.log.Warn("search: rebuilding embeddings under a new fingerprint; existing vectors dropped",
+				"stored", stored, "current", current)
+		}
+		if err := c.writeMeta(ctx, tx, fp); err != nil {
+			return err
 		}
 	}
 
@@ -312,6 +338,48 @@ func (c *chunkStore) bootstrap(ctx context.Context, dim int) error {
 		return fmt.Errorf("search: bootstrap commit: %w", err)
 	}
 	return nil
+}
+
+// reconcileFingerprint decides what a stored-versus-current fingerprint means:
+// the fingerprint to persist, whether the stored vectors must be dropped first,
+// and whether the change needs a human.
+//
+// Fields only one side knows are adopted rather than rejected, so an existing
+// corpus records its recipe on the first run after the upgrade and the *next*
+// change is the one caught.
+//
+// The three mismatches are not the same event, which is why they are not
+// handled the same way:
+//
+//   - A model or dimension change means something moved *underneath* the
+//     deployment -- a tag repointed, a model swapped -- rather than in it. The
+//     stored vectors are garbage against the new ones, but dropping them
+//     automatically would hide the mistake that caused it, so the run refuses
+//     unless ReembedOnMismatch says otherwise.
+//   - A recipe change follows an edit someone made on purpose: a different chunk
+//     target, a different task, a changed header layout. The vectors are still
+//     comparable, just no longer consistent with what queries now produce, and
+//     mixing the two recipes is worse than either used alone. That is the one
+//     case the caller can resolve alone, so it clears and lets the backfill
+//     rebuild.
+//
+// The distinction has to be asked for as the absence of the other two, not the
+// presence of one: a model swap usually moves the dimension and the recipe as
+// well, so errors.Is(err, ErrRecipeChanged) alone is true in cases where
+// clearing would be wrong. RecipeOnly asks it correctly.
+func reconcileFingerprint(stored, current embedding.Fingerprint, reembed bool) (embedding.Fingerprint, bool, error) {
+	fp, err := embedding.Reconcile(stored, current)
+	switch {
+	case err == nil:
+		return fp, false, nil
+	case embedding.RecipeOnly(err):
+		return current, true, nil
+	case reembed:
+		return current, true, nil
+	default:
+		return embedding.Fingerprint{}, false, fmt.Errorf(
+			"search: embedding fingerprint mismatch (%w); set Config.ReembedOnMismatch to drop and recompute all embeddings", err)
+	}
 }
 
 func (c *chunkStore) createChunkSchema(ctx context.Context, tx pgx.Tx, dim int, opclass string) error {
@@ -353,12 +421,12 @@ func (c *chunkStore) reembedSchema(ctx context.Context, tx pgx.Tx, dim int, opcl
 	return nil
 }
 
-func (c *chunkStore) writeMeta(ctx context.Context, tx pgx.Tx, dim int) error {
+func (c *chunkStore) writeMeta(ctx context.Context, tx pgx.Tx, fp embedding.Fingerprint) error {
 	if _, err := tx.Exec(ctx,
 		`UPDATE search_index_meta
-		 SET embed_model = $1, embed_dim = $2, embed_metric = $3, last_index_at = now()
+		 SET embed_model = $1, embed_dim = $2, embed_recipe = $3, embed_metric = $4, last_index_at = now()
 		 WHERE id = 1`,
-		c.model, dim, c.metric,
+		fp.Model, fp.Dim, fp.Recipe, c.metric,
 	); err != nil {
 		return fmt.Errorf("search: write index meta: %w", err)
 	}
