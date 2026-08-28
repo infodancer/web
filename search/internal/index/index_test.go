@@ -7,17 +7,39 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+
+	"github.com/infodancer/web/search/internal/extract"
 )
 
-// fakeEmbedder returns a fixed-dimension vector per call, or a configured error.
+// fakeEmbedder returns a fixed-dimension vector per piece, or a configured
+// error. maxBytes, when set, makes it split sections the way a real adapter
+// would, so the pipeline's handling of a multi-piece section is exercised
+// without a model or a backend.
 type fakeEmbedder struct {
-	calls int
-	dim   int
-	err   error
+	calls    int // EmbedPieces calls (batches), not pieces
+	pieces   int // pieces embedded in total
+	dim      int
+	maxBytes int
+	err      error
 }
 
-func (f *fakeEmbedder) EmbedDocument(_ context.Context, _, _, text string) ([]float32, error) {
+func (f *fakeEmbedder) SplitSections(_ string, sections []extract.Section) []Piece {
+	var out []Piece
+	for _, s := range sections {
+		for _, text := range splitEvery(s.Text, f.maxBytes) {
+			out = append(out, Piece{
+				HeadingPath:   s.HeadingPath,
+				Text:          text,
+				TokenEstimate: len(text) / 2,
+			})
+		}
+	}
+	return out
+}
+
+func (f *fakeEmbedder) EmbedPieces(_ context.Context, _ string, pieces []Piece) ([][]float32, error) {
 	f.calls++
+	f.pieces += len(pieces)
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -25,9 +47,26 @@ func (f *fakeEmbedder) EmbedDocument(_ context.Context, _, _, text string) ([]fl
 	if d == 0 {
 		d = 3
 	}
-	v := make([]float32, d)
-	v[0] = float32(len(text)) // deterministic, content-dependent
-	return v, nil
+	out := make([][]float32, len(pieces))
+	for i, p := range pieces {
+		v := make([]float32, d)
+		v[0] = float32(len(p.Text)) // deterministic, content-dependent
+		out[i] = v
+	}
+	return out, nil
+}
+
+// splitEvery cuts s into runs of at most n bytes; n <= 0 leaves it whole.
+func splitEvery(s string, n int) []string {
+	if n <= 0 || len(s) <= n {
+		return []string{s}
+	}
+	var out []string
+	for len(s) > n {
+		out = append(out, s[:n])
+		s = s[n:]
+	}
+	return append(out, s)
 }
 
 // fakeChunkStore records the chunk set last written per document.
@@ -378,8 +417,11 @@ func TestIndex_EmbedsSectionsAsChunks(t *testing.T) {
 	if len(chunks[0].Embedding) != 4 {
 		t.Errorf("embedding dim = %d, want 4", len(chunks[0].Embedding))
 	}
-	if emb.calls != 3 {
-		t.Errorf("embedder called %d times, want 3", emb.calls)
+	if emb.pieces != 3 {
+		t.Errorf("embedded %d pieces, want 3", emb.pieces)
+	}
+	if emb.calls != 1 {
+		t.Errorf("embedder called %d times, want 1 batch for the whole document", emb.calls)
 	}
 }
 
@@ -394,12 +436,12 @@ func TestIndex_SkippedContentDoesNotReembed(t *testing.T) {
 	if _, err := ix.Index(context.Background(), doc); err != nil {
 		t.Fatalf("first Index: %v", err)
 	}
-	first := emb.calls
+	first := emb.pieces
 	if _, err := ix.Index(context.Background(), doc); err != nil {
 		t.Fatalf("second Index: %v", err)
 	}
-	if emb.calls != first {
-		t.Errorf("unchanged content should not re-embed: %d then %d calls", first, emb.calls)
+	if emb.pieces != first {
+		t.Errorf("unchanged content should not re-embed: %d then %d pieces", first, emb.pieces)
 	}
 }
 
@@ -484,4 +526,107 @@ func keysOf(w *fakeWriter) []Key {
 		out = append(out, k)
 	}
 	return out
+}
+
+// A section too large to embed whole becomes several chunks that share its
+// heading path, in document order. Before this, the tail of a long section was
+// handed to the backend whole and silently truncated -- a normal-looking vector
+// computed from a document whose end was thrown away (DESIGN §5.2).
+func TestIndex_OversizedSectionBecomesSeveralChunks(t *testing.T) {
+	w := newFakeWriter()
+	emb := &fakeEmbedder{dim: 4, maxBytes: 20}
+	cs := newFakeChunkStore()
+	ix := New(w, emb, cs, nil)
+
+	long := strings.Repeat("alpha body text. ", 6) // ~102 bytes => 6 pieces
+	body := "# Title\n\n## Alpha\n\n" + long
+	res, err := ix.Index(context.Background(), mdDoc("1", body))
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+
+	chunks := cs.replaced[res.DocID]
+	if len(chunks) < 4 {
+		t.Fatalf("want the long section split into several chunks, got %d", len(chunks))
+	}
+	for i, c := range chunks {
+		if c.Ord != i {
+			t.Errorf("chunk %d has Ord %d; ords must be sequential across the split", i, c.Ord)
+		}
+		if len(c.Text) > emb.maxBytes {
+			t.Errorf("chunk %d is %d bytes, over the %d-byte budget", i, len(c.Text), emb.maxBytes)
+		}
+		if c.HeadingPath != "Title > Alpha" {
+			t.Errorf("chunk %d heading path = %q, want every piece to keep its section's path",
+				i, c.HeadingPath)
+		}
+		if len(c.Embedding) != 4 {
+			t.Errorf("chunk %d has no embedding", i)
+		}
+	}
+}
+
+// Every piece is embedded in one call, not one call each. Splitting multiplies
+// the piece count, so a request per piece would turn one long document into
+// dozens of round trips.
+func TestIndex_EmbedsAllPiecesInOneCall(t *testing.T) {
+	w := newFakeWriter()
+	emb := &fakeEmbedder{dim: 3, maxBytes: 20}
+	cs := newFakeChunkStore()
+	ix := New(w, emb, cs, nil)
+
+	body := "# Title\n\n## Alpha\n\n" + strings.Repeat("alpha body text. ", 6)
+	if _, err := ix.Index(context.Background(), mdDoc("1", body)); err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	if emb.calls != 1 {
+		t.Errorf("embedder called %d times, want 1 for the whole document", emb.calls)
+	}
+	if emb.pieces < 4 {
+		t.Errorf("embedded %d pieces, want the split to have produced several", emb.pieces)
+	}
+}
+
+// The token estimate comes from the splitter, which knows the model, rather
+// than from a bytes/4 guess in the pipeline, which does not.
+func TestIndex_TokenEstimateComesFromTheSplitter(t *testing.T) {
+	w := newFakeWriter()
+	emb := &fakeEmbedder{dim: 3}
+	cs := newFakeChunkStore()
+	ix := New(w, emb, cs, nil)
+
+	res, err := ix.Index(context.Background(), mdDoc("1", "# Title\n\n## Alpha\n\nAlpha body."))
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	for i, c := range cs.replaced[res.DocID] {
+		// The fake reports len/2; the pipeline must pass it through untouched.
+		if want := len(c.Text) / 2; c.TokenEstimate != want {
+			t.Errorf("chunk %d token estimate = %d, want the splitter's %d", i, c.TokenEstimate, want)
+		}
+	}
+}
+
+// A document with nothing embeddable clears its chunk set rather than skipping
+// the write: the content that used to be there must not keep matching.
+func TestIndex_EmptySectionsClearChunks(t *testing.T) {
+	w := newFakeWriter()
+	emb := &fakeEmbedder{dim: 3}
+	cs := newFakeChunkStore()
+	ix := New(w, emb, cs, nil)
+
+	res, err := ix.Index(context.Background(), mdDoc("1", "# Title Only"))
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	chunks, ok := cs.replaced[res.DocID]
+	if !ok {
+		t.Fatal("ReplaceChunks was not called for a document with no embeddable text")
+	}
+	if len(chunks) != 0 {
+		t.Errorf("want no chunks, got %d", len(chunks))
+	}
+	if emb.calls != 0 {
+		t.Errorf("embedder called %d times for a document with nothing to embed, want 0", emb.calls)
+	}
 }

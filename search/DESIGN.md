@@ -436,10 +436,19 @@ type Section struct {
 Each `Section` becomes one chunk, in document order, with `heading_path` preserved
 for snippet breadcrumbs. Two refinements:
 
-- **Oversized sections.** A section whose estimated tokens exceed the model's limit
-  (via `embedding.LookupLimits`) is split into multiple chunks on paragraph
-  boundaries with a small overlap, so the tail of a long section is not silently
-  truncated by the embedder. The sub-chunks share the section's `heading_path`.
+- **Oversized sections.** A section larger than the chunk budget is split into
+  several chunks on paragraph boundaries (falling to line, sentence, then word)
+  with a small overlap, so the tail of a long section is not silently truncated
+  by the embedder. The sub-chunks share the section's `heading_path`.
+
+  The budget is the smaller of the model's registered ceiling
+  (`embedding.LookupLimits`) and `Config.ChunkTokens` converted through
+  `embedding.BudgetForTokens`, which follows the bytes-per-token ratio observed
+  for the model rather than a guess. The model's *full* window is deliberately
+  not the target: a vector has fixed capacity, so filling the window averages
+  away the specificity retrieval depends on. The document-side header rendered
+  into every chunk is charged against the budget -- sizing the body at the full
+  budget and then prepending a header puts every request over it.
 - **Preamble.** Text before the first heading is its own chunk with an empty
   `heading_path`.
 
@@ -462,8 +471,13 @@ different task prefixes — embedding both sides identically silently degrades r
 - Query: `embedding.FormatForTask(model, embedding.TaskRetrievalQuery, q)`
   (nomic emits `search_query:`).
 
-Indexing uses `embedding.BatchEmbed` with retry. The distance operator follows the
-configured `embed_metric` (default cosine `<=>`; see §3.2).
+Indexing uses `embedding.BatchEmbedResults`, one batch per `Config.EmbedBatchSize`
+chunks: splitting multiplies the chunk count, and chunks are uniform by
+construction, which makes them a better batching unit than whole documents. A
+failed chunk fails its whole document -- a partially embedded document reads as
+*complete* to the backfill (it has chunks, so the next run skips it) and would
+keep a permanent hole. The distance operator follows the configured
+`embed_metric` (default cosine `<=>`; see §3.2).
 
 **Fingerprint + dimension bootstrap.** `embedding.Fingerprint{Model, Dim}` is
 persisted in `search_index_meta`. `Dim` is 0 until the first successful `Embed`, so:

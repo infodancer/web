@@ -126,15 +126,34 @@ const defaultReapFraction = 0.20
 // snippetMaxRunes bounds the plain-text listing excerpt derived from body text.
 const snippetMaxRunes = 240
 
-// Embedder turns a chunk's text into a vector using asymmetric document-side
-// formatting (DESIGN §5.3). It is optional: a nil embedder makes the corpus
-// FTS-only and no chunks are written.
-type Embedder interface {
-	EmbedDocument(ctx context.Context, title, headingPath, text string) ([]float32, error)
+// Piece is one embeddable slice of a section: a section short enough to embed
+// whole yields exactly one, a long one yields several sharing its heading path
+// (DESIGN §5.2).
+type Piece struct {
+	HeadingPath   string
+	Text          string
+	TokenEstimate int
 }
 
-// Chunk is one heading-delimited slice of a document with its embedding, ready
-// to persist (DESIGN §3.2).
+// Embedder turns a document's sections into vectors. It is optional: a nil
+// embedder makes the corpus FTS-only and no chunks are written.
+//
+// The split is part of this interface rather than the pipeline because every
+// input to it is model knowledge: the byte budget the model accepts, the token
+// target chunks are sized to, and the size of the document-side header that
+// budget is charged for (DESIGN §5.3). The pipeline stays free of all of it and
+// keeps only what it owns -- ordering, persistence, and the hash gate.
+type Embedder interface {
+	// SplitSections cuts sections into pieces that each fit the model's input
+	// budget once document-side formatting is applied, in document order.
+	SplitSections(title string, sections []extract.Section) []Piece
+	// EmbedPieces returns one vector per piece, index-aligned. An error fails
+	// the whole document: see embedDocument.
+	EmbedPieces(ctx context.Context, title string, pieces []Piece) ([][]float32, error)
+}
+
+// Chunk is one embeddable slice of a document with its embedding, ready to
+// persist (DESIGN §3.2).
 type Chunk struct {
 	Ord           int
 	HeadingPath   string
@@ -247,28 +266,42 @@ func (ix *Indexer) Index(ctx context.Context, doc Document) (Result, error) {
 	return Result{DocID: id, Created: !found}, nil
 }
 
-// embedDocument embeds each non-empty section as a chunk and replaces the
-// document's chunk set. One chunk per section in document order; oversized
-// sections are not yet sub-split (DESIGN §5.2 refinement, deferred).
+// embedDocument splits the document's non-empty sections into budget-sized
+// pieces, embeds them, and replaces the document's chunk set (DESIGN §5.2/§5.3).
+//
+// One failed piece fails the whole document, deliberately. A partially embedded
+// document reads as *complete* to the backfill -- HasChunks is true, so the next
+// run skips it -- leaving a permanent hole in the middle of the document that
+// nothing will ever come back for. Failing whole means it is retried whole.
 func (ix *Indexer) embedDocument(ctx context.Context, docID int64, title string, sections []extract.Section) error {
-	chunks := make([]Chunk, 0, len(sections))
-	ord := 0
+	nonEmpty := make([]extract.Section, 0, len(sections))
 	for _, s := range sections {
-		if s.Text == "" {
-			continue
+		if s.Text != "" {
+			nonEmpty = append(nonEmpty, s)
 		}
-		vec, err := ix.emb.EmbedDocument(ctx, title, s.HeadingPath, s.Text)
-		if err != nil {
-			return fmt.Errorf("embed chunk %d: %w", ord, err)
+	}
+
+	pieces := ix.emb.SplitSections(title, nonEmpty)
+	vectors := make([][]float32, 0, len(pieces))
+	if len(pieces) > 0 {
+		var err error
+		if vectors, err = ix.emb.EmbedPieces(ctx, title, pieces); err != nil {
+			return fmt.Errorf("embed pieces: %w", err)
 		}
-		chunks = append(chunks, Chunk{
-			Ord:           ord,
-			HeadingPath:   s.HeadingPath,
-			Text:          s.Text,
-			TokenEstimate: len(s.Text) / 4, // rough; refined when a tokenizer lands
-			Embedding:     vec,
-		})
-		ord++
+		if len(vectors) != len(pieces) {
+			return fmt.Errorf("embed pieces: got %d vectors for %d pieces", len(vectors), len(pieces))
+		}
+	}
+
+	chunks := make([]Chunk, len(pieces))
+	for i, p := range pieces {
+		chunks[i] = Chunk{
+			Ord:           i,
+			HeadingPath:   p.HeadingPath,
+			Text:          p.Text,
+			TokenEstimate: p.TokenEstimate,
+			Embedding:     vectors[i],
+		}
 	}
 	if err := ix.chunks.ReplaceChunks(ctx, docID, chunks); err != nil {
 		return fmt.Errorf("replace chunks: %w", err)

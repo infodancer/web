@@ -84,7 +84,11 @@ func New(cfg Config) (*Module, error) {
 			chunks index.ChunkStore
 		)
 		if cfg.Embedder != nil {
-			emb = embedAdapter{emb: cfg.Embedder}
+			emb = embedAdapter{
+				emb:         cfg.Embedder,
+				chunkTokens: cfg.ChunkTokens,
+				batchSize:   cfg.EmbedBatchSize,
+			}
 			chunks = &chunkStore{
 				pool:    cfg.IndexerDB,
 				model:   cfg.Embedder.Model(),

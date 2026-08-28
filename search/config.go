@@ -40,6 +40,23 @@ type Config struct {
 	// baked in — the backend, model, and metric are this caller's choice.
 	Embedder embedding.Embedder
 
+	// ChunkTokens is the token target one chunk is sized to. Defaults to 512.
+	//
+	// The model's full context window is the wrong target and the library says
+	// so: a vector has fixed capacity, so filling the window averages away the
+	// specificity retrieval depends on. 256-512 tokens is the working range.
+	// The model's registered byte ceiling still applies on top -- whichever
+	// binds first wins, so this can only ever make chunks smaller.
+	//
+	// Changing it moves the recipe fingerprint (DESIGN §5.3), which clears the
+	// stored vectors so a backfill rebuilds them at the new size.
+	ChunkTokens int
+
+	// EmbedBatchSize is how many chunks are sent per embed request at index
+	// time. Defaults to 25, which both backend families handle without tripping
+	// a per-request size limit. It affects throughput only, never the vectors.
+	EmbedBatchSize int
+
 	// EmbedMetric is the vector distance metric: "cosine" (default), "ip", or
 	// "l2". It sets both the HNSW operator class at bootstrap and the query
 	// distance operator; changing it after the first index run requires a rebuild.
@@ -104,6 +121,16 @@ type Config struct {
 	AutoMigrate bool
 }
 
+// defaultChunkTokens is the token target one chunk is sized to. 512 is the top
+// of the 256-512 range that retrieval actually works in, and well under the
+// 2048-token window a typical embedder advertises.
+const defaultChunkTokens = 512
+
+// defaultEmbedBatchSize matches go-embedding's own default: large enough to
+// amortise the round trip, small enough that neither backend family rejects the
+// request.
+const defaultEmbedBatchSize = 25
+
 // CSRFConfig tunes the bundled same-origin CSRF middleware.
 type CSRFConfig struct {
 	// Disable skips the guard. Use only when the host enforces an equivalent
@@ -141,5 +168,11 @@ func (c *Config) applyDefaults() {
 	}
 	if c.QueryCacheSize == 0 {
 		c.QueryCacheSize = 1024
+	}
+	if c.ChunkTokens == 0 {
+		c.ChunkTokens = defaultChunkTokens
+	}
+	if c.EmbedBatchSize == 0 {
+		c.EmbedBatchSize = defaultEmbedBatchSize
 	}
 }
