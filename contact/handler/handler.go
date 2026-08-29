@@ -218,6 +218,12 @@ func (h *Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Persistence succeeded — tell the user immediately, send email async.
 	h.inFlight.Add(1)
+	// deliver deliberately does not take the request context. The response is
+	// written on the next line, and r.Context() is cancelled the moment this
+	// handler returns -- inheriting it would cancel the send mid-flight. It
+	// runs on its own SendTimeout instead, and inFlight keeps shutdown waiting
+	// for it.
+	//nolint:gosec // G118: detaching from the request context is the point here, not an oversight.
 	go h.deliver(*sub)
 
 	_, _ = w.Write([]byte(h.MsgSuccess))
