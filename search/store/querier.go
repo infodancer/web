@@ -35,7 +35,7 @@ type Querier interface {
 	// GetIndexMeta returns the singleton index-meta row (DESIGN §3.3), read on
 	// server open and every index run.
 	//
-	GetIndexMeta(ctx context.Context) (SearchIndexMeta, error)
+	GetIndexMeta(ctx context.Context) (GetIndexMetaRow, error)
 	// ListLiveSourceKeys returns the natural keys of every live document in a source.
 	// Reconcile diffs this against the keys it was handed to find the absent set.
 	//

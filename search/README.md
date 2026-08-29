@@ -9,8 +9,8 @@ specification.
 > module, calls the in-process ingestion API when its content changes, and
 > mounts the search UI. Full-text search works immediately; supplying an
 > embedder adds vector search fused with FTS (RRF) and an optional reranker.
-> Not yet built: the Hugo `public/` crawl source and oversized-section
-> sub-chunking.
+> Long sections are split to a token budget (`Config.ChunkTokens`, default 512)
+> and embedded in batches. Not yet built: the Hugo `public/` crawl source.
 
 ## Ingestion (in-process)
 

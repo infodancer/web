@@ -54,14 +54,29 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // buildEmbedder constructs a go-embedding Embedder from the EMBEDDING_* env
-// (see embedding.ConfigFromEnv). It is opt-in: a nil embedder (and no error) is
-// returned unless EMBEDDING_MODEL is set, so a deployment that has not chosen an
-// embedding model stays FTS-only rather than dialing a default backend.
+// (see embedding.ConfigFromEnvPrefixStrict). It is opt-in: a nil embedder (and
+// no error) is returned unless EMBEDDING_MODEL is set, so a deployment that has
+// not chosen an embedding model stays FTS-only rather than dialing a default
+// backend.
+//
+// Strict on the model name. Model identity picks the task prefixes text is
+// wrapped in and the input budget requests are clipped to, and both fail open:
+// a name go-embedding does not recognise yields a passthrough prompter and a
+// zero budget, with no error. Nothing looks wrong -- the corpus indexes cleanly
+// and retrieves badly, and every vector has to be recomputed once someone
+// notices. That matters more here than in most places, because DESIGN 5.3 makes
+// asymmetric document/query prefixes mandatory: losing them silently embeds
+// both sides of every comparison identically.
+//
+// Serving runtimes rename models freely (Ollama appends a :tag, Lemonade
+// appends -GGUF), so packaging affixes resolve automatically and anything
+// further takes EMBEDDING_MODEL_ALIAS. An operator setting EMBEDDING_STRICT_MODEL
+// is obeyed either way.
 func buildEmbedder() (embedding.Embedder, error) {
 	if os.Getenv("EMBEDDING_MODEL") == "" {
 		return nil, nil
 	}
-	cfg, err := embedding.ConfigFromEnv()
+	cfg, err := embedding.ConfigFromEnvPrefixStrict(embedding.DefaultEnvPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("embedding config: %w", err)
 	}
