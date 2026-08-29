@@ -49,6 +49,20 @@ linters:
         # gosec has no XML sanitizer in its model, so no honest code change
         # clears it; suppress the class here rather than scatter flaky nolints.
         - G705
+        # G710 (open-redirect taint): the same SSA taint pass, and wrong about
+        # every site it flags in faq (infodancer/web#102). An open redirect
+        # needs control of the *start* of the URL -- a scheme, or a leading //
+        # that makes it scheme-relative. Every flagged target is
+        # fmt.Sprintf("%s/q/%d/%s", BasePath, id, slug.Normalize(title)) or a
+        # sibling: the prefix is host configuration plus a string literal, and
+        # the tainted parts are a suffix on an already-relative path. A suffix
+        # cannot move the origin. The taint is also narrow on its own terms --
+        # ids render as digits, and slug.Normalize emits only [a-z0-9-] and
+        # cannot lead with a hyphen, so no /, :, or backslash survives it.
+        # gosec models reachability from r to http.Redirect and stops there; it
+        # has no notion of a relative path with a constant prefix, so no honest
+        # code change clears it.
+        - G710
     revive:
       rules:
         # unused-parameter is idiomatic noise: interface implementations and
