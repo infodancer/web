@@ -1,8 +1,11 @@
 package obs
 
 import (
+	"io"
 	"net/http"
 	"runtime/debug"
+
+	"github.com/felixge/httpsnoop"
 )
 
 // CaptureOptions configures [Capture]. The zero value is usable: with no
@@ -32,6 +35,10 @@ type CaptureOptions struct {
 // The status code is the trigger, so no component decides what is report-worthy.
 // Capture sits outside [Middleware]; compose them as Middleware(Capture(h, opts))
 // so a recovered panic still has a request id to correlate by.
+//
+// Capture does not log the request itself. The access log is
+// github.com/infodancer/logging/httplog, which every server wires in whether or
+// not a proxy sits in front of it; Capture adds the failure detail on top.
 func Capture(next http.Handler, opts CaptureOptions) http.Handler {
 	reporter := opts.Reporter
 	if reporter == nil {
@@ -43,7 +50,46 @@ func Capture(next http.Handler, opts CaptureOptions) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sw := &statusWriter{ResponseWriter: w}
+		var (
+			status int
+			wrote  bool
+		)
+
+		// httpsnoop.Wrap reproduces whichever optional interfaces w implements
+		// (Flusher, Hijacker, ReaderFrom, Pusher) on the wrapper. A hand-written
+		// wrapper that embeds http.ResponseWriter keeps the method set of the
+		// interface, not of the value, so every one of those is hidden from the
+		// handler -- and nothing fails loudly: streaming stops flushing, an
+		// upgrade cannot hijack, a file copy leaves the sendfile path.
+		sw := httpsnoop.Wrap(w, httpsnoop.Hooks{
+			WriteHeader: func(next httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
+				return func(code int) {
+					if wrote {
+						// net/http ignores a superfluous WriteHeader; swallow it
+						// here too so the recorded status is the one sent.
+						return
+					}
+					status, wrote = code, true
+					next(code)
+				}
+			},
+			Write: func(next httpsnoop.WriteFunc) httpsnoop.WriteFunc {
+				return func(b []byte) (int, error) {
+					if !wrote {
+						status, wrote = http.StatusOK, true
+					}
+					return next(b)
+				}
+			},
+			ReadFrom: func(next httpsnoop.ReadFromFunc) httpsnoop.ReadFromFunc {
+				return func(src io.Reader) (int64, error) {
+					if !wrote {
+						status, wrote = http.StatusOK, true
+					}
+					return next(src)
+				}
+			},
+		})
 
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -51,10 +97,10 @@ func Capture(next http.Handler, opts CaptureOptions) http.Handler {
 				// If the handler already wrote a header before panicking we
 				// cannot change the status, but we still record 500 as the
 				// effective failure. If nothing was written, send a 500 now.
-				if !sw.wrote {
+				if !wrote {
 					sw.WriteHeader(http.StatusInternalServerError)
 				}
-				metric.ObserveRequest(opts.Component, r.Method, sw.status)
+				metric.ObserveRequest(opts.Component, r.Method, status)
 				reporter.Report(r.Context(), Notice{
 					RequestID: RequestID(r.Context()),
 					Component: opts.Component,
@@ -67,43 +113,25 @@ func Capture(next http.Handler, opts CaptureOptions) http.Handler {
 				return
 			}
 
-			metric.ObserveRequest(opts.Component, r.Method, sw.status)
-			if sw.status >= 500 {
+			// A handler that returns having written nothing still answered 200:
+			// net/http sends it on the way out. Recording 0 would put a status
+			// no server ever sent onto the metric.
+			if !wrote {
+				status = http.StatusOK
+			}
+
+			metric.ObserveRequest(opts.Component, r.Method, status)
+			if status >= 500 {
 				reporter.Report(r.Context(), Notice{
 					RequestID: RequestID(r.Context()),
 					Component: opts.Component,
 					Method:    r.Method,
 					Path:      r.URL.Path,
-					Status:    sw.status,
+					Status:    status,
 				})
 			}
 		}()
 
 		next.ServeHTTP(sw, r)
 	})
-}
-
-// statusWriter wraps an [http.ResponseWriter] to record the status code and
-// whether a header was written. A handler that never calls WriteHeader and just
-// writes a body implicitly sends 200, which WriteHeader-on-first-Write records.
-type statusWriter struct {
-	http.ResponseWriter
-	status int
-	wrote  bool
-}
-
-func (s *statusWriter) WriteHeader(code int) {
-	if s.wrote {
-		return
-	}
-	s.status = code
-	s.wrote = true
-	s.ResponseWriter.WriteHeader(code)
-}
-
-func (s *statusWriter) Write(b []byte) (int, error) {
-	if !s.wrote {
-		s.WriteHeader(http.StatusOK)
-	}
-	return s.ResponseWriter.Write(b)
 }
