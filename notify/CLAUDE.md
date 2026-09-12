@@ -22,7 +22,7 @@ integration surface. Coding standards are in `CONVENTIONS.md`.
 
 ## Workflow
 
-- Module path `github.com/infodancer/web/notify`, Go 1.26.4, part of the parent
+- Module path `github.com/infodancer/web/notify`, Go 1.26.6, part of the parent
   `go.work`.
 - After editing `db/queries.sql` or `migrations/`, run `task generate` to
   regenerate the `db` package (sqlc), then `task check`.
