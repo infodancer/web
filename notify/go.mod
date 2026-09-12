@@ -1,6 +1,6 @@
 module github.com/infodancer/web/notify
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/infodancer/ui v0.4.6

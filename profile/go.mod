@@ -1,6 +1,6 @@
 module github.com/infodancer/web/profile
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/infodancer/ui v0.6.1
