@@ -33,3 +33,12 @@ jobs:
         ["search", "notify", "blog", "claim", "contact", "newsletter", "media",
          "media/cmd/media-import", "faq", "timeline", "profile", "integration",
          "paging", "sitemap", "obs", "errnotice", "pgtest"]
+      # Assert every tracked go.mod agrees on the go directive, and that
+      # CONVENTIONS.md names that version. This repo is why the gate exists:
+      # media/cmd/media-import stopped building for weeks on a one-patch
+      # disagreement with its parent (#111), and CONVENTIONS.md drifted from the
+      # code three times (#86, then twice more). The check scans every tracked
+      # go.mod rather than the matrix above, which is the point -- the module
+      # that broke was the one the matrix did not cover.
+      check_go_consistency: true
+      go_version_doc: CONVENTIONS.md
