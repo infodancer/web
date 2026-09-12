@@ -98,11 +98,18 @@ func TestCaptureSilentHandlerRecords200(t *testing.T) {
 // 200 with a body.
 func TestCaptureReadFromReachesUnderlyingWriter(t *testing.T) {
 	met := &recordingMetric{}
+	const body = "file contents"
 	h := Capture(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Masked in a bare io.Reader: io.Copy prefers the source's WriteTo when
 		// it has one, and strings.Reader does, which would bypass ReadFrom
 		// entirely and make this test pass for the wrong reason.
-		io.Copy(w, struct{ io.Reader }{strings.NewReader("file contents")})
+		n, err := io.Copy(w, struct{ io.Reader }{strings.NewReader(body)})
+		if err != nil {
+			t.Errorf("io.Copy: %v", err)
+		}
+		if n != int64(len(body)) {
+			t.Errorf("io.Copy wrote %d bytes, want %d", n, len(body))
+		}
 	}), CaptureOptions{Metric: met})
 
 	inner := &fullWriter{ResponseRecorder: *httptest.NewRecorder()}
