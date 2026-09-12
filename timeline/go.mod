@@ -1,6 +1,6 @@
 module github.com/infodancer/web/timeline
 
-go 1.26.5
+go 1.26.6
 
 require (
 	cuelang.org/go v0.16.0

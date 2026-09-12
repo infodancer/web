@@ -1,6 +1,6 @@
 module github.com/infodancer/web/blog
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/infodancer/authz v0.1.0
