@@ -8,7 +8,10 @@ conventions.
 
 ## Toolchain
 
-- **Go** `1.26.5` (suite standard). Bump in lockstep across modules.
+- **Go** `1.26.6` (suite standard). Bump in lockstep across modules, and update
+  this line in the same change -- the `go` directive in every `go.mod` is the
+  source of truth, and these docs have drifted from it three times (#86, #111).
+  `git ls-files '*go.mod' | xargs grep -h '^go '` should report one version.
 - **Build tool**: [Task](https://taskfile.dev/). Root `Taskfile.yml` fans out
   across modules; module-specific tasks live in the module's own `Taskfile.yml`.
 - **Lint**: `golangci-lint` v2.10.1 (pinned in CI). Build it with a Go toolchain

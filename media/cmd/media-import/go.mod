@@ -1,6 +1,6 @@
 module github.com/infodancer/web/media/cmd/media-import
 
-go 1.26.5
+go 1.26.6
 
 // media is unpublished at the version carrying Ingest; resolve it from the
 // parent tree (the go.work workspace also wires this for local dev).
@@ -20,8 +20,8 @@ require (
 	github.com/pressly/goose/v3 v3.27.1 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/image v0.43.0 // indirect
+	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	modernc.org/libc v1.72.3 // indirect
 )

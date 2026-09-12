@@ -22,9 +22,14 @@ jobs:
   checks:
     uses: infodancer/workflows/.github/workflows/go-ci.yml@v0
     with:
-      # media/cmd/media-import is intentionally omitted -- it is not part of
-      # the checked module set today; add it here when it should be covered.
+      # media/cmd/media-import is a nested module under media/ that resolves
+      # the parent through `replace ../..`. It was never in the matrix: #51
+      # added it to go.work and the root Taskfile but not to the three
+      # per-module workflows of the day, and #95 carried that gap forward when
+      # it consolidated them. Nothing was checking it, so it drifted out of the
+      # suite standard (go 1.26.5 against a parent requiring 1.26.6) and stopped
+      # building entirely, which no run reported. Covered now.
       modules: >-
-        ["search", "notify", "blog", "claim", "contact", "newsletter", "media", "faq",
-         "timeline", "profile", "integration", "paging", "sitemap", "obs",
-         "errnotice", "pgtest"]
+        ["search", "notify", "blog", "claim", "contact", "newsletter", "media",
+         "media/cmd/media-import", "faq", "timeline", "profile", "integration",
+         "paging", "sitemap", "obs", "errnotice", "pgtest"]
