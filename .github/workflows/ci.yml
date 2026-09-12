@@ -27,4 +27,4 @@ jobs:
       modules: >-
         ["search", "notify", "blog", "claim", "contact", "newsletter", "media", "faq",
          "timeline", "profile", "integration", "paging", "sitemap", "obs",
-         "errnotice"]
+         "errnotice", "pgtest"]
