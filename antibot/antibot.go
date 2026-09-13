@@ -29,10 +29,18 @@ const (
 var (
 	defaultIPLimit    = Limit{Max: 5, Window: time.Hour}
 	defaultEmailLimit = Limit{Max: 3, Window: 24 * time.Hour}
+	// defaultAccountLimit suits a signed-in action a person takes a few times
+	// a day at most, like asking to join a group.
+	defaultAccountLimit = Limit{Max: 10, Window: 24 * time.Hour}
 )
 
 // ErrWeakSecret is returned by New when Config.Secret is shorter than 32 bytes.
 var ErrWeakSecret = fmt.Errorf("antibot: secret must be at least %d bytes", minSecretLen)
+
+// ErrEmptyAccount reports an Account option with no id, a caller bug: counted,
+// every such request would share one budget, and skipped, the limit would
+// silently not apply.
+var ErrEmptyAccount = errors.New("antibot: Account needs a non-empty id")
 
 // ErrFormNotParsed is returned by Check when the request's form has not been
 // parsed. Check reads the values the handler already parsed and never touches
@@ -97,10 +105,12 @@ type Config struct {
 	MinFill time.Duration
 	MaxAge  time.Duration
 
-	// IPLimit and EmailLimit bound submissions per form. The zero value takes
-	// the default (5 an hour per IP, 3 a day per email); NoLimit disables one.
-	IPLimit    Limit
-	EmailLimit Limit
+	// IPLimit, EmailLimit and AccountLimit bound submissions per form. The zero
+	// value takes the default (5 an hour per IP, 3 a day per email, 10 a day per
+	// account); NoLimit disables one.
+	IPLimit      Limit
+	EmailLimit   Limit
+	AccountLimit Limit
 
 	// LookupMX resolves mail servers. Nil uses net.DefaultResolver.
 	LookupMX func(ctx context.Context, domain string) ([]*net.MX, error)
@@ -122,6 +132,7 @@ type Guard struct {
 	maxAge        time.Duration
 	ipLimit       Limit
 	emailLimit    Limit
+	accountLimit  Limit
 	lookupMX      func(ctx context.Context, domain string) ([]*net.MX, error)
 	now           func() time.Time
 }
@@ -152,6 +163,7 @@ func newGuard(cfg Config, store db.Querier) (*Guard, error) {
 		maxAge:        orDuration(cfg.MaxAge, defaultMaxAge),
 		ipLimit:       orLimit(cfg.IPLimit, defaultIPLimit),
 		emailLimit:    orLimit(cfg.EmailLimit, defaultEmailLimit),
+		accountLimit:  orLimit(cfg.AccountLimit, defaultAccountLimit),
 		lookupMX:      cfg.LookupMX,
 		now:           cfg.Now,
 	}
@@ -167,7 +179,7 @@ func newGuard(cfg Config, store db.Querier) (*Guard, error) {
 	if g.now == nil {
 		g.now = time.Now
 	}
-	for name, l := range map[string]Limit{"IPLimit": g.ipLimit, "EmailLimit": g.emailLimit} {
+	for name, l := range map[string]Limit{"IPLimit": g.ipLimit, "EmailLimit": g.emailLimit, "AccountLimit": g.accountLimit} {
 		if l.Max > 0 && l.Window <= 0 {
 			return nil, fmt.Errorf("antibot: %s has a limit but no window", name)
 		}
@@ -179,8 +191,10 @@ func newGuard(cfg Config, store db.Querier) (*Guard, error) {
 type CheckOption func(*checkOptions)
 
 type checkOptions struct {
-	email    string
-	hasEmail bool
+	email      string
+	hasEmail   bool
+	account    string
+	hasAccount bool
 }
 
 // Email adds the submitted address to the check: its syntax, its per-address
@@ -192,12 +206,22 @@ func Email(addr string) CheckOption {
 	}
 }
 
+// Account adds the signed-in account to the check, counted against the
+// per-account limit however many addresses it posts from. id is the host's
+// stable identifier for the account; it must not be empty.
+func Account(id string) CheckOption {
+	return func(o *checkOptions) {
+		o.account = id
+		o.hasAccount = true
+	}
+}
+
 // Check decides whether a submission to form may proceed. The request's form
 // must already be parsed.
 //
-// A non-nil error means the limiter's store failed; the verdict is then a
-// rejection with ReasonUnavailable, and the caller should treat the submission
-// as failed rather than let it through.
+// A non-nil error means the limiter's store failed, or the call was wrong (an
+// unparsed form, an empty Account); the verdict is then a rejection, and the
+// caller should treat the submission as failed rather than let it through.
 func (g *Guard) Check(ctx context.Context, r *http.Request, form string, opts ...CheckOption) (Verdict, error) {
 	if r.PostForm == nil {
 		return Verdict{}, ErrFormNotParsed
@@ -214,8 +238,37 @@ func (g *Guard) Check(ctx context.Context, r *http.Request, form string, opts ..
 	if reason := g.verifyToken(form, r.PostForm.Get(g.tokenField)); reason != "" {
 		return g.reject(ctx, form, ip, reason, false), nil
 	}
+	return g.limits(ctx, form, ip, co)
+}
+
+// Limit counts a submission to form against its limits and checks nothing
+// else: no honeypot, no timing token, and no parsed form needed. It is for
+// forms behind a sign-in, where a bot has already had to get past the login
+// and the useful question is only how often; pass Account so the count
+// follows the account rather than its address. Email works as it does in
+// Check. Errors and the verdict mean what they mean for Check.
+func (g *Guard) Limit(ctx context.Context, r *http.Request, form string, opts ...CheckOption) (Verdict, error) {
+	var co checkOptions
+	for _, o := range opts {
+		o(&co)
+	}
+	return g.limits(ctx, form, g.proxies.ClientIP(r), co)
+}
+
+// limits runs the counters Check and Limit share: IP, then account, then the
+// email checks. The IP counts first so a flood from one address is turned away
+// before it costs a lookup.
+func (g *Guard) limits(ctx context.Context, form, ip string, co checkOptions) (Verdict, error) {
+	if co.hasAccount && co.account == "" {
+		return Verdict{Reason: ReasonUnavailable}, ErrEmptyAccount
+	}
 	if v, done, err := g.count(ctx, form, ip, kindIP, ipKey(ip), g.ipLimit); done {
 		return v, err
+	}
+	if co.hasAccount {
+		if v, done, err := g.count(ctx, form, ip, kindAccount, co.account, g.accountLimit); done {
+			return v, err
+		}
 	}
 	if !co.hasEmail {
 		return Verdict{Allowed: true}, nil
