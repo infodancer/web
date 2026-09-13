@@ -110,7 +110,7 @@ iframe use.
 
 ```bash
 task check                                    # fmt, vet, lint, test, vulncheck
-TEST_DATABASE_URL=postgres://… task test      # DB tests (skip without the DSN)
+WEB_TEST_PG=postgres://… task test            # DB tests (skip without the DSN)
 task generate                                 # regenerate the db package via sqlc
 ```
 
