@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/infodancer/web/newsletter/antibot"
+	"github.com/infodancer/web/antibot"
+	mx "github.com/infodancer/web/newsletter/antibot"
 	"github.com/infodancer/web/newsletter/listmonk"
 )
 
@@ -18,6 +19,12 @@ type Store interface {
 	MarkSynced(email string) error
 }
 
+// Guard decides whether a submission may proceed. *antibot.Guard satisfies it;
+// tests substitute a fake.
+type Guard interface {
+	Check(ctx context.Context, r *http.Request, form string, opts ...antibot.CheckOption) (antibot.Verdict, error)
+}
+
 // Subscribe is an http.Handler that accepts POST /subscribe requests,
 // records the email in the subscriber store, and forwards to Listmonk.
 // Response messages are configurable HTML fragments.
@@ -26,12 +33,22 @@ type Subscribe struct {
 	Listmonk *listmonk.Client
 	ListUUID string
 
+	// Guard checks each signup -- honeypot, timing token, rate limits, and the
+	// address's mail domain -- before it is stored. Nil falls back to the mail
+	// domain check alone, which puts no limit on volume.
+	Guard Guard
+
+	// Form names this form to the Guard, which keeps a separate token and
+	// budget per form. Default "newsletter".
+	Form string
+
 	// Response HTML fragments written back to the client.
 	MsgEmpty         string
 	MsgError         string
 	MsgDupe          string
 	MsgSuccess       string
 	MsgInvalidDomain string
+	MsgRejected      string // the Guard refused the signup
 
 	// Logger receives structured logs at the HTTP boundary. Defaults to
 	// [slog.Default] when nil (resolved once in New). The store and Listmonk
@@ -59,6 +76,8 @@ func New(store Store, lm *listmonk.Client, listUUID string) *Subscribe {
 		MsgDupe:          `<p class="error">You're already subscribed.</p>`,
 		MsgSuccess:       `<p class="success">You're on the list. We'll be in touch.</p>`,
 		MsgInvalidDomain: `<p class="error">Please check your email address and try again.</p>`,
+		MsgRejected:      `<p class="error">That did not go through. Please reload the page and try again.</p>`,
+		Form:             "newsletter",
 		Logger:           slog.Default(),
 		RequestID:        func(context.Context) string { return "" },
 	}
@@ -87,6 +106,34 @@ func writeMessage(w http.ResponseWriter, msg string) {
 	_, _ = w.Write([]byte(msg)) //nolint:gosec // G705: static operator-configured message constant, not request-derived
 }
 
+// admit asks the Guard about the signup and, when the answer is no, writes this
+// form's response. It reports whether the handler should carry on.
+//
+// The Guard fails closed: an error means its store could not be reached, and
+// the signup is refused rather than let through unchecked. Rejections are
+// logged by the Guard, so only the error is logged here.
+func (h *Subscribe) admit(w http.ResponseWriter, r *http.Request, log *slog.Logger, email string) bool {
+	form := h.Form
+	if form == "" {
+		form = "newsletter"
+	}
+	v, err := h.Guard.Check(r.Context(), r, form, antibot.Email(email))
+	switch {
+	case err != nil:
+		log.Error("antibot check failed", "err", err)
+		writeMessage(w, h.MsgError)
+	case v.Allowed:
+		return true
+	case v.Silent:
+		writeMessage(w, h.MsgSuccess)
+	case v.Reason == antibot.ReasonInvalidEmail || v.Reason == antibot.ReasonNoMX:
+		writeMessage(w, h.MsgInvalidDomain)
+	default:
+		writeMessage(w, h.MsgRejected)
+	}
+	return false
+}
+
 func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -109,7 +156,11 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := antibot.ValidateMX(email); err != nil {
+	if h.Guard != nil {
+		if !h.admit(w, r, log, email) {
+			return
+		}
+	} else if err := mx.ValidateMX(email); err != nil {
 		// User input rejection, not a server fault: the submitted address has no
 		// usable mail domain. INFO so an operator can spot abuse patterns without
 		// it polluting the error stream.
