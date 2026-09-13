@@ -20,10 +20,7 @@ on:
 
 jobs:
   checks:
-    # TEMPORARY: pinned to infodancer/workflows feat/test-postgres to prove
-    # test_postgres_env in real CI before that change merges. Switch back to
-    # @v0 once it is tagged, before this PR merges.
-    uses: infodancer/workflows/.github/workflows/go-ci.yml@2ca7fea3ed93b7d1348c9f08eb46db1524f55c5d
+    uses: infodancer/workflows/.github/workflows/go-ci.yml@v0
     with:
       # Hand every test job a PostgreSQL to create databases on, so pgtest
       # suites run in CI instead of skipping (antibot, and pgtest itself).
