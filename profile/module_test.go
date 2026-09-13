@@ -9,20 +9,18 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/infodancer/web/pgtest"
 	profile "github.com/infodancer/web/profile"
 	"github.com/infodancer/web/profile/profileuser"
 )
 
 const basePath = "/profile"
 
+// newPool gives the test its own empty database, from pgtest, dropped when the
+// test ends. The test skips when WEB_TEST_PG is unset.
 func newPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	pool, err := pgxpool.New(context.Background(), testDSN)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return pgtest.Pool(t)
 }
 
 type resolver struct{ u *profileuser.User }
