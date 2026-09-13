@@ -9,8 +9,8 @@ replace (
 
 require (
 	github.com/infodancer/logging/httplog v0.1.2
-	github.com/infodancer/web/antibot v0.0.0-00010101000000-000000000000
-	github.com/infodancer/web/pgtest v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/antibot v0.1.1
+	github.com/infodancer/web/pgtest v0.1.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pressly/goose/v3 v3.28.0
 )
