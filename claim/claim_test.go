@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,31 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/infodancer/web/claim"
+	"github.com/infodancer/web/pgtest"
 )
 
 // newModule builds a migrated module against a fresh database, so each test
 // starts from an empty table and the partial unique indexes cannot carry state
-// between tests.
+// between tests. The database comes from pgtest and is dropped when the test
+// ends; the test skips when WEB_TEST_PG is unset.
 func newModule(t *testing.T, opts ...func(*claim.Config)) (*claim.Module, *pgxpool.Pool) {
 	t.Helper()
-	ctx := context.Background()
-
-	admin, err := pgxpool.New(ctx, claim.ContainerDSN())
-	require.NoError(t, err)
-	defer admin.Close()
-
-	dbName := "claim_" + strings.ToLower(strings.NewReplacer("/", "", "-", "", " ", "_").Replace(t.Name()))
-	if len(dbName) > 60 {
-		dbName = dbName[:60]
-	}
-	_, err = admin.Exec(ctx, `DROP DATABASE IF EXISTS `+dbName)
-	require.NoError(t, err)
-	_, err = admin.Exec(ctx, `CREATE DATABASE `+dbName)
-	require.NoError(t, err)
-
-	pool, err := pgxpool.New(ctx, strings.Replace(claim.ContainerDSN(), "/claim_test?", "/"+dbName+"?", 1))
-	require.NoError(t, err)
-	t.Cleanup(pool.Close)
+	pool := pgtest.Pool(t)
 
 	cfg := claim.Config{DB: pool, AutoMigrate: true}
 	for _, o := range opts {
