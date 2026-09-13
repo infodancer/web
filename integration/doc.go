@@ -13,7 +13,8 @@
 //     wiring, dependency-injection, template, and config faults that 500 on
 //     first request even when migrations and stores are green.
 //
-// The tests require a Postgres reachable at TEST_DATABASE_URL and are skipped
-// when it is unset, so a plain `go test` without a database passes; CI sets it
-// to the workflow's Postgres service.
+// Each test takes a private database from pgtest on the server named by
+// WEB_TEST_PG, and skips when it is unset, so a plain `go test` without a
+// database passes. CI sets it through the shared workflow's test_postgres_env;
+// the server must carry pgvector, because the smoke test mounts search.
 package integration

@@ -18,7 +18,7 @@ import (
 // a route we deliberately probe is a failure; nothing should be silently
 // skipped except routes we did not register.
 func TestSmokeAllComponents(t *testing.T) {
-	pool := newTestPool(t) // skips when TEST_DATABASE_URL is unset
+	pool := newTestPool(t) // skips when WEB_TEST_PG is unset
 	app := buildSmokeApp(t, pool)
 	ctx := context.Background()
 
