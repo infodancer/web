@@ -22,6 +22,9 @@ jobs:
   checks:
     uses: infodancer/workflows/.github/workflows/go-ci.yml@v0
     with:
+      # Hand every test job a PostgreSQL to create databases on, so pgtest
+      # suites run in CI instead of skipping (antibot, and pgtest itself).
+      test_postgres_env: WEB_TEST_PG
       # media/cmd/media-import is a nested module under media/ that resolves
       # the parent through `replace ../..`. It was never in the matrix: #51
       # added it to go.work and the root Taskfile but not to the three
@@ -30,7 +33,7 @@ jobs:
       # suite standard (go 1.26.5 against a parent requiring 1.26.6) and stopped
       # building entirely, which no run reported. Covered now.
       modules: >-
-        ["search", "notify", "blog", "claim", "contact", "newsletter", "media",
+        ["search", "notify", "blog", "claim", "contact", "newsletter", "antibot", "media",
          "media/cmd/media-import", "faq", "timeline", "profile", "integration",
          "paging", "sitemap", "obs", "errnotice", "pgtest"]
       # Assert every tracked go.mod agrees on the go directive, and that
