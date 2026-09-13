@@ -30,7 +30,7 @@ jobs:
       # suite standard (go 1.26.5 against a parent requiring 1.26.6) and stopped
       # building entirely, which no run reported. Covered now.
       modules: >-
-        ["search", "notify", "blog", "claim", "contact", "newsletter", "media",
+        ["search", "notify", "blog", "claim", "contact", "newsletter", "antibot", "media",
          "media/cmd/media-import", "faq", "timeline", "profile", "integration",
          "paging", "sitemap", "obs", "errnotice", "pgtest"]
       # Assert every tracked go.mod agrees on the go directive, and that
