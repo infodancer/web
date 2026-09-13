@@ -241,3 +241,48 @@ func (f *fakeT) Cleanup(func()) {} // the fake never runs cleanups
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
+
+// dbNameOf reports which database a pool is connected to.
+func dbNameOf(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	var name string
+	if err := pool.QueryRow(context.Background(), "SELECT current_database()").Scan(&name); err != nil {
+		t.Fatalf("current_database: %v", err)
+	}
+	return name
+}
+
+// A helper called twice in one test must land on one database, or the store it
+// returned first and the one it returns second silently diverge.
+func TestSharedReturnsTheSameDatabaseWithinATest(t *testing.T) {
+	requireServer(t)
+	first := pgtest.Shared(t)
+	second := pgtest.Shared(t)
+	if first != second || dbNameOf(t, first) != dbNameOf(t, second) {
+		t.Fatal("Shared returned a different database on the second call in one test")
+	}
+}
+
+func TestSharedGivesEachTestItsOwnDatabase(t *testing.T) {
+	requireServer(t)
+	var first, second string
+	t.Run("first", func(t *testing.T) { first = dbNameOf(t, pgtest.Shared(t)) })
+	t.Run("second", func(t *testing.T) { second = dbNameOf(t, pgtest.Shared(t)) })
+	if first == "" || first == second {
+		t.Fatalf("two tests shared a database: %q and %q", first, second)
+	}
+}
+
+func TestSharedMigratesOnTheFirstCallOnly(t *testing.T) {
+	requireServer(t)
+	calls := 0
+	migrate := pgtest.WithMigrate(func(context.Context, *pgxpool.Pool) error {
+		calls++
+		return nil
+	})
+	pgtest.Shared(t, migrate)
+	pgtest.Shared(t, migrate)
+	if calls != 1 {
+		t.Fatalf("migrate ran %d times, want once", calls)
+	}
+}
