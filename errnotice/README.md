@@ -92,8 +92,7 @@ propagates an error -- a write failure is logged at `ERROR` and swallowed.
 
 ```
 task generate          # regenerate db/ from db/queries.sql via sqlc (after schema/query edits)
-task test              # unit tests, no Docker
-task test:integration  # Postgres-backed tests (Docker, testcontainers)
+task test              # all tests; Postgres-backed ones skip without WEB_TEST_PG
 task check             # fmt, vet, lint, test, vulncheck
 ```
 

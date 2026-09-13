@@ -14,7 +14,7 @@ tasks:
       - go build ./...
 
   test:
-    desc: Run tests with the race detector (DB tests skip without TEST_DATABASE_URL)
+    desc: Run tests with the race detector (DB tests skip without WEB_TEST_PG)
     cmds:
       - go test -race -count=1 ./...
 

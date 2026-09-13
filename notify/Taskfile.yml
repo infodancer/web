@@ -22,7 +22,7 @@ tasks:
       - go install ./cmd/notifyctl
 
   test:
-    desc: Run unit tests with race detector (no Docker required)
+    desc: Run tests with the race detector (DB tests skip without WEB_TEST_PG)
     cmds:
       - go test -race -count=1 ./...
 
@@ -31,11 +31,6 @@ tasks:
     cmds:
       - go test -race -count=1 -coverprofile={{.COVERAGE_FILE}} ./...
       - go tool cover -func={{.COVERAGE_FILE}} | tail -1
-
-  test:integration:
-    desc: Run integration tests (requires Docker for testcontainers)
-    cmds:
-      - go test -race -count=1 -tags=integration ./...
 
   fmt:
     desc: Format code

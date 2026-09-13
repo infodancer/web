@@ -3,8 +3,8 @@
 ## Local development
 
 Requires Go (`stable` or `oldstable` — see `.github/workflows/ci.yml` for the
-exact matrix), [Task](https://taskfile.dev), and Docker (for integration tests
-against Postgres via testcontainers).
+exact matrix), [Task](https://taskfile.dev), and a PostgreSQL server named by
+`WEB_TEST_PG` for the integration tests, which skip without it.
 
 ```
 task test       # unit tests with race detector
@@ -25,7 +25,7 @@ task generate   # regenerate store/ from store/queries.sql via sqlc
   live under `cmd/<name>/`.
 - All exported symbols carry doc comments.
 - Tests use the `package foo_test` black-box form where it makes sense.
-  Integration tests hit a real Postgres via testcontainers — no mocks for the
+  Integration tests hit a real Postgres, a private database per test from `pgtest` — no mocks for the
   store layer.
 
 ## Module extension points

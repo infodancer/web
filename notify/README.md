@@ -141,8 +141,7 @@ via `NOTIFY_ADDR` (default `:8099`).
 ## Development
 
 ```
-task test              # unit tests (race + goleak, no Docker)
-task test:integration  # integration tests (testcontainers — needs Docker)
+task test              # all tests (race + goleak); Postgres-backed ones skip without WEB_TEST_PG
 task generate          # regenerate db/ from db/queries.sql via sqlc
 task check             # fmt, vet, lint, test, vulncheck
 ```

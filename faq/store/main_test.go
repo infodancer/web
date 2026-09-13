@@ -1,12 +1,9 @@
-//go:build integration
-
 package store_test
 
 import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -16,50 +13,18 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/infodancer/web/faq/store"
+	"github.com/infodancer/web/pgtest"
 )
 
+// testPool is the current test's database, set by freshStore. It is package
+// level so the tests that query it directly need no change, which is sound only
+// because no test in this package calls t.Parallel: a parallel test would see
+// another test's database.
 var testPool *pgxpool.Pool
 
-func TestMain(m *testing.M) {
-	ctx := context.Background()
-
-	pg, err := postgres.Run(ctx,
-		"postgres:17-alpine",
-		postgres.WithDatabase("faq_test"),
-		postgres.WithUsername("test"),
-		postgres.WithPassword("test"),
-		postgres.BasicWaitStrategies(),
-	)
-	if err != nil {
-		log.Fatalf("postgres container: %v", err)
-	}
-
-	connStr, err := pg.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		log.Fatalf("connection string: %v", err)
-	}
-
-	testPool, err = pgxpool.New(ctx, connStr)
-	if err != nil {
-		log.Fatalf("pool: %v", err)
-	}
-
-	if err := runMigrations(testPool); err != nil {
-		log.Fatalf("migrations: %v", err)
-	}
-
-	code := m.Run()
-
-	testPool.Close()
-	_ = pg.Terminate(ctx)
-
-	os.Exit(code)
-}
-
-func runMigrations(pool *pgxpool.Pool) error {
+func runMigrations(_ context.Context, pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
 	defer func() { _ = db.Close() }()
 
@@ -74,13 +39,15 @@ func runMigrations(pool *pgxpool.Pool) error {
 	return nil
 }
 
-// freshStore truncates all faq_* tables (RESTART IDENTITY CASCADE) and returns
-// a fresh Store. Use at the top of every integration test for isolation.
+// freshStore returns a Store on this test's database, emptied. The database comes
+// from pgtest.Shared: created and migrated on the first call, reused by later
+// calls in the same test, dropped when the test ends, and skipped when
+// WEB_TEST_PG is unset. Use at the top of every integration test.
 func freshStore(t *testing.T) *store.Store {
 	t.Helper()
-	ctx := context.Background()
+	testPool = pgtest.Shared(t, pgtest.WithMigrate(runMigrations))
 
-	_, err := testPool.Exec(ctx, `TRUNCATE
+	_, err := testPool.Exec(context.Background(), `TRUNCATE
 		faq_comments, faq_votes, faq_question_tags, faq_answers,
 		faq_questions, faq_subsite_tags, faq_subsites,
 		faq_tags, faq_imported_authors,

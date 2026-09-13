@@ -835,7 +835,7 @@ Test-driven, per standing preference.
   split, preamble); RRF fusion math; cursor encode/decode; config reader layering;
   the v1 visibility hard-refusal; (v2) the three-state filter semantics including
   `Omit`-from-counts.
-- **Integration (real Postgres + `pgvector`, testcontainers):** migrations + dim
+- **Integration (real Postgres + `pgvector`, via `pgtest`):** migrations + dim
   bootstrap; incremental hash gating; soft-delete reconciliation + bulk-reap abort +
   GC; FTS ranking; vector + RRF with a **fake `Embedder`** (deterministic vectors);
   fingerprint-mismatch refusal and `--reembed`.

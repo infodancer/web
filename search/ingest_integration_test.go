@@ -2,12 +2,11 @@ package search_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	embedding "github.com/matthewjhunter/go-embedding"
 
+	"github.com/infodancer/web/pgtest"
 	"github.com/infodancer/web/search"
 	"github.com/infodancer/web/search/store"
 )
@@ -34,21 +33,11 @@ func (s stubEmbedder) Fingerprint() embedding.Fingerprint {
 }
 
 // TestIngest_Integration exercises the real write queries and the FTS round-trip
-// against a live Postgres. It is skipped unless SEARCH_TEST_DSN points at a
-// throwaway database (the schema is created by AutoMigrate and rows are written),
-// so it never runs in CI, which has no Postgres service.
+// against a live Postgres: a private database from pgtest, where AutoMigrate
+// creates the schema. It skips when WEB_TEST_PG is unset.
 func TestIngest_Integration(t *testing.T) {
-	dsn := os.Getenv("SEARCH_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set SEARCH_TEST_DSN to a throwaway Postgres to run the ingestion integration test")
-	}
 	ctx := context.Background()
-
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer pool.Close()
+	pool := pgtest.Pool(t)
 
 	m, err := search.New(search.Config{DB: pool, IndexerDB: pool, AutoMigrate: true})
 	if err != nil {
@@ -142,19 +131,10 @@ func TestIngest_Integration(t *testing.T) {
 // TestIngest_Embeddings_Integration verifies the lazy embedding bootstrap and
 // chunk-write path: indexing with an embedder creates the pgvector chunk table,
 // the HNSW index, and one chunk row per section, and records the dimension in
-// the index meta. Requires a pgvector-capable Postgres at SEARCH_TEST_DSN.
+// the index meta. Requires pgvector on the WEB_TEST_PG server.
 func TestIngest_Embeddings_Integration(t *testing.T) {
-	dsn := os.Getenv("SEARCH_TEST_DSN")
-	if dsn == "" {
-		t.Skip("set SEARCH_TEST_DSN to a pgvector-capable Postgres to run the embedding integration test")
-	}
 	ctx := context.Background()
-
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer pool.Close()
+	pool := pgtest.Pool(t)
 
 	const (
 		src  = "db"

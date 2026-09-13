@@ -13,20 +13,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/infodancer/web/media"
+	"github.com/infodancer/web/pgtest"
 	"github.com/infodancer/web/timeline"
 	"github.com/infodancer/web/timeline/internal/transfer"
 	"github.com/infodancer/web/timeline/timelineuser"
 )
 
-// newPool connects to the package's testcontainers Postgres (see TestMain).
+// newPool gives the test its own empty database, from pgtest, dropped when the
+// test ends. The test skips when WEB_TEST_PG is unset.
 func newPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	pool, err := pgxpool.New(context.Background(), testDSN)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return pgtest.Pool(t)
 }
 
 // resolver returns a fixed user (or nil for anonymous) regardless of request.
@@ -217,7 +214,7 @@ func TestHandlerErrorLogsAreStructured(t *testing.T) {
 	// Own the pool directly: this test closes it mid-flight to force a query
 	// error, so it must not also be closed by newPool's t.Cleanup (pgxpool
 	// panics on a double close).
-	pool, err := pgxpool.New(context.Background(), testDSN)
+	pool, err := pgxpool.New(context.Background(), pgtest.DSN(t))
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

@@ -9,10 +9,10 @@ name: CI
 # the current Go release, so stdlib advisories fixed in a newer patch resolve
 # on the next run instead of pinning every module's go.mod. Dependency
 # advisories still gate on reachability (the reusable govulncheck job fails
-# only on a called symbol). run_tests is left on -- the shared test job already
-# runs `go test -race -count=1 ./...` per module with the testcontainers Ryuk
-# reaper disabled and a deterministic label-based reap, which is exactly what
-# this suite needs (see infodancer/web#90).
+# only on a called symbol). run_tests is left on -- the shared test job runs
+# `go test -race -count=1 ./...` per module, and test_postgres_env below hands
+# each job a PostgreSQL server, so the pgtest suites run their database tests
+# instead of skipping them.
 on:
   push:
     branches: [main, master]
@@ -25,6 +25,9 @@ jobs:
       # Hand every test job a PostgreSQL to create databases on, so pgtest
       # suites run in CI instead of skipping (antibot, and pgtest itself).
       test_postgres_env: WEB_TEST_PG
+      # search creates the vector extension, and the integration smoke test
+      # mounts search, so the server has to carry pgvector.
+      test_postgres_image: pgvector/pgvector:pg17
       # media/cmd/media-import is a nested module under media/ that resolves
       # the parent through `replace ../..`. It was never in the matrix: #51
       # added it to go.work and the root Taskfile but not to the three

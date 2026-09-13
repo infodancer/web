@@ -10,7 +10,7 @@ Pre-implementation. No build commands yet; they'll land with v0.1 implementation
 
 - Apache-2.0 license; new files don't need per-file headers (repo-level LICENSE covers them).
 - `gofmt`, `go vet`, `golangci-lint`, `govulncheck` all clean.
-- Tests against real Postgres via testcontainers; build tag `integration` for the expensive tests.
+- Handler tests run against an in-memory fake store; Postgres tests live in the monorepo `integration` module, which takes a private database per test from `pgtest` (`WEB_TEST_PG`).
 - Markdown rendering pipeline identical to [`github.com/matthewjhunter/faq`](https://github.com/matthewjhunter/faq) (goldmark + bluemonday). See faq's `internal/render` for the reference implementation; this module copies until the two converge enough to justify extracting to a shared package.
 
 ## Reporting issues

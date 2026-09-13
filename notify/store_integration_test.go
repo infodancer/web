@@ -1,59 +1,26 @@
-//go:build integration
-
 package notify
 
 import (
 	"context"
-	"log"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/infodancer/web/pgtest"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
+// testPool is the current test's database, set by freshStore. It is package
+// level so the tests that query it directly need no change, which is sound only
+// because no database test in this package calls t.Parallel.
 var testPool *pgxpool.Pool
 
-func TestMain(m *testing.M) {
-	ctx := context.Background()
-
-	pg, err := postgres.Run(ctx,
-		"postgres:17-alpine",
-		postgres.WithDatabase("notify_test"),
-		postgres.WithUsername("test"),
-		postgres.WithPassword("test"),
-		postgres.BasicWaitStrategies(),
-	)
-	if err != nil {
-		log.Fatalf("postgres container: %v", err)
-	}
-
-	connStr, err := pg.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		log.Fatalf("connection string: %v", err)
-	}
-
-	testPool, err = pgxpool.New(ctx, connStr)
-	if err != nil {
-		log.Fatalf("pool: %v", err)
-	}
-
-	if err := Migrate(ctx, testPool); err != nil {
-		log.Fatalf("migrate: %v", err)
-	}
-
-	code := m.Run()
-
-	testPool.Close()
-	_ = pg.Terminate(ctx)
-	os.Exit(code)
-}
-
-// freshStore truncates the notify tables and returns a clean Store.
+// freshStore returns a clean Store on this test's database. The database comes
+// from pgtest.Shared: created and migrated on the first call, reused by later
+// calls in the same test, and skipped when WEB_TEST_PG is unset.
 func freshStore(t *testing.T) *Store {
 	t.Helper()
+	testPool = pgtest.Shared(t, pgtest.WithMigrate(Migrate))
 	_, err := testPool.Exec(context.Background(),
 		`TRUNCATE notify_events, notify_user_notifications, notify_admin_read_cursor RESTART IDENTITY`)
 	require.NoError(t, err)
@@ -261,6 +228,7 @@ func TestAdminUnreadAndMarkSeen(t *testing.T) {
 }
 
 func TestMigrateIdempotent(t *testing.T) {
+	pool := pgtest.Shared(t, pgtest.WithMigrate(Migrate))
 	// Running Migrate again against the already-migrated pool must be a no-op.
-	require.NoError(t, Migrate(context.Background(), testPool))
+	require.NoError(t, Migrate(context.Background(), pool))
 }

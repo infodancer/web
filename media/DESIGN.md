@@ -248,7 +248,7 @@ way (new vectors are added, never removed):
 - truncated / zero-byte / non-image (PDF, HTML) — rejected.
 
 The pipeline corpus needs no database. Store and handler get Postgres-backed
-tests via testcontainers behind the `integration` build tag, plus an in-memory
+tests against a private database per test from `pgtest`, plus an in-memory
 `BlobStore` and a fake store interface for fast handler unit tests.
 
 ## Versioning

@@ -46,6 +46,6 @@ separately inside osg's own server).
 - Follow the monorepo [CONVENTIONS.md](../CONVENTIONS.md): Task, golangci-lint,
   govulncheck, goose, sqlc + pgx/v5, Postgres only, host owns the pool.
 - Tests: handler unit tests on an in-memory fake store; Postgres integration
-  tests live in the monorepo `integration` module (TEST_DATABASE_URL).
+  tests live in the monorepo `integration` module (WEB_TEST_PG).
 - No frontend framework. htmx + vanilla JS; templates consume `infodancer/ui`
   tokens through a `--blog-*` chain.

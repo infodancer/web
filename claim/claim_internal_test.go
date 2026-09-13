@@ -3,7 +3,6 @@ package claim
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/infodancer/web/claim/db"
+	"github.com/infodancer/web/pgtest"
 )
 
 // These tests sit inside the package on purpose. The exported Consume performs
@@ -24,37 +24,11 @@ import (
 // database where concurrency cannot get around it, and it has to be tested
 // there directly rather than through the layer that masks it.
 
+// newTestPool gives the test its own empty database, from pgtest. The tests here
+// migrate it themselves through New.
 func newTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	ctx := context.Background()
-
-	admin, err := pgxpool.New(ctx, testDSN)
-	if err != nil {
-		t.Fatalf("admin pool: %v", err)
-	}
-	defer admin.Close()
-
-	// Lowercased because Postgres folds unquoted identifiers, so a mixed-case
-	// CREATE DATABASE cannot be connected to by the name as written.
-	name := strings.ToLower("claim_internal_" + t.Name())
-	if _, err := admin.Exec(ctx, `DROP DATABASE IF EXISTS `+name); err != nil {
-		t.Fatalf("drop database: %v", err)
-	}
-	if _, err := admin.Exec(ctx, `CREATE DATABASE `+name); err != nil {
-		t.Fatalf("create database: %v", err)
-	}
-
-	dsn := replaceDB(testDSN, name)
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatalf("pool: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
-}
-
-func replaceDB(dsn, name string) string {
-	return strings.Replace(dsn, "/claim_test?", "/"+name+"?", 1)
+	return pgtest.Pool(t)
 }
 
 // TestConsumeQueryIsSingleUseAtTheDatabase drives the generated query directly,

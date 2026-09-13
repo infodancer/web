@@ -6,7 +6,8 @@ closest sibling).
 - **Test-driven.** Add or update tests with every change. Pure-Go logic
   (config defaults, the rerank pass-through, cursor encode/decode) gets unit
   tests; anything touching SQL gets an integration test against a real
-  Postgres via `testcontainers`.
+  Postgres, a private database per test from `pgtest` (set `WEB_TEST_PG`;
+  the server needs `pgvector`).
 - **Toolchain.** `pgxpool` + `goose` + `sqlc`. Regenerate the store with
   `sqlc generate` from `store/` after editing `queries.sql` or a migration.
 - **CI must stay green:** `gofmt`, `go vet`, `go test -race`,

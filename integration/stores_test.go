@@ -6,20 +6,17 @@ import (
 
 	"github.com/infodancer/web/contact/submissions"
 	"github.com/infodancer/web/newsletter/subscribers"
+	"github.com/infodancer/web/pgtest"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// newTestPool connects to the suite's testcontainers Postgres (see TestMain).
-// The suite shares one database across components by design; each test
-// truncates its own tables.
+// newTestPool gives the test its own empty database, from pgtest, dropped when
+// the test ends; the test skips when WEB_TEST_PG is unset. Several components
+// migrate into that one database, which is the point of this suite: they share
+// a database without colliding.
 func newTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	pool, err := pgxpool.New(context.Background(), testDSN)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return pgtest.Pool(t)
 }
 
 func mustExec(t *testing.T, pool *pgxpool.Pool, sql string) {

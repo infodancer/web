@@ -58,8 +58,9 @@ module follows.
 ## Commands
 
 - `task check` — fmt, vet, lint, test, vulncheck (the gating set).
-- `TEST_DATABASE_URL=postgres://… task test` — DB-backed tests; they skip when
-  the DSN is unset (matching CI, which provides a Postgres service).
+- `WEB_TEST_PG=postgres://… task test` — DB-backed tests take a private database
+  from `pgtest` and skip when it is unset. CI sets it through the shared
+  workflow's `test_postgres_env`.
 - `task generate` — regenerate the `db` package via the pinned sqlc.
 - Build the suite-wide tasks from the repo root (`task build` / `task test`).
 

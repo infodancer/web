@@ -1,5 +1,3 @@
-//go:build integration
-
 package handler_test
 
 import (
@@ -17,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	uiassets "github.com/infodancer/ui"
 
@@ -25,6 +22,7 @@ import (
 	"github.com/infodancer/web/faq/internal/handler"
 	"github.com/infodancer/web/faq/internal/render"
 	"github.com/infodancer/web/faq/store"
+	"github.com/infodancer/web/pgtest"
 )
 
 var (
@@ -33,33 +31,6 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	ctx := context.Background()
-
-	pg, err := postgres.Run(ctx,
-		"postgres:17-alpine",
-		postgres.WithDatabase("faq_handler_test"),
-		postgres.WithUsername("test"),
-		postgres.WithPassword("test"),
-		postgres.BasicWaitStrategies(),
-	)
-	if err != nil {
-		log.Fatalf("postgres container: %v", err)
-	}
-
-	connStr, err := pg.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		log.Fatalf("connection string: %v", err)
-	}
-
-	testPool, err = pgxpool.New(ctx, connStr)
-	if err != nil {
-		log.Fatalf("pool: %v", err)
-	}
-
-	if err := runMigrations(testPool); err != nil {
-		log.Fatalf("migrations: %v", err)
-	}
-
 	// Load the embedded templates once. Since this file is outside the
 	// faq package, we use the os filesystem rooted at the repo's
 	// templates directory rather than the embed.FS in faq.go.
@@ -68,14 +39,10 @@ func TestMain(m *testing.M) {
 		log.Fatalf("templates: %v", err)
 	}
 	testTemplates = tpls
-
-	code := m.Run()
-	testPool.Close()
-	_ = pg.Terminate(ctx)
-	os.Exit(code)
+	os.Exit(m.Run())
 }
 
-func runMigrations(pool *pgxpool.Pool) error {
+func runMigrations(_ context.Context, pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
 	defer func() { _ = db.Close() }()
 
@@ -90,13 +57,20 @@ func runMigrations(pool *pgxpool.Pool) error {
 	return nil
 }
 
-// freshServer truncates the faq_* tables and returns a wired handler.Server
+// freshServer empties this test's database and returns a wired handler.Server
 // plus the underlying store so tests can seed it directly.
 func freshServer(t *testing.T, opts ...func(*handler.Deps)) (*handler.Server, *store.Store) {
 	t.Helper()
-	ctx := context.Background()
 
-	_, err := testPool.Exec(ctx, `TRUNCATE
+	// This test's database from pgtest.Shared: created and migrated on the first
+	// call, reused by a second freshServer in the same test -- which some tests
+	// make, and then keep using the store from the first -- and emptied on every
+	// call. testPool is package level so the tests that query it directly need no
+	// change, which is sound only because no test in this package calls
+	// t.Parallel.
+	testPool = pgtest.Shared(t, pgtest.WithMigrate(runMigrations))
+
+	_, err := testPool.Exec(context.Background(), `TRUNCATE
 		faq_comments, faq_votes, faq_question_tags, faq_answers,
 		faq_subsite_questions,
 		faq_questions, faq_subsite_tags, faq_subsites,

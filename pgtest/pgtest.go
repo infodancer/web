@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -107,6 +108,35 @@ func Pool(t TestingT, opts ...Option) *pgxpool.Pool {
 			return nil
 		}
 	}
+	return pool
+}
+
+// shared maps a test to the pool Shared created for it, so later calls from the
+// same test return that pool. Entries are removed when the test ends.
+var shared sync.Map // TestingT -> *pgxpool.Pool
+
+// Shared returns this test's database: created and migrated on the first call,
+// the same pool on every later call from the same test. Options apply to the
+// first call only.
+//
+// It is for suites written against one database per package that a helper
+// empties before each test. Such a helper is sometimes called twice in one test,
+// and the test keeps using the store it got from the first call. With Pool the
+// second call would hand back a different, empty database, so writes through
+// the first store would land where anything built on the second never looks.
+// Shared keeps both calls on one database, and the helper's own TRUNCATE gives
+// the second call the clean slate the test was written against.
+func Shared(t TestingT, opts ...Option) *pgxpool.Pool {
+	t.Helper()
+	if p, ok := shared.Load(t); ok {
+		return p.(*pgxpool.Pool)
+	}
+	pool := Pool(t, opts...)
+	if pool == nil {
+		return nil // skipped or failed; the test is already over
+	}
+	shared.Store(t, pool)
+	t.Cleanup(func() { shared.Delete(t) })
 	return pool
 }
 
