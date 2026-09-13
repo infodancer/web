@@ -14,11 +14,6 @@ tasks:
     cmds:
       - go test -race -count=1 ./...
 
-  test-integration:
-    desc: Run integration tests (requires Docker for testcontainers)
-    cmds:
-      - go test -tags integration -race -count=1 -timeout 5m ./...
-
   build:
     desc: Verify the Go module builds
     cmds:
