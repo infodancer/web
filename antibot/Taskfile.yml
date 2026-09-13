@@ -1,0 +1,75 @@
+version: '3'
+
+vars:
+  COVERAGE_FILE: coverage.out
+
+tasks:
+  default:
+    cmds:
+      - task: check
+
+  build:
+    desc: Build all packages (library-only; used by a host)
+    cmds:
+      - go build ./...
+
+  test:
+    desc: Run tests with the race detector
+    cmds:
+      - go test -race -count=1 ./...
+
+  test:cover:
+    desc: Run tests with coverage
+    cmds:
+      - go test -race -count=1 -coverprofile={{.COVERAGE_FILE}} ./...
+      - go tool cover -func={{.COVERAGE_FILE}} | tail -1
+
+  fmt:
+    desc: Format code
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Fail if any file needs formatting
+    cmds:
+      - test -z "$(gofmt -l .)"
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run ./...
+
+  vulncheck:
+    desc: Run govulncheck
+    cmds:
+      - govulncheck ./...
+
+  check:
+    desc: All gating checks (fmt, vet, lint, test, vulncheck)
+    cmds:
+      - task: fmt:check
+      - task: vet
+      - task: lint
+      - task: test
+      - task: vulncheck
+
+  sqlc:
+    desc: Regenerate the db package from migrations and queries
+    dir: db
+    cmds:
+      - sqlc generate
+
+  tidy:
+    desc: go mod tidy
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -f {{.COVERAGE_FILE}} coverage.html
