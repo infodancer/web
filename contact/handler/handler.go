@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -16,6 +15,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/infodancer/logging/httplog"
+	"github.com/infodancer/web/antibot"
 	"github.com/infodancer/web/contact/submissions"
 )
 
@@ -35,6 +36,12 @@ type Store interface {
 	Save(ctx context.Context, sub *submissions.Submission) error
 	MarkSent(ctx context.Context, id int64) error
 	MarkFailed(ctx context.Context, id int64, errMsg string) error
+}
+
+// Guard decides whether a submission may proceed. *antibot.Guard satisfies it;
+// tests substitute a fake.
+type Guard interface {
+	Check(ctx context.Context, r *http.Request, form string, opts ...antibot.CheckOption) (antibot.Verdict, error)
 }
 
 // Message is the wire representation of an outgoing email.
@@ -77,8 +84,22 @@ type Contact struct {
 	SubjectTmpl *template.Template
 	BodyTmpl    *template.Template
 
-	// Spam protection. Honeypot field name is read from the form; if non-empty
-	// the request is silently accepted (200) without persisting or emailing.
+	// Guard checks each submission -- honeypot, timing token, rate limits, and
+	// the email's mail domain -- before anything is stored or sent. Nil falls
+	// back to the honeypot check below, which puts no limit on volume.
+	Guard Guard
+
+	// Form names this form to the Guard, which keeps a separate token and
+	// budget per form. Default "contact".
+	Form string
+
+	// Proxies decides whose X-Forwarded-For is believed when recording the
+	// sender's address. The zero value trusts nothing and records the peer.
+	Proxies httplog.Proxies
+
+	// Honeypot field used only when Guard is nil: if the named field is
+	// non-empty the request is silently accepted (200) without persisting or
+	// emailing. With a Guard the honeypot is the Guard's check.
 	HoneypotField string
 
 	// Body size caps applied after trimming. Zero values use sensible defaults.
@@ -91,9 +112,10 @@ type Contact struct {
 
 	// HTML response fragments returned to the client. Match the newsletter
 	// shortcode pattern so both forms can share styling hooks.
-	MsgSuccess string
-	MsgInvalid string
-	MsgError   string
+	MsgSuccess  string
+	MsgInvalid  string
+	MsgError    string
+	MsgRejected string // the Guard refused the submission
 
 	// Logger for diagnostic output. nil → slog.Default().
 	Logger *slog.Logger
@@ -118,6 +140,7 @@ func New(store Store, mailer Mailer, to, from string) *Contact {
 		Mailer:        mailer,
 		To:            ParseAddrList(to),
 		From:          from,
+		Form:          "contact",
 		HoneypotField: "website",
 		MaxNameLen:    200,
 		MaxSubjectLen: 200,
@@ -126,6 +149,7 @@ func New(store Store, mailer Mailer, to, from string) *Contact {
 		MsgSuccess:    `<p class="contact-msg contact-msg--ok">Thanks &mdash; I&rsquo;ll be in touch.</p>`,
 		MsgInvalid:    `<p class="contact-msg contact-msg--err">Please fill in name, email, and a message.</p>`,
 		MsgError:      `<p class="contact-msg contact-msg--err">Something went wrong. Please try again.</p>`,
+		MsgRejected:   `<p class="contact-msg contact-msg--err">Your message was not sent. Please reload the page and try again.</p>`,
 	}
 	c.SubjectTmpl = template.Must(template.New("subject").Parse(defaultSubjectTmpl))
 	c.BodyTmpl = template.Must(template.New("body").Parse(defaultBodyTmpl))
@@ -162,18 +186,25 @@ func (h *Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	// Honeypot: a real user never fills this hidden field. If we see content
-	// here, return success without doing anything — never tell the bot it lost.
-	if h.HoneypotField != "" && r.FormValue(h.HoneypotField) != "" {
+	ip := h.Proxies.ClientIP(r)
+	email := strings.TrimSpace(r.FormValue("email"))
+
+	if h.Guard != nil {
+		if !h.admit(w, r, email, ip) {
+			return
+		}
+	} else if h.HoneypotField != "" && r.FormValue(h.HoneypotField) != "" {
+		// Honeypot: a real user never fills this hidden field. If we see
+		// content here, return success without doing anything -- never tell
+		// the bot it lost.
 		logger.Info("contact: honeypot triggered",
-			"ip", clientIP(r),
+			"ip", ip,
 			"field", h.HoneypotField)
 		_, _ = w.Write([]byte(h.MsgSuccess))
 		return
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
-	email := strings.TrimSpace(r.FormValue("email"))
 	subject := strings.TrimSpace(r.FormValue("subject"))
 	message := strings.TrimSpace(r.FormValue("message"))
 
@@ -204,7 +235,7 @@ func (h *Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Email:     email,
 		Subject:   subject,
 		Message:   message,
-		IP:        clientIP(r),
+		IP:        ip,
 		UserAgent: r.UserAgent(),
 	}
 
@@ -227,6 +258,38 @@ func (h *Contact) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go h.deliver(*sub)
 
 	_, _ = w.Write([]byte(h.MsgSuccess))
+}
+
+// admit asks the Guard about the submission and, when the answer is no, writes
+// this form's response. It reports whether the handler should carry on.
+//
+// The Guard fails closed: an error means its store could not be reached, and
+// the submission is refused rather than let through unchecked.
+func (h *Contact) admit(w http.ResponseWriter, r *http.Request, email, ip string) bool {
+	var opts []antibot.CheckOption
+	if email != "" {
+		opts = append(opts, antibot.Email(email))
+	}
+	form := h.Form
+	if form == "" {
+		form = "contact"
+	}
+	v, err := h.Guard.Check(r.Context(), r, form, opts...)
+	switch {
+	case err != nil:
+		h.logger().Error("contact: antibot check failed", "err", err, "ip", ip)
+		_, _ = w.Write([]byte(h.MsgError))
+	case v.Allowed:
+		return true
+	case v.Silent:
+		// The Guard has logged it. Look successful, as the bot would expect.
+		_, _ = w.Write([]byte(h.MsgSuccess))
+	case v.Reason == antibot.ReasonInvalidEmail || v.Reason == antibot.ReasonNoMX:
+		_, _ = w.Write([]byte(h.MsgInvalid))
+	default:
+		_, _ = w.Write([]byte(h.MsgRejected))
+	}
+	return false
 }
 
 // deliver sends the primary email and (optionally) a confirmation, then
@@ -345,22 +408,4 @@ func ParseAddrList(s string) []string {
 		}
 	}
 	return out
-}
-
-// clientIP extracts the client IP from X-Forwarded-For (first entry),
-// falling back to RemoteAddr. Appropriate when behind a trusted reverse
-// proxy. Mirror of newsletter/antibot.clientIP — duplicated here because
-// that helper is unexported. If antibot is ever extracted to its own
-// module with an exported ClientIP, swap to that and delete this.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if ip := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); ip != "" {
-			return ip
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

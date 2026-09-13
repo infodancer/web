@@ -3,8 +3,8 @@
 A small Go toolkit for newsletter subscription on low-volume sites:
 a subscribe handler, a PostgreSQL subscriber store, thin
 clients for [Listmonk](https://listmonk.app/) and
-[Buttondown](https://buttondown.email/), and a few composable anti-bot
-middlewares.
+[Buttondown](https://buttondown.email/). Abuse checks come from
+[`antibot`](../antibot).
 
 > Maintained as a personal utility for my own sites. Issues and PRs are
 > welcome but I may not respond quickly. See [SECURITY.md](SECURITY.md)
@@ -12,7 +12,6 @@ middlewares.
 
 ```
 import (
-    "github.com/infodancer/web/newsletter/antibot"
     "github.com/infodancer/web/newsletter/buttondown"
     "github.com/infodancer/web/newsletter/handler"
     "github.com/infodancer/web/newsletter/listmonk"
@@ -32,13 +31,11 @@ store := subscribers.New(pool)
 lm := listmonk.NewClient("http://listmonk:9000")
 
 h := handler.New(store, lm, "your-list-uuid")
+h.Guard = guard // *antibot.Guard from github.com/infodancer/web/antibot
 
 mux := http.NewServeMux()
-mux.Handle("POST /subscribe",
-    antibot.Honeypot("website")(
-        antibot.Timing("ts", 3*time.Second)(h),
-    ),
-)
+mux.Handle("POST /subscribe", h)
+mux.Handle("GET /antibot/token/newsletter", guard.TokenHandler("newsletter"))
 ```
 
 ## Packages
@@ -53,10 +50,9 @@ mux.Handle("POST /subscribe",
   silently if the base URL is empty (handy for local dev).
 - **`buttondown/`** — Posts to Buttondown's `/v1/subscribers` endpoint.
   Same no-op behavior on empty API key.
-- **`antibot/`** — Composable middlewares: `Honeypot` (hidden field),
-  `Timing` (token-stamped submit), `IPRateLimiter` (per-IP sliding
-  window), and `ValidateMX` (domain has MX records). Each is independent
-  — pick the ones you want.
+- **`antibot/`** — Deprecated, and to be removed: superseded by the
+  [`antibot`](../antibot) module. The handler uses its `ValidateMX` only
+  when no Guard is set.
 - **`migrations/`** — Embedded PostgreSQL SQL, applied by
   `subscribers.Migrate`.
 
@@ -75,27 +71,20 @@ pool, so the store has no `Close`.
 
 ## Anti-bot
 
-None of these are strong by themselves. Stacked, they catch most casual
-bots without bothering real users with a CAPTCHA:
+Set `Subscribe.Guard` to an [`antibot`](../antibot) guard. Before a signup is
+stored it checks the honeypot, a signed timing token, per-IP and per-address
+rate limits, and the address's mail domain. The form needs a hidden
+`antibot_token` field filled from the token endpoint and an empty hidden
+`website` field; antibot's README has the page script.
 
-```go
-mux.Handle("POST /subscribe",
-    antibot.Honeypot("website")(
-        antibot.Timing("ts", 3*time.Second)(
-            rateLimiter.Middleware()(h),
-        ),
-    ),
-)
-```
+A refused signup gets `MsgRejected`; an address whose domain takes no mail gets
+`MsgInvalidDomain`; a honeypot trip gets `MsgSuccess` and nothing is stored; a
+guard that cannot reach its database gets `MsgError`, and the signup is refused
+rather than let through unchecked. `Subscribe.Form` (default `newsletter`)
+names the form to the guard.
 
-- **Honeypot** — hidden field that bots fill and humans don't.
-  Rejections return `200` with the success fragment so bots don't learn.
-- **Timing** — submission must arrive at least N seconds after render.
-  Token is a base64-encoded Unix timestamp injected at template time.
-- **IPRateLimiter** — sliding-window per-IP counter with background
-  cleanup. Call `Stop()` on shutdown.
-- **ValidateMX** — call from your handler before accepting an email;
-  rejects domains with no MX records.
+Without a Guard the handler checks only that the domain has MX records, which
+puts no limit on volume.
 
 ## Status
 

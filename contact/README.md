@@ -110,15 +110,33 @@ directly using the vendor SDK.
 
 ## Spam protection
 
-- **Honeypot** — a hidden form field that real users won't see and bots
-  will fill. If non-empty, the request is silently accepted (200 with
-  the success fragment) without persisting or emailing. Configure via
-  `Contact.HoneypotField` (default `website`).
-- **Rate limiting** is **not** built into this handler. Wrap with any
-  middleware you like — `github.com/infodancer/web/newsletter/antibot`'s
-  `RateLimit` works well, as does any per-IP token bucket.
-- **CAPTCHA** — not bundled. If honeypot + rate limit isn't sufficient,
-  Cloudflare Turnstile is a good privacy-respecting drop-in.
+Set `Contact.Guard` to an [`antibot`](../antibot) guard. Before anything is
+stored or sent, it checks the honeypot, a signed timing token, per-IP and
+per-address rate limits, and the address's mail domain:
+
+```go
+h := handler.New(store, mailer, "to@x", "from@x")
+h.Guard = guard                                  // *antibot.Guard
+h.Proxies = httplog.NewProxies(trustedProxies...) // whose X-Forwarded-For to believe
+
+mux.Handle("POST /contact", h)
+mux.Handle("GET /antibot/token/contact", guard.TokenHandler("contact"))
+```
+
+The form needs a hidden `antibot_token` field filled from the token endpoint,
+and an empty hidden `website` field; see antibot's README for the page script.
+A refused submission gets `MsgRejected`; an address whose domain takes no mail
+gets `MsgInvalid`; a honeypot trip gets `MsgSuccess` and nothing is stored; a
+guard that cannot reach its database gets `MsgError`, and the submission is
+refused rather than let through unchecked. `Contact.Form` (default `contact`)
+names the form to the guard, which keeps a separate budget per form.
+
+`Contact.Proxies` decides which address is stored and mailed with a
+submission. The zero value trusts no proxy and records the peer, so behind a
+reverse proxy it has to be set or every submission is attributed to the proxy.
+
+Without a Guard the handler checks only the honeypot field
+(`Contact.HoneypotField`, default `website`), which puts no limit on volume.
 
 ## Customization
 

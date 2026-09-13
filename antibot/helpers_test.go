@@ -47,6 +47,7 @@ type fakeStore struct {
 	mu     sync.Mutex
 	counts map[string]int32
 	calls  int
+	sweeps int
 	params []db.HitParams
 	err    error
 }
@@ -66,7 +67,19 @@ func (f *fakeStore) Hit(_ context.Context, p db.HitParams) (int32, error) {
 	return f.counts[k], nil
 }
 
-func (f *fakeStore) Sweep(_ context.Context, _ time.Time) (int64, error) { return 0, f.err }
+func (f *fakeStore) Sweep(_ context.Context, _ time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sweeps++
+	return 0, f.err
+}
+
+// Sweeps reports how many times Sweep has been called.
+func (f *fakeStore) Sweeps() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.sweeps
+}
 
 // mxResolver is a fake MX lookup that counts calls.
 type mxResolver struct {

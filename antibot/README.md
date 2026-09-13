@@ -41,8 +41,38 @@ default:
 }
 ```
 
-Schedule `g.Sweep(ctx)` to delete expired rate-limit windows. An unswept table
+Run `go g.SweepEvery(ctx, time.Hour)` to delete expired rate-limit windows, or
+call `g.Sweep(ctx)` from a job the host already schedules. An unswept table
 grows; it never miscounts.
+
+### Static pages
+
+A page built ahead of time -- a Hugo site, say -- cannot embed a token, because
+its HTML was generated long before the visitor arrived. Mount a token endpoint
+per form and have the page fetch it when it loads:
+
+```go
+mux.Handle("GET /antibot/token/contact", g.TokenHandler("contact"))
+```
+
+```html
+<input type="hidden" name="antibot_token" id="contact-token">
+<script>
+fetch('/antibot/token/contact', {credentials: 'same-origin'})
+  .then(r => r.ok ? r.text() : '')
+  .then(t => { document.getElementById('contact-token').value = t; });
+</script>
+```
+
+The response is `no-store`: a token records when it was issued, so a cached one
+would reach every later visitor already aged. Serving one counts nothing against
+any budget. A form that depends on the script to get its token rejects a
+submission from a browser with scripts disabled, as `token_missing`.
+
+A bot can fetch a token too, wait out `MinFill`, and submit. It could do the
+same with a token embedded in rendered HTML. The token raises the cost of a
+submission and binds it to one form and a two-hour window; the limits are what
+bound the volume.
 
 ## Checks
 
