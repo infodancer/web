@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/infodancer/web/antibot"
-	mx "github.com/infodancer/web/newsletter/antibot"
 	"github.com/infodancer/web/newsletter/listmonk"
 )
 
@@ -160,7 +159,7 @@ func (h *Subscribe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !h.admit(w, r, log, email) {
 			return
 		}
-	} else if err := mx.ValidateMX(email); err != nil {
+	} else if err := validateMX(email); err != nil {
 		// User input rejection, not a server fault: the submitted address has no
 		// usable mail domain. INFO so an operator can spot abuse patterns without
 		// it polluting the error stream.

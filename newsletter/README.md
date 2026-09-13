@@ -50,9 +50,6 @@ mux.Handle("GET /antibot/token/newsletter", guard.TokenHandler("newsletter"))
   silently if the base URL is empty (handy for local dev).
 - **`buttondown/`** — Posts to Buttondown's `/v1/subscribers` endpoint.
   Same no-op behavior on empty API key.
-- **`antibot/`** — Deprecated, and to be removed: superseded by the
-  [`antibot`](../antibot) module. The handler uses its `ValidateMX` only
-  when no Guard is set.
 - **`migrations/`** — Embedded PostgreSQL SQL, applied by
   `subscribers.Migrate`.
 

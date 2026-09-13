@@ -17,14 +17,11 @@ times, but I will take credible reports seriously.
 
 ## In scope
 
-- The HTTP handler in `handler/`: input validation, unintended
-  persistence behavior, denial-of-service via oversized bodies, race
+- The HTTP handler in `handler/`: input validation, the mail-domain check
+  it makes when no antibot guard is set, unintended persistence behavior, denial-of-service via oversized bodies, race
   conditions across goroutines.
 - The `subscribers/` store: SQL injection, dialect-mismatch corruption,
   data leakage in logs.
-- The `antibot/` package: bypasses that defeat honeypot/timing/rate-limit
-  checks, log-injection via attacker-controlled fields, panics on
-  malformed input.
 - The `buttondown/` and `listmonk/` clients: credential handling,
   request smuggling, TLS configuration weaknesses.
 
