@@ -31,6 +31,19 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	}
 }
 
+// The fake store takes any key kind; the table's CHECK constraint does not, so
+// a kind the schema was never taught fails only here.
+func TestSchemaAcceptsAccountCounters(t *testing.T) {
+	g, err := New(Config{DB: migratedPool(t), Secret: testSecret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := request{remote: "203.0.113.7:5555"}.build(t)
+	if v, err := g.Limit(context.Background(), r, "join", Account("42")); err != nil || !v.Allowed {
+		t.Fatalf("got %+v, %v; want allowed", v, err)
+	}
+}
+
 // The whole limit rests on this: concurrent submissions on one key must each
 // see a distinct count. A read-then-write would let several read the same count
 // and all slip under the limit.

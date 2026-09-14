@@ -23,8 +23,9 @@ var NoLimit = Limit{Max: -1}
 
 // Key kinds, as stored in antibot_counters.key_kind.
 const (
-	kindIP    = "ip"
-	kindEmail = "email"
+	kindIP      = "ip"
+	kindEmail   = "email"
+	kindAccount = "account"
 )
 
 // keyDomain separates the limiter's key hashes from token signatures.

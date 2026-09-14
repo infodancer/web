@@ -28,8 +28,11 @@ times, but I will take credible reports seriously.
   budget -- concurrent submissions racing the counter, an `X-Forwarded-For`
   believed from an untrusted peer, IPv6 addresses within one /64 counted
   separately, or case or whitespace splitting an email's budget.
-- **Identifiers in the limiter table:** an IP address or email stored, or
-  recoverable without the secret, in `antibot_counters`.
+- **Identifiers in the limiter table:** an IP address, email or account id
+  stored, or recoverable without the secret, in `antibot_counters`.
+- **Account budget bypass:** an empty or omitted account id on a signed-in
+  form landing in a shared bucket, or skipping the account limit, rather than
+  failing.
 - **Failing open:** any store failure that results in an allowed verdict.
 - **Leaks through logs:** a token, or a secret-derived value, written to the log.
 

@@ -74,6 +74,24 @@ same with a token embedded in rendered HTML. The token raises the cost of a
 submission and binds it to one form and a two-hour window; the limits are what
 bound the volume.
 
+### Signed-in forms
+
+Behind a login, the timing token and honeypot add nothing: a bot has already
+had to sign in. What is left is how often one account may act, so `Limit`
+counts and checks nothing else. It needs no token and no parsed form:
+
+```go
+v, err := g.Limit(r.Context(), r, "join", antibot.Account(strconv.FormatInt(u.ID, 10)))
+```
+
+`Account` also works in `Check`. The account limit holds however many addresses
+the account posts from. An empty id is an error (`ErrEmptyAccount`), not a
+shared bucket.
+
+A Guard has one set of limits. A host that wants different limits for
+different forms builds a Guard for each, over the same pool and secret; the
+counters are kept per form, so they never collide.
+
 ## Checks
 
 Check runs them cheapest first, so an early rejection costs nothing later.
@@ -83,6 +101,7 @@ Check runs them cheapest first, so an early rejection costs nothing later.
 | Honeypot | a filled hidden field, silently | `honeypot` |
 | Timing token | no token; a forged, backdated, future or other-form token; faster than `MinFill`; older than `MaxAge` | `token_missing`, `token_invalid`, `too_fast`, `token_expired` |
 | IP limit | more than `IPLimit` per form, per IP (IPv6 per /64) | `rate_limited` |
+| Account limit | more than `AccountLimit` per form, per account, from any IP | `rate_limited` |
 | Email syntax | not exactly one `@` with both sides | `invalid_email` |
 | Email limit | more than `EmailLimit` per form, per address, from any IP | `rate_limited` |
 | MX | a domain that does not exist, has no MX, or has a null MX | `no_mx` |
@@ -90,8 +109,9 @@ Check runs them cheapest first, so an early rejection costs nothing later.
 A resolver failure lets the request through and logs at warn: it is not evidence
 of a bot.
 
-Defaults: `MinFill` 3s, `MaxAge` 2h, `IPLimit` 5 an hour, `EmailLimit` 3 a day.
-Set a limit to `antibot.NoLimit` to disable it.
+Defaults: `MinFill` 3s, `MaxAge` 2h, `IPLimit` 5 an hour, `EmailLimit` 3 a day,
+`AccountLimit` 10 a day. Set a limit to `antibot.NoLimit` to disable it. `Limit`
+runs only the IP, account and email rows.
 
 ## Design notes
 
@@ -99,8 +119,8 @@ Set a limit to `antibot.NoLimit` to disable it.
   does not reset every budget. Each submission is one atomic upsert, so
   concurrent requests cannot race past the limit. Windows are fixed, which
   allows up to twice the limit in a burst across a window boundary.
-- **The table stores no identifiers.** Each key is an HMAC of the IP or email
-  under the secret. The limiter needs equality, not identity.
+- **The table stores no identifiers.** Each key is an HMAC of the IP, email or
+  account id under the secret. The limiter needs equality, not identity.
 - **A store error fails closed.** Every consumer writes its submission to the
   same database, so a form whose limiter cannot reach it could not have saved
   anyway.
