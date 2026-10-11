@@ -4,10 +4,13 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/infodancer/ui"
 	"github.com/jackc/pgx/v5/pgxpool"
 	embedding "github.com/matthewjhunter/go-embedding"
+
+	"github.com/infodancer/web/search/internal/query"
 )
 
 // Config is the serving configuration for the module. It mirrors the shape in
@@ -77,6 +80,14 @@ type Config struct {
 	// QueryCacheSize bounds the LRU of query-embedding vectors (DESIGN §6.4).
 	// Defaults to 1024; ignored when Embedder is nil.
 	QueryCacheSize int
+
+	// BackendTimeout bounds each call to the embedding or rerank backend made
+	// while serving a query. A backend that has not answered within it is
+	// treated as unavailable and the query degrades (FTS-only, or fused order)
+	// instead of waiting out the request; the index path is not affected.
+	// Defaults to 3s; a negative value disables the budget and leaves the
+	// request context in charge.
+	BackendTimeout time.Duration
 
 	// Logger is the module-level structured logger. Defaults to slog.Default.
 	Logger *slog.Logger
@@ -168,6 +179,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.QueryCacheSize == 0 {
 		c.QueryCacheSize = 1024
+	}
+	if c.BackendTimeout == 0 {
+		c.BackendTimeout = query.DefaultBackendTimeout
 	}
 	if c.ChunkTokens == 0 {
 		c.ChunkTokens = defaultChunkTokens

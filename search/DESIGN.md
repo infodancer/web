@@ -590,6 +590,12 @@ ORDER BY dist
 LIMIT $fanout;           -- default 100
 ```
 
+Both backend calls a query can make (this embed, and the rerank in §6.0) run under
+`Config.BackendTimeout` (default 3s). A backend that has not answered within it is
+treated exactly like one that is unreachable: the vector arm is skipped and the
+query continues FTS-only; the rerank stage keeps the fused order. The query must not
+fail, and must not stall, because an inference server is down.
+
 ### 6.3 Reciprocal Rank Fusion
 
 The two arms are fused by RRF over a bounded candidate pool:
