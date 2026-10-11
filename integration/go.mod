@@ -40,7 +40,7 @@ require (
 	github.com/infodancer/ui/markdown v0.2.1 // indirect
 	github.com/infodancer/ui/mdedit v0.2.4 // indirect
 	github.com/infodancer/web/antibot v0.1.1 // indirect
-	github.com/matthewjhunter/go-embedding v0.6.1 // indirect
+	github.com/matthewjhunter/go-embedding v0.6.3 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.1 // indirect

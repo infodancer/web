@@ -7,7 +7,7 @@ require (
 	github.com/infodancer/ui v0.4.6
 	github.com/infodancer/ui/markdown v0.2.0
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/matthewjhunter/go-embedding v0.6.1
+	github.com/matthewjhunter/go-embedding v0.6.3
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/pressly/goose/v3 v3.27.1
 	golang.org/x/net v0.55.0
