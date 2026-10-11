@@ -94,7 +94,14 @@ The pgvector chunk table and HNSW index are created lazily on the first embed
 with the dimension learned from the model, so FTS-only deployments need no
 extension. A model/dimension change is refused unless `index --reembed` (or
 `Config.ReembedOnMismatch`) is set. If the reranker is unreachable the query
-degrades to fused order rather than failing.
+degrades to fused order rather than failing, and if the embedder is
+unreachable the query runs FTS-only.
+
+Unreachable includes hung: each backend call made while serving a query
+has its own budget, `Config.BackendTimeout` (default 3s), after which the
+query degrades the same way instead of waiting out the request. A page
+load should never sit behind an inference server that has stopped
+answering. Indexing is not subject to it.
 
 ## Quick start (local dev)
 

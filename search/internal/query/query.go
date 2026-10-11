@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	embedding "github.com/matthewjhunter/go-embedding"
 
@@ -40,6 +41,13 @@ type Result struct {
 	Score   float64
 }
 
+// DefaultBackendTimeout is the budget for one call to the embedding or rerank
+// backend while serving a query, used when Options.BackendTimeout is zero. A
+// query is an interactive page load: a backend that has not answered in a few
+// seconds is not going to improve the results enough to be worth the wait, and
+// the FTS arm is already in hand.
+const DefaultBackendTimeout = 3 * time.Second
+
 // Options configures an Engine. Embedder, QueryCache, and Metric enable the
 // vector arm; leaving Embedder nil keeps the engine FTS-only. Reranker enables
 // the rerank stage.
@@ -52,6 +60,14 @@ type Options struct {
 	RRFk       int
 	RerankTopN int
 	Logger     *slog.Logger
+
+	// BackendTimeout bounds each call the engine makes to the embedding or
+	// rerank backend while serving a query. When it expires the query
+	// degrades (FTS-only, or fused order) exactly as it does when the backend
+	// is unreachable, so a hung backend costs a query this much rather than
+	// the whole request. Zero uses DefaultBackendTimeout; a negative value
+	// disables the budget and leaves the caller's context in charge.
+	BackendTimeout time.Duration
 }
 
 // Engine runs queries against the corpus. Construct with [New]; safe for
@@ -65,7 +81,9 @@ type Engine struct {
 	fanout     int
 	rrfK       int
 	rerankTopN int
-	log        *slog.Logger
+	// backendTimeout is the resolved Options.BackendTimeout; 0 means disabled.
+	backendTimeout time.Duration
+	log            *slog.Logger
 }
 
 // New builds an Engine over s with opts. Defaults: fanout 100, RRF k 60, rerank
@@ -81,6 +99,14 @@ func New(s DocStore, opts Options) *Engine {
 		rrfK:       opts.RRFk,
 		rerankTopN: opts.RerankTopN,
 		log:        opts.Logger,
+	}
+	switch {
+	case opts.BackendTimeout < 0:
+		e.backendTimeout = 0
+	case opts.BackendTimeout == 0:
+		e.backendTimeout = DefaultBackendTimeout
+	default:
+		e.backendTimeout = opts.BackendTimeout
 	}
 	if e.log == nil {
 		e.log = slog.Default()
@@ -151,7 +177,14 @@ func (e *Engine) vectorArm(ctx context.Context, q string) []store.VectorHit {
 		return nil
 	}
 	formatted := embedding.FormatForTask(e.embedder.Model(), embedding.TaskRetrievalQuery, q)
-	vec, err := e.queryCache.Single(ctx, e.embedder, formatted)
+	// Bound the backend call; see Options.BackendTimeout. A budget that
+	// expires is just another failed embed, and the arm degrades below.
+	embedCtx, cancel := ctx, context.CancelFunc(func() {})
+	if e.backendTimeout > 0 {
+		embedCtx, cancel = context.WithTimeout(ctx, e.backendTimeout)
+	}
+	defer cancel()
+	vec, err := e.queryCache.Single(embedCtx, e.embedder, formatted)
 	if err != nil {
 		e.log.Warn("query: embedding query failed; using FTS only", "err", err)
 		return nil
@@ -292,7 +325,15 @@ func (e *Engine) rerankOrder(ctx context.Context, q string, docs []string) ([]in
 		return nil, nil
 	}
 
-	res, err := e.reranker.Rerank(ctx, embedding.RerankRequest{Query: q, Documents: docs})
+	// Bound the backend call; see Options.BackendTimeout. A budget that
+	// expires surfaces as context.DeadlineExceeded, which IsRerankAvailable
+	// classifies as unavailable, so it degrades below like an outage.
+	rerankCtx, cancel := ctx, context.CancelFunc(func() {})
+	if e.backendTimeout > 0 {
+		rerankCtx, cancel = context.WithTimeout(ctx, e.backendTimeout)
+	}
+	defer cancel()
+	res, err := e.reranker.Rerank(rerankCtx, embedding.RerankRequest{Query: q, Documents: docs})
 	if err != nil {
 		if !embedding.IsRerankAvailable(err) {
 			e.log.Warn("rerank backend unavailable; keeping fused order", "err", err)

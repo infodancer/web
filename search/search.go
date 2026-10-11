@@ -114,6 +114,8 @@ func New(cfg Config) (*Module, error) {
 		RRFk:       cfg.RRFk,
 		RerankTopN: cfg.RerankTopN,
 		Logger:     cfg.Logger,
+
+		BackendTimeout: cfg.BackendTimeout,
 	})
 
 	srv, err := handler.New(handler.Deps{
