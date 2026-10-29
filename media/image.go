@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/gif"
 	"image/jpeg"
 	"io"
 	"math"
@@ -22,9 +21,10 @@ import (
 	// Register decoders for every format Process accepts. Go's image registry
 	// is populated by each decoder package's init(), so a format the switch
 	// lists ("png") is still rejected by image.DecodeConfig unless its decoder
-	// is linked in. image/jpeg and image/gif above are imported directly for
-	// their encode/decode; PNG and WebP are decode-only here (Process re-encodes
-	// to WebP/JPEG), so they are blank imports.
+	// is linked in. image/jpeg above is imported directly for its encoder; GIF,
+	// PNG, and WebP are decode-only here (Process re-encodes to WebP/JPEG), so
+	// they are blank imports.
+	_ "image/gif"
 	_ "image/png"
 
 	// The standard library has no WebP encoder; the lossless VP8L re-encode is
@@ -155,11 +155,13 @@ func Process(r io.Reader, cfg Config) (Processed, error) {
 	}
 
 	if format == "gif" {
-		g, err := gif.DecodeAll(bytes.NewReader(data))
+		// Count frames from the block structure, not by decoding them: a full
+		// multi-frame decode is a memory bomb (see gifFrameCount).
+		frames, err := gifFrameCount(data)
 		if err != nil {
 			return Processed{}, ErrDecode
 		}
-		if len(g.Image) > 1 {
+		if frames > 1 {
 			return Processed{}, ErrAnimated
 		}
 	}
