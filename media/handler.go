@@ -71,10 +71,7 @@ func validateConfig(cfg Config) error {
 	if cfg.Category == "" || !ValidCategory(cfg.Category) {
 		return fmt.Errorf("invalid category %q", cfg.Category)
 	}
-	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
-		return err
-	}
-	return nil
+	return validateProcessConfig(cfg)
 }
 
 // Routes returns the handler's mux. Mount it under a path with
@@ -89,7 +86,7 @@ func (h *Handler) Routes() http.Handler {
 	return mux
 }
 
-// uploadResponse is the success body. mdedit's adapter inserts ![](url).
+// uploadResponse is the success body. A Markdown editor inserts ![](url).
 type uploadResponse struct {
 	URL        string         `json:"url"`
 	Width      int            `json:"width"`

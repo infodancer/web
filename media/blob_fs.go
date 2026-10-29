@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 )
 
-// FilesystemBlobStore stores blob bytes on the local filesystem — the same
-// "image files under a root directory" posture osg uses for chronicle images,
-// adapted to media's content-addressed, category-partitioned model. One file
-// holds the bytes and a small sidecar records the content type; paths are
-// <root>/<category>/ab/cd/<hash> (the category folder gives the logical
-// separation; the first two bytes of the hash shard so no directory holds the
-// whole corpus). An empty category drops the category folder (<root>/ab/cd/...).
+// FilesystemBlobStore stores blob bytes on the local filesystem — plain image
+// files under a root directory, in media's content-addressed,
+// category-partitioned layout. One file holds the bytes and a small sidecar
+// records the content type; paths are <root>/<category>/ab/cd/<hash> (the
+// category folder gives the logical separation; the first two bytes of the hash
+// shard so no directory holds the whole corpus). An empty category drops the
+// category folder (<root>/ab/cd/...).
 //
 // It satisfies [BlobStore], so a host swaps it for [PostgresBlobStore] with no
 // other change. Like the Postgres backend it is content-addressed and

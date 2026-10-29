@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/gif"
 	"image/jpeg"
 	"io"
 	"math"
@@ -22,9 +21,10 @@ import (
 	// Register decoders for every format Process accepts. Go's image registry
 	// is populated by each decoder package's init(), so a format the switch
 	// lists ("png") is still rejected by image.DecodeConfig unless its decoder
-	// is linked in. image/jpeg and image/gif above are imported directly for
-	// their encode/decode; PNG and WebP are decode-only here (Process re-encodes
-	// to WebP/JPEG), so they are blank imports.
+	// is linked in. image/jpeg above is imported directly for its encoder; GIF,
+	// PNG, and WebP are decode-only here (Process re-encodes to WebP/JPEG), so
+	// they are blank imports.
+	_ "image/gif"
 	_ "image/png"
 
 	// The standard library has no WebP encoder; the lossless VP8L re-encode is
@@ -102,14 +102,16 @@ type Thumbnail struct {
 // (extension and any client-declared type are irrelevant — Process takes raw
 // bytes); reject anything outside the PNG/JPEG/GIF/WebP allowlist; refuse
 // oversized dimensions from the header before decoding (decompression-bomb
-// guard); reject animation; decode and re-encode to a canonical raster
+// guard); reject animation, or with Config.FlattenAnimation keep only the
+// first frame of an animated GIF; decode; scale down to Config.MaxWidth/MaxHeight
+// if set; re-encode to a canonical raster
 // (lossless WebP for PNG, static GIF, and WebP; q85 JPEG for JPEG, which would
 // only bloat under lossless), which strips EXIF and discards any
 // trailing/leading polyglot bytes; and finally content-address the result with
 // SHA-256.
 func Process(r io.Reader, cfg Config) (Processed, error) {
-	// Fail fast on a misconfigured spec list before reading or decoding anything.
-	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
+	// Fail fast on a misconfigured Config before reading or decoding anything.
+	if err := validateProcessConfig(cfg); err != nil {
 		return Processed{}, err
 	}
 
@@ -155,19 +157,27 @@ func Process(r io.Reader, cfg Config) (Processed, error) {
 	}
 
 	if format == "gif" {
-		g, err := gif.DecodeAll(bytes.NewReader(data))
+		// Count frames from the block structure, not by decoding them: a full
+		// multi-frame decode is a memory bomb (see gifFrameCount).
+		frames, err := gifFrameCount(data)
 		if err != nil {
 			return Processed{}, ErrDecode
 		}
-		if len(g.Image) > 1 {
+		if frames > 1 && !cfg.FlattenAnimation {
 			return Processed{}, ErrAnimated
 		}
 	}
 
+	// For GIF this decodes only the first frame (image/gif's Decode stops there),
+	// which is what makes flattening as cheap as a static image.
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return Processed{}, ErrDecode
 	}
+	if format == "gif" {
+		img = onLogicalScreen(img, cfgImg.Width, cfgImg.Height)
+	}
+	img = fitWithin(img, cfg.MaxWidth, cfg.MaxHeight)
 
 	out, contentType, err := reencode(img, format)
 	if err != nil {
@@ -275,6 +285,37 @@ func resize(src image.Image, spec ThumbnailSpec) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, outW, outH))
 	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, sb, xdraw.Over, nil)
 	return dst
+}
+
+// onLogicalScreen places a GIF frame on its logical screen. A frame may be
+// smaller than the screen and offset within it; a browser draws it at that
+// offset over a transparent screen, so the canonical output does the same.
+// image/gif rejects frames that extend past the screen, so the frame always
+// fits.
+func onLogicalScreen(frame image.Image, w, h int) image.Image {
+	screen := image.Rect(0, 0, w, h)
+	if frame.Bounds() == screen {
+		return frame
+	}
+	canvas := image.NewNRGBA(screen)
+	xdraw.Draw(canvas, frame.Bounds(), frame, frame.Bounds().Min, xdraw.Src)
+	return canvas
+}
+
+// fitWithin scales img down to fit maxW×maxH, aspect ratio preserved, never
+// upscaling. A zero limit leaves that side unbounded.
+func fitWithin(img image.Image, maxW, maxH int) image.Image {
+	if maxW == 0 && maxH == 0 {
+		return img
+	}
+	b := img.Bounds()
+	if maxW == 0 {
+		maxW = b.Dx()
+	}
+	if maxH == 0 {
+		maxH = b.Dy()
+	}
+	return resize(img, ThumbnailSpec{MaxWidth: maxW, MaxHeight: maxH, Fit: FitInside})
 }
 
 // scaleRound returns round(v * num / den), the standard aspect-preserving scale.

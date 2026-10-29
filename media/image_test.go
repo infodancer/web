@@ -10,6 +10,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -72,6 +73,24 @@ func animatedGIFBytes(t *testing.T) []byte {
 	var b bytes.Buffer
 	if err := gif.EncodeAll(&b, g); err != nil {
 		t.Fatalf("encode animated gif: %v", err)
+	}
+	return b.Bytes()
+}
+
+// manyFrameGIFBytes returns an animated GIF of n w×h frames. All frames are a
+// single color, so LZW compresses each to a few KB while a full decode costs
+// w*h bytes per frame: a small upload that is expensive to decode completely.
+func manyFrameGIFBytes(t *testing.T, w, h, n int) []byte {
+	t.Helper()
+	fr := image.NewPaletted(image.Rect(0, 0, w, h), color.Palette{color.Black, color.White})
+	g := &gif.GIF{}
+	for range n {
+		g.Image = append(g.Image, fr)
+		g.Delay = append(g.Delay, 0)
+	}
+	var b bytes.Buffer
+	if err := gif.EncodeAll(&b, g); err != nil {
+		t.Fatalf("encode many-frame gif: %v", err)
 	}
 	return b.Bytes()
 }
@@ -255,6 +274,28 @@ func TestProcess_RejectsAnimatedGIF(t *testing.T) {
 	_, err := Process(bytes.NewReader(animatedGIFBytes(t)), Config{})
 	if !errors.Is(err, ErrAnimated) {
 		t.Fatalf("err = %v, want ErrAnimated", err)
+	}
+}
+
+// An animated GIF must be rejected without decoding every frame. Before the
+// block walker, Process called gif.DecodeAll, so a ~1 MB upload of 60 large
+// single-color frames allocated ~240 MB; the default 10 MiB cap allowed tens
+// of GB from one upload.
+func TestProcess_AnimatedGIFRejectionIsCheap(t *testing.T) {
+	data := manyFrameGIFBytes(t, 2000, 2000, 60)
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	_, err := Process(bytes.NewReader(data), Config{})
+	runtime.ReadMemStats(&after)
+
+	if !errors.Is(err, ErrAnimated) {
+		t.Fatalf("err = %v, want ErrAnimated", err)
+	}
+	const budget = 32 << 20
+	if alloc := after.TotalAlloc - before.TotalAlloc; alloc > budget {
+		t.Fatalf("Process allocated %d MB rejecting an animated GIF, want < %d MB", alloc>>20, budget>>20)
 	}
 }
 
