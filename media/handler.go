@@ -86,7 +86,7 @@ func (h *Handler) Routes() http.Handler {
 	return mux
 }
 
-// uploadResponse is the success body. mdedit's adapter inserts ![](url).
+// uploadResponse is the success body. A Markdown editor inserts ![](url).
 type uploadResponse struct {
 	URL        string         `json:"url"`
 	Width      int            `json:"width"`

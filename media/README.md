@@ -1,12 +1,10 @@
 # media
 
-A reusable image upload/store/serve component for infodancer websites. It backs
-mdedit's image references and blog's embedded images: a host mounts it, an
-author uploads an image, and `media` makes it safe, stores it, and serves it
-under a stable content-addressed URL.
+A reusable image upload/store/serve component for infodancer websites: a host
+mounts it, an author uploads an image, and `media` makes it safe, stores it, and
+serves it under a stable content-addressed URL.
 
-It is the storage/serving third of the image split — the editor
-([`infodancer/ui/mdedit`](https://github.com/infodancer/ui)) inserts a
+It is the storage/serving third of the image split — an editor inserts a
 reference and the sanitizer
 ([`infodancer/ui/markdown`](https://github.com/infodancer/ui)) decides what
 `<img>` survives; neither stores bytes. `media` does.
@@ -76,7 +74,7 @@ rather than relying on a metadata column alone.
 
 - `POST {mount}/` — multipart field `image`. On success: `201` + JSON
   `{ "url": "...", "width": N, "height": N }` (plus `"thumbnails"` when
-  configured, see below). mdedit's adapter inserts `![](url)`. The `url` sits
+  configured, see below). A Markdown editor inserts `![](url)`. The `url` sits
   under this handler's `PublicBaseURL`, so the category is in the URL because the
   host mounted the handler there.
 - `GET {mount}/{hash}[.ext]` — serves the bytes (scoped to this handler's
@@ -134,9 +132,8 @@ Backends, all behind the same seam (swap one for another with no other change):
 - `PostgresBlobStore` — bytes in Postgres `bytea` (default).
 - `FilesystemBlobStore` — bytes on disk under a root dir, content-addressed and
   category-sharded (`<root>/<category>/ab/cd/<hash>`) with a content-type
-  sidecar; the same filesystem-image posture osg uses, with atomic writes. Bytes
-  are still served through the handler (so `nosniff` + headers apply), never a
-  bare directory listing.
+  sidecar, written atomically. Bytes are still served through the handler (so
+  `nosniff` + headers apply), never a bare directory listing.
 - `MemoryBlobStore` — in-memory, for tests and no-database dev mounts.
 
 ```go

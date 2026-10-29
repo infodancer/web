@@ -1,7 +1,6 @@
 // Package media is a reusable image upload/store/serve component for infodancer
-// websites. It backs mdedit's image references and blog's embedded images: a
-// host mounts it, an author uploads an image, and the component makes it safe,
-// stores it, and serves it under a stable content-addressed URL.
+// websites: a host mounts it, an author uploads an image, and the component
+// makes it safe, stores it, and serves it under a stable content-addressed URL.
 //
 // Serving user-uploaded files is a stored-XSS and privacy vector. media
 // concentrates that risk in one audited place — the way infodancer/ui/markdown
