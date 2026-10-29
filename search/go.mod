@@ -10,7 +10,7 @@ require (
 	github.com/matthewjhunter/go-embedding v0.6.3
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/pressly/goose/v3 v3.27.1
-	golang.org/x/net v0.55.0
+	golang.org/x/net v0.62.0
 )
 
 require (
@@ -29,8 +29,8 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )
 
 replace github.com/infodancer/web/pgtest => ../pgtest
