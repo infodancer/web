@@ -14,7 +14,7 @@ require github.com/kr/pretty v0.3.1 // indirect
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/infodancer/web/pgtest v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/pgtest v0.1.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
