@@ -9,6 +9,11 @@ import (
 )
 
 type Querier interface {
+	DeleteBlob(ctx context.Context, arg DeleteBlobParams) error
+	DeleteObject(ctx context.Context, arg DeleteObjectParams) error
+	// Remove every derived size of one original, returning the variants' own
+	// content addresses so the caller can decide which blobs are now unused.
+	DeleteVariantsByParent(ctx context.Context, arg DeleteVariantsByParentParams) ([]string, error)
 	GetBlob(ctx context.Context, arg GetBlobParams) (GetBlobRow, error)
 	GetObject(ctx context.Context, arg GetObjectParams) (MediaObjects, error)
 	HasBlob(ctx context.Context, arg HasBlobParams) (bool, error)
@@ -30,6 +35,9 @@ type Querier interface {
 	// (category, parent_hash, name). The variant's bytes are stored separately in
 	// the BlobStore under (category, hash).
 	PutVariant(ctx context.Context, arg PutVariantParams) error
+	// Of the candidate content addresses, those that no object and no variant in
+	// the category refers to: the blobs that can be deleted.
+	UnreferencedHashes(ctx context.Context, arg UnreferencedHashesParams) ([]string, error)
 }
 
 var _ Querier = (*Queries)(nil)

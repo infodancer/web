@@ -60,5 +60,9 @@ standards and the mount contract are in the root
   variants at upload time (FitInside/FitCover, never upscale); they are stored
   as ordinary content-addressed blobs (served by the existing GET path) with a
   `media_variants` map table; `BackfillThumbnails` fills an existing corpus.
+- Deletion shipped: `BlobStore.Delete` on every backend, `Store.DeleteObject`
+  (rows in one transaction, reports blobs no longer referenced), and
+  `media.Delete` (rows first, then unreferenced blobs). No HTTP delete route:
+  who may delete what is host policy.
 - Deferred: an object-store (S3) `BlobStore` backend; lossy-WebP thumbnails (would
   need cgo); a hardened sanitized-SVG path; per-owner quotas.

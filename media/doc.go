@@ -38,6 +38,8 @@
 //     [NewFilesystemBlobStore] as a disk alternative.
 //   - [NewHandler] returns the upload (POST) + serve (GET) routes to mount; its
 //     [Config] fixes the category and the authorize hook.
+//   - [Ingest] stores an image from a trusted in-process caller; [Delete]
+//     removes an object, its variants, and any blob no longer in use.
 //   - [Migrate] installs the schema under a dedicated goose version table so it
 //     coexists with the host's own schema.
 //

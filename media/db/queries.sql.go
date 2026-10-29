@@ -10,6 +10,67 @@ import (
 	"time"
 )
 
+const deleteBlob = `-- name: DeleteBlob :exec
+DELETE FROM media_blobs WHERE category = $1 AND hash = $2
+`
+
+type DeleteBlobParams struct {
+	Category string
+	Hash     string
+}
+
+func (q *Queries) DeleteBlob(ctx context.Context, arg DeleteBlobParams) error {
+	_, err := q.db.Exec(ctx, deleteBlob, arg.Category, arg.Hash)
+	return err
+}
+
+const deleteObject = `-- name: DeleteObject :exec
+DELETE FROM media_objects WHERE category = $1 AND hash = $2
+`
+
+type DeleteObjectParams struct {
+	Category string
+	Hash     string
+}
+
+func (q *Queries) DeleteObject(ctx context.Context, arg DeleteObjectParams) error {
+	_, err := q.db.Exec(ctx, deleteObject, arg.Category, arg.Hash)
+	return err
+}
+
+const deleteVariantsByParent = `-- name: DeleteVariantsByParent :many
+DELETE FROM media_variants
+WHERE category = $1 AND parent_hash = $2
+RETURNING hash
+`
+
+type DeleteVariantsByParentParams struct {
+	Category   string
+	ParentHash string
+}
+
+// Remove every derived size of one original, returning the variants' own
+// content addresses so the caller can decide which blobs are now unused.
+func (q *Queries) DeleteVariantsByParent(ctx context.Context, arg DeleteVariantsByParentParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, deleteVariantsByParent, arg.Category, arg.ParentHash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			return nil, err
+		}
+		items = append(items, hash)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getBlob = `-- name: GetBlob :one
 SELECT bytes, content_type
 FROM media_blobs
@@ -301,4 +362,39 @@ func (q *Queries) PutVariant(ctx context.Context, arg PutVariantParams) error {
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const unreferencedHashes = `-- name: UnreferencedHashes :many
+SELECT DISTINCT c.hash::text AS hash
+FROM unnest($1::text[]) AS c(hash)
+WHERE NOT EXISTS (SELECT 1 FROM media_objects o WHERE o.category = $2 AND o.hash = c.hash)
+  AND NOT EXISTS (SELECT 1 FROM media_variants v WHERE v.category = $2 AND v.hash = c.hash)
+ORDER BY 1
+`
+
+type UnreferencedHashesParams struct {
+	Hashes   []string
+	Category string
+}
+
+// Of the candidate content addresses, those that no object and no variant in
+// the category refers to: the blobs that can be deleted.
+func (q *Queries) UnreferencedHashes(ctx context.Context, arg UnreferencedHashesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, unreferencedHashes, arg.Hashes, arg.Category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var hash string
+		if err := rows.Scan(&hash); err != nil {
+			return nil, err
+		}
+		items = append(items, hash)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
