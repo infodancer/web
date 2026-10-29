@@ -42,7 +42,7 @@ standards and the mount contract are in the root
 
 ## Workflow
 
-- Module path `github.com/infodancer/web/media`, Go 1.26.6, part of the parent
+- Module path `github.com/infodancer/web/media`, Go 1.26.10, part of the parent
   `go.work`. Build with `GOWORK=off` to match CI.
 - After editing `db/queries.sql` or `migrations/`, run `task generate` to
   regenerate the `db` package (sqlc), then `task check`.

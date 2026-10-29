@@ -1,6 +1,6 @@
 module github.com/infodancer/web/profile
 
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/infodancer/ui v0.6.1
@@ -15,7 +15,7 @@ require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
-	github.com/infodancer/web/pgtest v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/pgtest v0.1.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
@@ -25,9 +25,9 @@ require (
 	github.com/yuin/goldmark v1.8.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )
 
 replace github.com/infodancer/web/media => ../media
