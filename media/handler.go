@@ -71,10 +71,7 @@ func validateConfig(cfg Config) error {
 	if cfg.Category == "" || !ValidCategory(cfg.Category) {
 		return fmt.Errorf("invalid category %q", cfg.Category)
 	}
-	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
-		return err
-	}
-	return nil
+	return validateProcessConfig(cfg)
 }
 
 // Routes returns the handler's mux. Mount it under a path with

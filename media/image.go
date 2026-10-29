@@ -102,14 +102,15 @@ type Thumbnail struct {
 // (extension and any client-declared type are irrelevant — Process takes raw
 // bytes); reject anything outside the PNG/JPEG/GIF/WebP allowlist; refuse
 // oversized dimensions from the header before decoding (decompression-bomb
-// guard); reject animation; decode and re-encode to a canonical raster
+// guard); reject animation; decode; scale down to Config.MaxWidth/MaxHeight
+// if set; re-encode to a canonical raster
 // (lossless WebP for PNG, static GIF, and WebP; q85 JPEG for JPEG, which would
 // only bloat under lossless), which strips EXIF and discards any
 // trailing/leading polyglot bytes; and finally content-address the result with
 // SHA-256.
 func Process(r io.Reader, cfg Config) (Processed, error) {
-	// Fail fast on a misconfigured spec list before reading or decoding anything.
-	if err := validateThumbnailSpecs(cfg.Thumbnails); err != nil {
+	// Fail fast on a misconfigured Config before reading or decoding anything.
+	if err := validateProcessConfig(cfg); err != nil {
 		return Processed{}, err
 	}
 
@@ -170,6 +171,7 @@ func Process(r io.Reader, cfg Config) (Processed, error) {
 	if err != nil {
 		return Processed{}, ErrDecode
 	}
+	img = fitWithin(img, cfg.MaxWidth, cfg.MaxHeight)
 
 	out, contentType, err := reencode(img, format)
 	if err != nil {
@@ -277,6 +279,22 @@ func resize(src image.Image, spec ThumbnailSpec) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, outW, outH))
 	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, sb, xdraw.Over, nil)
 	return dst
+}
+
+// fitWithin scales img down to fit maxW×maxH, aspect ratio preserved, never
+// upscaling. A zero limit leaves that side unbounded.
+func fitWithin(img image.Image, maxW, maxH int) image.Image {
+	if maxW == 0 && maxH == 0 {
+		return img
+	}
+	b := img.Bounds()
+	if maxW == 0 {
+		maxW = b.Dx()
+	}
+	if maxH == 0 {
+		maxH = b.Dy()
+	}
+	return resize(img, ThumbnailSpec{MaxWidth: maxW, MaxHeight: maxH, Fit: FitInside})
 }
 
 // scaleRound returns round(v * num / den), the standard aspect-preserving scale.

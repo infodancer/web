@@ -59,8 +59,8 @@ type ThumbnailSpec struct {
 }
 
 // Config tunes the upload pipeline, serving, and the category a handler stores
-// under. The pipeline ([Process]) reads MaxUploadBytes, MaxPixels, and
-// Thumbnails; the rest is used by the HTTP handler.
+// under. The pipeline ([Process]) reads MaxUploadBytes, MaxPixels, MaxWidth,
+// MaxHeight, and Thumbnails; the rest is used by the HTTP handler.
 type Config struct {
 	// Category is the server-side bucket this handler stores under (e.g.
 	// "campaign", "creature", "character"). It is a property of the mount, NOT
@@ -78,6 +78,16 @@ type Config struct {
 	// MaxPixels caps width*height to refuse decompression bombs before a full
 	// decode. Zero uses the default (25 MP).
 	MaxPixels int
+
+	// MaxWidth and MaxHeight bound the canonical output. An image larger than
+	// either is scaled down to fit, aspect ratio preserved, before re-encode;
+	// smaller images are never upscaled. Zero leaves that side unbounded (the
+	// default), and negative values are rejected. Thumbnails derive from the
+	// bounded output, so no variant exceeds these limits either. They do not
+	// relax the pre-decode guards: MaxPixels and the WebP side limit still
+	// apply to the source.
+	MaxWidth  int
+	MaxHeight int
 
 	// PublicBaseURL is the externally-visible prefix the handler builds object
 	// URLs from — point it at where this handler's GET route is mounted, which
@@ -133,6 +143,14 @@ func validThumbName(s string) bool {
 		}
 	}
 	return true
+}
+
+// validateProcessConfig checks the Config fields [Process] reads.
+func validateProcessConfig(cfg Config) error {
+	if cfg.MaxWidth < 0 || cfg.MaxHeight < 0 {
+		return fmt.Errorf("media: negative output limit %dx%d", cfg.MaxWidth, cfg.MaxHeight)
+	}
+	return validateThumbnailSpecs(cfg.Thumbnails)
 }
 
 // validateThumbnailSpecs checks a thumbnail spec list: every name valid and
