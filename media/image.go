@@ -102,7 +102,8 @@ type Thumbnail struct {
 // (extension and any client-declared type are irrelevant — Process takes raw
 // bytes); reject anything outside the PNG/JPEG/GIF/WebP allowlist; refuse
 // oversized dimensions from the header before decoding (decompression-bomb
-// guard); reject animation; decode; scale down to Config.MaxWidth/MaxHeight
+// guard); reject animation, or with Config.FlattenAnimation keep only the
+// first frame of an animated GIF; decode; scale down to Config.MaxWidth/MaxHeight
 // if set; re-encode to a canonical raster
 // (lossless WebP for PNG, static GIF, and WebP; q85 JPEG for JPEG, which would
 // only bloat under lossless), which strips EXIF and discards any
@@ -162,14 +163,19 @@ func Process(r io.Reader, cfg Config) (Processed, error) {
 		if err != nil {
 			return Processed{}, ErrDecode
 		}
-		if frames > 1 {
+		if frames > 1 && !cfg.FlattenAnimation {
 			return Processed{}, ErrAnimated
 		}
 	}
 
+	// For GIF this decodes only the first frame (image/gif's Decode stops there),
+	// which is what makes flattening as cheap as a static image.
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return Processed{}, ErrDecode
+	}
+	if format == "gif" {
+		img = onLogicalScreen(img, cfgImg.Width, cfgImg.Height)
 	}
 	img = fitWithin(img, cfg.MaxWidth, cfg.MaxHeight)
 
@@ -279,6 +285,21 @@ func resize(src image.Image, spec ThumbnailSpec) image.Image {
 	dst := image.NewRGBA(image.Rect(0, 0, outW, outH))
 	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, sb, xdraw.Over, nil)
 	return dst
+}
+
+// onLogicalScreen places a GIF frame on its logical screen. A frame may be
+// smaller than the screen and offset within it; a browser draws it at that
+// offset over a transparent screen, so the canonical output does the same.
+// image/gif rejects frames that extend past the screen, so the frame always
+// fits.
+func onLogicalScreen(frame image.Image, w, h int) image.Image {
+	screen := image.Rect(0, 0, w, h)
+	if frame.Bounds() == screen {
+		return frame
+	}
+	canvas := image.NewNRGBA(screen)
+	xdraw.Draw(canvas, frame.Bounds(), frame, frame.Bounds().Min, xdraw.Src)
+	return canvas
 }
 
 // fitWithin scales img down to fit maxW×maxH, aspect ratio preserved, never

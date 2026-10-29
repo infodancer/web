@@ -30,8 +30,10 @@ bomb. `media` concentrates that risk in one audited, tested place, the way
 2. Sniff the format from content — extension and client type are never trusted.
 3. Allowlist **PNG, JPEG, GIF, WebP**.
 4. Guard dimensions from the header *before* decoding (decompression-bomb guard).
-5. Reject animation (animated GIF and animated WebP); reject SVG (not a raster format).
-6. Decode and **re-encode** to a canonical raster (lossless WebP for PNG,
+5. Reject animation (animated GIF and animated WebP), or, with `FlattenAnimation`,
+   keep only an animated GIF's first frame; reject SVG (not a raster format).
+   GIF frames are counted from the block structure, never by decoding them all.
+6. Decode, scale down to `MaxWidth`/`MaxHeight` if set, and **re-encode** to a canonical raster (lossless WebP for PNG,
    static GIF, and WebP; q85 JPEG for JPEG, which lossless would only bloat) —
    strips EXIF, kills polyglots. WebP encoding is pure Go (no cgo).
 7. Content-address by SHA-256; identical uploads dedupe.

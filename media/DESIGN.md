@@ -119,8 +119,13 @@ at 16383px (the VP8L bitstream limit), checked from the header before decode.
 - **SVG is rejected.** It is XML, not a raster format, so it fails the decode
   gate; there is no safe-by-construction SVG, and a sanitized-SVG path is
   deferred until something needs vector images.
-- **Animated GIF is rejected** (detected via multi-frame decode). Static GIF
-  re-encodes to lossless WebP. **Animated WebP is rejected** too — the decoder
+- **Animated GIF is rejected** by default. Animation is detected by walking the
+  GIF block structure and counting image descriptors, not by decoding frames:
+  a full multi-frame decode lets a small upload of many highly compressible
+  frames allocate gigabytes. A caller may set `FlattenAnimation` to keep only
+  the first frame instead, placed on the GIF's logical screen; only that frame
+  is decoded, and the stored output is a static image. Static GIF re-encodes to
+  lossless WebP. **Animated WebP is rejected** too — the decoder
   does not implement the animated VP8X container, so it fails the decode gate.
 
 ### Serving: the module owns the GET handler
@@ -191,8 +196,10 @@ Process(r io.Reader, cfg Config) (Processed, error)
    reject if `width*height > cfg.MaxPixels` *before* a full decode, so a
    decompression bomb (a tiny file declaring 50000×50000) is refused without
    allocating it.
-4. **Decode + animation check.** Decode the image; for GIF, a multi-frame
-   decode rejects animation.
+4. **Animation check + decode.** For GIF, count frames from the block
+   structure (no decompression); more than one is rejected unless
+   `FlattenAnimation` is set. Decode (for GIF, the first frame only).
+   Scale down to `MaxWidth`/`MaxHeight` if set.
 5. **Re-encode** to the canonical format → strips metadata, kills polyglots.
 6. **Content-address.** `hash = sha256(reencoded)`; the hash is the object id
    and the URL slug. Identical uploads dedupe.
@@ -239,7 +246,8 @@ way (new vectors are added, never removed):
 
 - polyglots: GIF/JS, JPEG with appended HTML, PNG with trailing script;
 - SVG with `<script>` (rejected);
-- animated GIF (rejected);
+- animated GIF (rejected), including a many-frame GIF built to be expensive
+  to decode (rejected, or flattened, in bounded memory);
 - decompression bomb: small file, huge declared dimensions (rejected at
   `DecodeConfig`);
 - magic/extension mismatch (`.png` that is really JPEG — accepted as JPEG by

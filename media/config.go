@@ -60,7 +60,8 @@ type ThumbnailSpec struct {
 
 // Config tunes the upload pipeline, serving, and the category a handler stores
 // under. The pipeline ([Process]) reads MaxUploadBytes, MaxPixels, MaxWidth,
-// MaxHeight, and Thumbnails; the rest is used by the HTTP handler.
+// MaxHeight, FlattenAnimation, and Thumbnails; the rest is used by the HTTP
+// handler.
 type Config struct {
 	// Category is the server-side bucket this handler stores under (e.g.
 	// "campaign", "creature", "character"). It is a property of the mount, NOT
@@ -88,6 +89,16 @@ type Config struct {
 	// apply to the source.
 	MaxWidth  int
 	MaxHeight int
+
+	// FlattenAnimation accepts an animated GIF and keeps only its first frame,
+	// placed on the GIF's logical screen, instead of rejecting it with
+	// [ErrAnimated]. Only the first frame is decoded, so a GIF with many frames
+	// costs no more than a static one. The output is a static image like any
+	// other; animation is never stored. Animated WebP is still rejected, since
+	// the WebP decoder cannot read the animated container. Off by default:
+	// callers taking deliberate uploads should refuse animation outright rather
+	// than silently store a still the uploader did not choose.
+	FlattenAnimation bool
 
 	// PublicBaseURL is the externally-visible prefix the handler builds object
 	// URLs from — point it at where this handler's GET route is mounted, which

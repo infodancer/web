@@ -58,7 +58,8 @@ contained.
 ## Known limitations (v0.1)
 
 - Animated WebP and animated GIF are rejected (animation is not supported), as
-  is SVG.
+  is SVG. A caller may opt in to `FlattenAnimation`, which keeps an animated
+  GIF's first frame as a static image; animated WebP is rejected either way.
 - Re-encoding is lossy for JPEG sources (q85) by design; PNG/GIF/WebP re-encode
   to lossless WebP. The safety win (EXIF/polyglot stripping) is the deliberate
   trade.
