@@ -23,7 +23,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/infodancer/ui/markdown v0.2.1
 	github.com/infodancer/web/media v0.1.0
-	github.com/infodancer/web/pgtest v0.0.0-00010101000000-000000000000
+	github.com/infodancer/web/pgtest v0.1.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.9.2
