@@ -38,6 +38,10 @@ func ValidCategory(s string) bool {
 // disk; a future object-store backend fits the same interface without touching
 // the pipeline, metadata, or handler. Keys are (category, content-address), so
 // Put is idempotent and a stored blob never changes for a given key.
+//
+// Delete removes bytes unconditionally. Content addressing means one blob can
+// back several objects or variants, so callers normally go through [Delete],
+// which removes a blob only once no metadata row refers to it.
 type BlobStore interface {
 	// Put stores data under (category, hash) with its content type. Storing an
 	// existing key is a no-op (idempotent).
@@ -47,6 +51,9 @@ type BlobStore interface {
 	Get(ctx context.Context, category, hash string) (data []byte, contentType string, err error)
 	// Has reports whether a blob with (category, hash) is stored.
 	Has(ctx context.Context, category, hash string) (bool, error)
+	// Delete removes the blob for (category, hash). Deleting a key that is not
+	// stored is not an error (idempotent).
+	Delete(ctx context.Context, category, hash string) error
 }
 
 // MemoryBlobStore is an in-memory [BlobStore] for tests and a no-database dev
@@ -104,4 +111,12 @@ func (m *MemoryBlobStore) Has(_ context.Context, category, hash string) (bool, e
 	defer m.mu.RUnlock()
 	_, ok := m.data[memKey(category, hash)]
 	return ok, nil
+}
+
+// Delete removes the blob for (category, hash); a missing key is not an error.
+func (m *MemoryBlobStore) Delete(_ context.Context, category, hash string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.data, memKey(category, hash))
+	return nil
 }

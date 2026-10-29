@@ -147,3 +147,42 @@ func TestIngest_RejectsBadImage(t *testing.T) {
 		t.Errorf("err = %v, want ErrUnsupportedFormat", err)
 	}
 }
+
+func TestIngest_RestoresMissingBlobs(t *testing.T) {
+	// If a blob goes missing while its rows remain (a Delete racing an Ingest of
+	// the same content), re-ingesting the same image puts the bytes back.
+	store := newFakeStore()
+	blobs := NewMemoryBlobStore()
+	ctx := context.Background()
+	cfg := ingestCfg()
+	cfg.Thumbnails = []ThumbnailSpec{{Name: "thumb", MaxWidth: 8, MaxHeight: 8}}
+	img := pngBytes(t, 32, 32)
+
+	first, err := Ingest(ctx, store, blobs, cfg, "s", bytes.NewReader(img))
+	if err != nil {
+		t.Fatalf("Ingest: %v", err)
+	}
+	processed, err := Process(bytes.NewReader(img), cfg)
+	if err != nil || len(processed.Thumbnails) != 1 {
+		t.Fatalf("Process: %v, %d thumbnails; want 1", err, len(processed.Thumbnails))
+	}
+	hashes := []string{first.Meta.Hash, processed.Thumbnails[0].SHA256}
+	for _, h := range hashes {
+		if err := blobs.Delete(ctx, cfg.Category, h); err != nil {
+			t.Fatalf("Delete %s: %v", h, err)
+		}
+	}
+
+	again, err := Ingest(ctx, store, blobs, cfg, "s", bytes.NewReader(img))
+	if err != nil {
+		t.Fatalf("re-Ingest: %v", err)
+	}
+	if !again.Existed {
+		t.Errorf("Existed = false, want true on re-ingest")
+	}
+	for _, h := range hashes {
+		if ok, err := blobs.Has(ctx, cfg.Category, h); err != nil || !ok {
+			t.Errorf("blob %s not restored by re-ingest (Has = %v, %v)", h, ok, err)
+		}
+	}
+}

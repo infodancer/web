@@ -62,5 +62,13 @@ func (p *PostgresBlobStore) Has(ctx context.Context, category, hash string) (boo
 	return ok, nil
 }
 
+// Delete removes the blob for (category, hash); a missing key is not an error.
+func (p *PostgresBlobStore) Delete(ctx context.Context, category, hash string) error {
+	if err := p.q.DeleteBlob(ctx, db.DeleteBlobParams{Category: category, Hash: hash}); err != nil {
+		return fmt.Errorf("media: delete blob: %w", err)
+	}
+	return nil
+}
+
 // Compile-time proof the concrete blob store satisfies the seam.
 var _ BlobStore = (*PostgresBlobStore)(nil)

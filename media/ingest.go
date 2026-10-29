@@ -45,10 +45,20 @@ func Ingest(ctx context.Context, store objectStore, blobs BlobStore, cfg Config,
 	}
 
 	// Idempotency: if this content address is already recorded under the
-	// category, return its URL without rewriting any bytes.
+	// category, return its URL without rewriting the metadata. Its bytes are
+	// restored if they are missing, which a [Delete] racing an earlier ingest
+	// of the same image can cause.
 	if existing, ok, err := store.Lookup(ctx, cfg.Category, processed.SHA256); err != nil {
 		return IngestResult{}, fmt.Errorf("media: Ingest: lookup: %w", err)
 	} else if ok {
+		if err := restoreBlob(ctx, blobs, cfg.Category, processed.SHA256, processed.ContentType, processed.Bytes); err != nil {
+			return IngestResult{}, fmt.Errorf("media: Ingest: restore blob: %w", err)
+		}
+		for _, t := range processed.Thumbnails {
+			if err := restoreBlob(ctx, blobs, cfg.Category, t.SHA256, t.ContentType, t.Bytes); err != nil {
+				return IngestResult{}, fmt.Errorf("media: Ingest: restore thumbnail %q blob: %w", t.Name, err)
+			}
+		}
 		return IngestResult{
 			Meta:    existing,
 			URL:     objectURL(cfg.PublicBaseURL, existing.Hash, existing.ContentType),
@@ -106,4 +116,14 @@ func Ingest(ctx context.Context, store objectStore, blobs BlobStore, cfg Config,
 		URL:     objectURL(cfg.PublicBaseURL, meta.Hash, meta.ContentType),
 		Existed: false,
 	}, nil
+}
+
+// restoreBlob stores data under (category, hash) only if no blob is there. The
+// Has check keeps the common case (bytes present) from resending them.
+func restoreBlob(ctx context.Context, blobs BlobStore, category, hash, contentType string, data []byte) error {
+	ok, err := blobs.Has(ctx, category, hash)
+	if err != nil || ok {
+		return err
+	}
+	return blobs.Put(ctx, category, hash, contentType, data)
 }

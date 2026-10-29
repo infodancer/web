@@ -56,3 +56,25 @@ SELECT category, parent_hash, name, hash, content_type, width, height, byte_size
 FROM media_variants
 WHERE category = $1 AND parent_hash = $2
 ORDER BY name;
+
+-- name: DeleteBlob :exec
+DELETE FROM media_blobs WHERE category = $1 AND hash = $2;
+
+-- name: DeleteVariantsByParent :many
+-- Remove every derived size of one original, returning the variants' own
+-- content addresses so the caller can decide which blobs are now unused.
+DELETE FROM media_variants
+WHERE category = $1 AND parent_hash = $2
+RETURNING hash;
+
+-- name: DeleteObject :exec
+DELETE FROM media_objects WHERE category = $1 AND hash = $2;
+
+-- name: UnreferencedHashes :many
+-- Of the candidate content addresses, those that no object and no variant in
+-- the category refers to: the blobs that can be deleted.
+SELECT DISTINCT c.hash::text AS hash
+FROM unnest(@hashes::text[]) AS c(hash)
+WHERE NOT EXISTS (SELECT 1 FROM media_objects o WHERE o.category = @category AND o.hash = c.hash)
+  AND NOT EXISTS (SELECT 1 FROM media_variants v WHERE v.category = @category AND v.hash = c.hash)
+ORDER BY 1;

@@ -118,6 +118,24 @@ func (f *FilesystemBlobStore) Has(_ context.Context, category, hash string) (boo
 	}
 }
 
+// Delete removes the blob and its sidecar; a missing key is not an error. The
+// blob goes first, the reverse of Put, so Has never reports a blob whose
+// sidecar is already gone. Empty shard directories are left in place: there
+// are at most 65,536 per category, and removing one could race a concurrent
+// Put that has just created it.
+func (f *FilesystemBlobStore) Delete(_ context.Context, category, hash string) error {
+	blobPath, typePath, ok := f.paths(category, hash)
+	if !ok {
+		return fmt.Errorf("media: filesystem delete: invalid category/hash %q/%q", category, hash)
+	}
+	for _, p := range []string{blobPath, typePath} {
+		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) { //nolint:gosec // G703: validated category/hash path
+			return fmt.Errorf("media: filesystem delete: %w", err)
+		}
+	}
+	return nil
+}
+
 // writeFileAtomic writes data to a temp file in the destination directory, then
 // renames it into place — so a reader never sees a half-written blob and a
 // crash mid-write leaves the old file (or none), never a corrupt one.

@@ -138,6 +138,43 @@ func (s *Store) ListObjectsAfter(ctx context.Context, category, cursor string, l
 	return out, nil
 }
 
+// DeleteObject removes the object (category, hash) and every variant row of it
+// in one transaction, and returns the content addresses among the object and
+// its variants that no remaining object or variant in the category refers to.
+// Those are the blobs the caller may now delete; a blob shared with another
+// object or variant is left out. A missing object is not an error: its own
+// hash is still reported when unreferenced, so a repeated delete removes bytes
+// a crash left behind.
+//
+// Two concurrent deletes of objects that share a blob can each see the other's
+// row and both keep it. That leaks bytes but never loses them; deleting either
+// hash again removes them.
+func (s *Store) DeleteObject(ctx context.Context, category, hash string) (unreferenced []string, err error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("media: delete object: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit
+
+	q := s.q.WithTx(tx)
+	variantHashes, err := q.DeleteVariantsByParent(ctx, db.DeleteVariantsByParentParams{Category: category, ParentHash: hash})
+	if err != nil {
+		return nil, fmt.Errorf("media: delete object: variants: %w", err)
+	}
+	if err := q.DeleteObject(ctx, db.DeleteObjectParams{Category: category, Hash: hash}); err != nil {
+		return nil, fmt.Errorf("media: delete object: %w", err)
+	}
+	candidates := append([]string{hash}, variantHashes...)
+	unreferenced, err = q.UnreferencedHashes(ctx, db.UnreferencedHashesParams{Hashes: candidates, Category: category})
+	if err != nil {
+		return nil, fmt.Errorf("media: delete object: references: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("media: delete object: commit: %w", err)
+	}
+	return unreferenced, nil
+}
+
 func metaFromRow(row db.MediaObjects) ObjectMeta {
 	return ObjectMeta{
 		Category:    row.Category,

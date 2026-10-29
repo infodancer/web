@@ -124,6 +124,7 @@ type BlobStore interface {
     Put(ctx, category, hash, contentType string, data []byte) error
     Get(ctx, category, hash string) (data []byte, contentType string, err error)
     Has(ctx, category, hash string) (bool, error)
+    Delete(ctx, category, hash string) error
 }
 ```
 
@@ -139,6 +140,21 @@ Backends, all behind the same seam (swap one for another with no other change):
 ```go
 blobs, err := media.NewFilesystemBlobStore("/var/lib/app/media")
 ```
+
+## Deleting
+
+`media.Delete(ctx, store, blobs, category, hash)` removes an object, its
+variants, and every blob of theirs that nothing else in the category still
+uses. Content addressing lets one blob back several objects or variants (a
+small image's thumbnail is often the image itself), so a shared blob is kept.
+Metadata goes first and bytes second: a failure in between leaves unused bytes,
+never a row pointing at missing ones, and calling `Delete` again finishes the
+job. Deleting a missing object is not an error.
+
+Run bulk deletes (for example, a sweep of objects the host no longer
+references) serialized with ingestion: a delete that races an upload of the
+same image can remove bytes the upload found already present. Re-ingesting the
+image restores them.
 
 ## What the host owns
 
@@ -157,7 +173,7 @@ task check             # fmt, vet, lint, test, vulncheck
 ## Status
 
 Pre-1.0 (tag `media/vX.Y.Z`). `Config`, `Process`/`Processed`, `BlobStore`,
-`ThumbnailSpec`/`BackfillThumbnails`,
+`ThumbnailSpec`/`BackfillThumbnails`, `Ingest`/`Delete`,
 `NewStore`/`NewPostgresBlobStore`/`NewHandler`/`Migrate`, and the upload/serve
 HTTP contract are the public surface. See [DESIGN.md](DESIGN.md).
 

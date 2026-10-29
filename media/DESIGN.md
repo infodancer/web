@@ -77,6 +77,7 @@ type BlobStore interface {
     Put(ctx context.Context, category, hash, contentType string, data []byte) error
     Get(ctx context.Context, category, hash string) (data []byte, contentType string, err error)
     Has(ctx context.Context, category, hash string) (bool, error)
+    Delete(ctx context.Context, category, hash string) error
 }
 ```
 
@@ -93,6 +94,35 @@ move when the backend is swapped. Shipped backends:
   served through the handler (Content-Type + nosniff), never via a bare
   directory listing. An empty category drops the prefix (`<root>/ab/cd/<hash>`).
 - `MemoryBlobStore` — in-memory, for tests and no-database dev mounts.
+
+### Deletion: metadata first, shared blobs kept
+
+`BlobStore.Delete` removes bytes unconditionally; the policy lives in
+`media.Delete`. Because blobs are content-addressed, one blob can back several
+rows: two objects never share a key, but a variant's bytes can equal another
+original's (a thumbnail of an image already under the thumbnail size is the
+image), and two originals can produce the same variant. `Store.DeleteObject`
+therefore removes the object and its variant rows in one transaction, then
+returns only those of the candidate hashes (the object's and its variants')
+that no remaining `media_objects` or `media_variants` row in the category
+refers to. `00003` adds the `media_variants (category, hash)` index that check
+needs.
+
+Ordering follows the same rule as ingest, reversed: rows first, bytes second,
+so a crash leaves orphaned bytes rather than a dangling row. A missing object
+still reports its own hash when unreferenced, so a repeated `Delete` clears
+the leftovers.
+
+Two known races, both chosen over locking across the metadata store and an
+arbitrary blob backend:
+
+- Two concurrent deletes of objects sharing a blob can each see the other's
+  row and both keep the blob. Bytes leak; nothing is lost.
+- A delete racing an ingest of the same image can remove bytes the ingest
+  found present and skipped writing. Callers serialize bulk deletes with
+  ingestion, and `Ingest` restores missing blobs when it finds the object
+  already recorded, so re-ingesting heals it. The HTTP upload path always
+  writes the blob, so it heals the same way.
 
 ### Transform policy: re-encode raster; reject SVG and animated
 
