@@ -1,6 +1,6 @@
 module github.com/infodancer/web/media/cmd/media-import
 
-go 1.26.6
+go 1.26.10
 
 // media is unpublished at the version carrying Ingest; resolve it from the
 // parent tree (the go.work workspace also wires this for local dev).

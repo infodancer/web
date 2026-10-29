@@ -8,7 +8,7 @@ conventions.
 
 ## Toolchain
 
-- **Go** `1.26.6` (suite standard). Bump in lockstep across modules, and update
+- **Go** `1.26.10` (suite standard). Bump in lockstep across modules, and update
   this line in the same change -- the `go` directive in every `go.mod` is the
   source of truth, and these docs have drifted from it three times (#86, #111).
   `git ls-files '*go.mod' | xargs grep -h '^go '` should report one version.

@@ -1,6 +1,6 @@
 module github.com/infodancer/web/faq
 
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/infodancer/ui v0.4.6

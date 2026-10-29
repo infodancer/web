@@ -1,6 +1,6 @@
 module github.com/infodancer/web/contact
 
-go 1.26.6
+go 1.26.10
 
 replace (
 	github.com/infodancer/web/antibot => ../antibot
