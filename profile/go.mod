@@ -25,9 +25,9 @@ require (
 	github.com/yuin/goldmark v1.8.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )
 
 replace github.com/infodancer/web/media => ../media
