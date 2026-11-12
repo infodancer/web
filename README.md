@@ -25,6 +25,7 @@ builds each module independently against its own `go.mod`.
 | [faq](faq/) | `github.com/infodancer/web/faq` | Postgres | FAQ / Q&A sections: imported and locally authored questions, answers, votes. |
 | [timeline](timeline/) | `github.com/infodancer/web/timeline` | Postgres | Interactive multi-category event timelines over extended timeframes. |
 | [profile](profile/) | `github.com/infodancer/web/profile` | Postgres | Public persona: handle, display name, bio, avatar, embeddable card. |
+| [apitoken](apitoken/) | `github.com/infodancer/web/apitoken` | Postgres | Personal access tokens: scoped, revocable bearer tokens so tools can call a site's API as a user. |
 | [paging](paging/) | `github.com/infodancer/web/paging` | — | Offset-pagination primitives shared by the components (data-layer half of ui's Pager). |
 | [integration](integration/) | `github.com/infodancer/web/integration` | Postgres | Cross-component tests against one shared database. |
 
