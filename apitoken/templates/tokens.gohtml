@@ -1,0 +1,67 @@
+{{- /*
+  apitoken account page: the user's personal access tokens, a mint form, and a
+  revoke button per live token. Rendered through ui/document with the host's
+  chrome. .NewToken is set only on the response to a successful mint.
+*/ -}}
+{{define "title"}}API tokens{{with .Meta.SiteName}} - {{.}}{{end}}{{end}}
+{{define "content"}}
+<header class="app-page-header">
+  <h1>API tokens</h1>
+</header>
+<p class="app-page-meta">A token lets a script or command-line tool act as you, limited to the scopes you give it. Treat it like a password. Revoke any token you no longer use.</p>
+
+{{with .Error}}<div class="app-alert app-alert-error" role="alert">{{.}}</div>{{end}}
+
+{{if .NewToken}}
+<section class="app-section app-panel" aria-labelledby="new-token">
+  <h2 id="new-token">New token: {{.NewTokenName}}</h2>
+  <p>Copy it now. It is shown only this once and cannot be recovered; if you lose it, revoke it and make another.</p>
+  <input type="text" readonly value="{{.NewToken}}" aria-label="New token" onfocus="this.select()" style="width:100%;font-family:monospace">
+</section>
+{{end}}
+
+<section class="app-section" aria-labelledby="mint">
+  <h2 id="mint">Create a token</h2>
+  <form method="post" action="{{.BasePath}}" class="app-form">
+    <label for="apitoken-name">Name</label>
+    <input type="text" id="apitoken-name" name="name" required maxlength="100" placeholder="laptop CLI">
+    <fieldset>
+      <legend>Scopes</legend>
+      {{range .Scopes}}
+      <label><input type="checkbox" name="scope" value="{{.Name}}"> <code>{{.Name}}</code>{{with .Description}} -- {{.}}{{end}}</label>
+      {{end}}
+    </fieldset>
+    <button type="submit" class="app-btn">Create token</button>
+  </form>
+</section>
+
+<section class="app-section" aria-labelledby="yours">
+  <h2 id="yours">Your tokens</h2>
+  {{if .Tokens}}
+  <table class="app-table">
+    <thead><tr><th>Name</th><th>Token</th><th>Scopes</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+    <tbody>
+    {{range .Tokens}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td><code>{{$.Prefix}}{{.DisplayPrefix}}...</code></td>
+      <td>{{join .Scopes ", "}}</td>
+      <td>{{day .CreatedAt}}</td>
+      <td>{{with .LastUsedAt}}{{when .}}{{else}}never{{end}}</td>
+      <td>
+        {{if .RevokedAt}}revoked {{when .RevokedAt}}{{else}}
+        <form method="post" action="{{$.BasePath}}/{{.ID}}/revoke" onsubmit="return confirm('Revoke this token? Anything using it stops working.');">
+          <button type="submit" class="app-btn app-btn-secondary">Revoke</button>
+        </form>
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="app-list-empty">You have no tokens.</p>
+  {{end}}
+</section>
+{{end}}
+{{template "ui/document" .}}
