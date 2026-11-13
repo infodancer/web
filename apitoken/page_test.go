@@ -2,6 +2,7 @@ package apitoken_test
 
 import (
 	"context"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -89,6 +90,27 @@ func TestPage_MintShowsTheTokenOnce(t *testing.T) {
 	rec = pageReq(h, http.MethodGet, base, "alice", nil, "")
 	require.NotContains(t, rec.Body.String(), plain)
 	require.Contains(t, rec.Body.String(), prefix+tok.DisplayPrefix+"...")
+}
+
+func TestPage_HostHeader(t *testing.T) {
+	_, h := pageFixture(t)
+	rec := pageReq(h, http.MethodGet, base, "alice", nil, "")
+	require.Contains(t, rec.Body.String(), "<h1>API tokens</h1>", "without a header the page owns the h1")
+
+	m, _ := newModule(t, func(c *apitoken.Config) {
+		c.BasePath = base
+		c.CurrentUser = func(http.ResponseWriter, *http.Request) (string, bool) { return "alice", true }
+		c.Header = func(*http.Request) template.HTML {
+			return `<h1>Your account</h1><nav class="host-tabs">tabs</nav>`
+		}
+	})
+	h, err := m.Handler()
+	require.NoError(t, err)
+	body := pageReq(h, http.MethodGet, base, "alice", nil, "").Body.String()
+	hdr := strings.Index(body, `<nav class="host-tabs">tabs</nav>`)
+	title := strings.Index(body, "<h2>API tokens</h2>")
+	require.True(t, hdr >= 0 && title > hdr, "the host header comes first, and the page title steps down to h2")
+	require.Equal(t, 1, strings.Count(body, "<h1>"), "one h1, the host's")
 }
 
 func TestPage_MintRejectsBadInput(t *testing.T) {

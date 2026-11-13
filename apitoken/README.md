@@ -39,6 +39,7 @@ m, err := apitoken.New(apitoken.Config{
     BasePath:    "/account/tokens",
     CurrentUser: requireSignedIn, // writes its own redirect when nobody is
     Chrome:      siteChrome,
+    Header:      accountTabs, // optional: the host's account heading and tabs
 })
 
 // The routes a token may reach -- nothing else is reachable with one.

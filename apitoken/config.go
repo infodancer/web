@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -60,6 +61,14 @@ type Config struct {
 	// Chrome supplies the host's page chrome per request. nil renders a bare
 	// ui/document page.
 	Chrome func(*http.Request) ui.DocumentData
+
+	// Header, when set, returns host markup rendered at the top of the
+	// account page's content, above the page's own title -- typically the
+	// host's account heading and section tabs, so the page sits among the
+	// host's other account pages. The page title then renders as an h2,
+	// leaving the host's markup to supply the page's one h1. nil means no
+	// header and an h1 title.
+	Header func(*http.Request) template.HTML
 
 	// CSRF tunes the account page's bundled same-origin check.
 	CSRF CSRFConfig

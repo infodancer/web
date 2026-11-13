@@ -22,6 +22,7 @@ var templatesFS embed.FS
 // page can hand itself straight to ui/document.
 type pageData struct {
 	ui.DocumentData
+	Header   template.HTML
 	BasePath string
 	Prefix   string
 	Tokens   []*Token
@@ -163,6 +164,9 @@ func (p *page) render(w http.ResponseWriter, r *http.Request, user string, statu
 	}
 	if p.m.cfg.Chrome != nil {
 		d.DocumentData = p.m.cfg.Chrome(r)
+	}
+	if p.m.cfg.Header != nil {
+		d.Header = p.m.cfg.Header(r)
 	}
 	d.BasePath, d.Prefix, d.Tokens, d.Scopes = p.base, p.m.cfg.Prefix, tokens, p.m.cfg.Scopes
 
