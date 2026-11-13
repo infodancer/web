@@ -2,8 +2,7 @@
 
 A reusable, mountable component for the public persona every community site
 needs: a unique handle, a display name, a short markdown bio, an avatar, and
-bio links. Built for [infodancer/web#52](https://github.com/infodancer/web/issues/52);
-first consumers are OSG and SF.
+bio links. Built for [infodancer/web#52](https://github.com/infodancer/web/issues/52).
 
 ## What it's for
 
