@@ -112,6 +112,13 @@ A site with literally one extra text field pays a whole section for it.
 Accepted: one seam used uniformly beats a second mechanism (the descriptor
 registry) maintained alongside for small cases.
 
+"One hook" is about profile *data*. `EditHeader` is not an exception to it:
+it carries no fields and nothing profile stores, only the host's navigation
+placed above the edit form, so a host whose account area has its own
+heading and tabs can show them on the edit page too. It never appears on
+the public page, and with it set the edit page's title steps down to an h2
+so the page keeps one h1.
+
 ## 4. Implementation status
 
 The `Sections` hook is implemented

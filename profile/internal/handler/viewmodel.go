@@ -90,6 +90,7 @@ func orProfiles(name string) string {
 
 // editView is the page payload for the edit form.
 type editView struct {
+	Header        template.HTML // host markup atop the page; empty for none
 	Profile       *store.Profile
 	HandleLocked  bool   // claimed and the viewer may not change it
 	AvatarUploads bool   // an IngestAvatar is configured

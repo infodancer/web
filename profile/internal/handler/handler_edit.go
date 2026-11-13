@@ -162,6 +162,9 @@ func (s *Server) renderEditStatus(w http.ResponseWriter, r *http.Request, p *sto
 	v.AvatarSrc = s.avatarSrc(p)
 	v.LinkRows = padLinkRows(p.Links)
 	v.Sections = s.hostSections(r, u.Key, true)
+	if s.editHeader != nil {
+		v.Header = s.editHeader(r)
+	}
 	// The bio rides in profile's own form via mdedit/field: no preview or
 	// upload endpoints, a comment-grade toolbar matching the markdown.Comment
 	// preset the bio renders through.
