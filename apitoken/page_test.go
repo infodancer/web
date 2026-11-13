@@ -77,6 +77,9 @@ func TestPage_MintShowsTheTokenOnce(t *testing.T) {
 		url.Values{"name": {"laptop CLI"}, "scope": {"notes:write"}}, sameOrigin)
 	require.Equal(t, http.StatusOK, rec.Code, "the token is in the response, not a redirect")
 	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	// Not no-referrer: under it a browser sends "Origin: null" on the page's
+	// own form posts, which a host's same-origin CSRF check must reject.
+	require.Equal(t, "same-origin", rec.Header().Get("Referrer-Policy"))
 	require.Empty(t, rec.Header().Get("Location"))
 	plain := regexp.MustCompile(prefix + `[A-Za-z0-9_-]{43}`).FindString(rec.Body.String())
 	require.NotEmpty(t, plain, "mint response shows the token")
