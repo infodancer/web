@@ -45,6 +45,9 @@ m, err := profile.New(profile.Config{
     Blobs:   blobs,
     Objects: mediaStore,
     Avatar:  media.Config{Category: "avatar", PublicBaseURL: "/media/avatar"},
+
+    // Optional: the host's account heading and tabs atop the edit page.
+    EditHeader: accountTabs,
 })
 if err != nil { ... }
 if err := m.Migrate(ctx); err != nil { ... } // profile_goose_db_version

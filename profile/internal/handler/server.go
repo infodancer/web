@@ -77,6 +77,7 @@ type Deps struct {
 	LogoURL      string
 	Chrome       func(*http.Request) uiassets.DocumentData // per-request host chrome; nil uses the module default
 	Sections     SectionsFunc                              // host-owned page sections; nil means none
+	EditHeader   func(*http.Request) template.HTML         // host markup atop the edit page; nil means none
 	OnChange     func(ctx context.Context, userKey string) // fired once per successful write; nil means none
 	IngestAvatar IngestAvatar                              // nil disables avatar upload
 	Reserved     []string                                  // host additions to the reserved-handle set
@@ -96,6 +97,7 @@ type Server struct {
 	logoURL      string
 	chrome       func(*http.Request) uiassets.DocumentData
 	sections     SectionsFunc
+	editHeader   func(*http.Request) template.HTML
 	onChange     func(ctx context.Context, userKey string)
 	ingestAvatar IngestAvatar
 	reserved     map[string]bool
@@ -149,6 +151,7 @@ func New(d Deps) (*Server, error) {
 		logoURL:      d.LogoURL,
 		chrome:       d.Chrome,
 		sections:     d.Sections,
+		editHeader:   d.EditHeader,
 		onChange:     d.OnChange,
 		ingestAvatar: d.IngestAvatar,
 		reserved:     reserved,

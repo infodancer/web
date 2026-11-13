@@ -2,6 +2,7 @@ package profile
 
 import (
 	"context"
+	"html/template"
 	"log/slog"
 	"net/http"
 
@@ -68,6 +69,14 @@ type Config struct {
 	// (EditHTML). Called per request with the profile owner's user key; the
 	// host gates per-viewer visibility itself. nil means no host sections.
 	Sections func(ctx context.Context, r *http.Request, userKey string) []Section
+
+	// EditHeader, when set, returns host markup rendered at the top of the
+	// edit page's content, above its own title -- typically the host's
+	// account heading and section tabs, so the edit page sits among the
+	// host's other account pages. The title then renders as an h2, leaving
+	// the host's markup to supply the page's one h1. The public profile page
+	// never shows it. nil means no header and an h1 title.
+	EditHeader func(*http.Request) template.HTML
 
 	// OnChange is called once after any successful profile write -- form
 	// save (including handle claims), avatar upload or removal -- with the

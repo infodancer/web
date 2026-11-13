@@ -5,9 +5,11 @@
 */ -}}
 {{define "title"}}API tokens{{with .Meta.SiteName}} - {{.}}{{end}}{{end}}
 {{define "content"}}
-<header class="app-page-header">
+{{if .Header}}{{.Header}}
+<h2>API tokens</h2>
+{{else}}<header class="app-page-header">
   <h1>API tokens</h1>
-</header>
+</header>{{end}}
 <p class="app-page-meta">A token lets a script or command-line tool act as you, limited to the scopes you give it. Treat it like a password. Revoke any token you no longer use.</p>
 
 {{with .Error}}<div class="app-alert app-alert-error" role="alert">{{.}}</div>{{end}}

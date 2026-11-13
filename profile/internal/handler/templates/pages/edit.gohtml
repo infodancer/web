@@ -3,8 +3,9 @@
 {{ define "content" }}
 {{- $base := .BasePath -}}
 {{- $v := .Page -}}
+{{ with $v.Header }}{{ . }}{{ end }}
 <div class="profile-edit">
-  <h1>Your profile</h1>
+  {{ if $v.Header }}<h2>Your profile</h2>{{ else }}<h1>Your profile</h1>{{ end }}
 
   {{ if $v.Saved }}<p class="profile-flash" role="status">Profile saved.</p>{{ end }}
   {{ if $v.Errors }}
