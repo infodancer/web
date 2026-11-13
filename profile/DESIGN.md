@@ -83,7 +83,7 @@ The contract:
 - **Each section is an htmx island.** The host renders it with its own
   templates, and its inputs post to *host* endpoints — save-per-section,
   the same display↔edit lifecycle the suite already uses (mdedit fields,
-  osg's inventory table). profile's own form saves profile's fields;
+  editable tables). profile's own form saves profile's fields;
   a section's form saves the section's. No merged validation, no
   partial-save ambiguity, no foreign fields riding profile's POST.
 - **Storage stays host-side**, in host tables keyed by the host's user id.
@@ -122,8 +122,7 @@ so the page keeps one h1.
 ## 4. Implementation status
 
 The `Sections` hook is implemented
-([#60](https://github.com/infodancer/web/issues/60)); the first consumer is
-osg's port off its bespoke persona, whose host sections carry the gaming
-fields (home location, player tags) and the bestiary-contributor link.
-sf's author-claim surface remains a planned consumer. The hook is additive:
-a nil `Sections` changes nothing.
+([#60](https://github.com/infodancer/web/issues/60)) and in use: a host has
+moved its own persona fields (home location, tags, a contributor link) into
+host sections. An author-claim section is a planned use. The hook is
+additive: a nil `Sections` changes nothing.

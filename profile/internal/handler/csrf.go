@@ -8,7 +8,7 @@ import (
 // csrfGuard rejects state-changing requests whose Origin (or Referer as
 // fallback) host doesn't match the request's Host header.
 //
-// Modeled on the faq module's guard (itself modeled on osg's). The host
+// Modeled on the faq module's guard. The host
 // application's session cookie already carries SameSite=Lax, which blocks
 // the overwhelming majority of cross-site POSTs in modern browsers; this
 // middleware covers the remaining cases (older browsers, sibling-origin
