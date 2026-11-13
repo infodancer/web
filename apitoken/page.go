@@ -179,7 +179,11 @@ func (p *page) render(w http.ResponseWriter, r *http.Request, user string, statu
 	// Private to the user, and on a mint response it carries a live secret.
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Referrer-Policy", "no-referrer")
+	// same-origin keeps the page's URL from other sites without blanking the
+	// Origin header: under no-referrer a browser sends "Origin: null" on the
+	// page's own form posts, and a same-origin CSRF check (this module's or
+	// the host's) rejects them.
+	w.Header().Set("Referrer-Policy", "same-origin")
 	w.WriteHeader(status)
 	_, _ = buf.WriteTo(w)
 }
