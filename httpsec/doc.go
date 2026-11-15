@@ -25,4 +25,17 @@
 // The defaults are deliberately strict. A site that needs a third-party origin
 // (an analytics host, a font CDN) adds it to the [Policy] by name, so every
 // relaxation is visible in the site's own code.
+//
+// # The default policy is shared with smoke
+//
+// The default, narrow security policy is expressed by two things together: this
+// package, which decides what a site sends, and github.com/infodancer/smoke,
+// which decides what a probe expects. Neither controls the other, and they must
+// stay in sync; the site template runs smoke against a server built on these
+// defaults, so drift between them fails a test. Whether to add a restriction or
+// loosen one is decided from first principles (what the browser feature does,
+// who needs it, what abuse it allows), never because one side says so. A site is
+// expected to conform to the defaults unless a specific exception is made for
+// that site or route, with the reason written next to it. See [Override] and
+// [HeaderConfig.Expected].
 package httpsec

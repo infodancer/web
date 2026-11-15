@@ -90,6 +90,8 @@ A handler may overwrite any header for its own response, for example to send
 
 ### Changing a default
 
+The default policy is shared with smoke. This package decides what a site sends and `github.com/infodancer/smoke` decides what a probe expects. Neither controls the other and they must stay in sync (the site template runs smoke against a server built on these defaults, so drift fails a test). Adding a restriction or loosening one is decided from first principles, not by whichever side says so. A site conforms to the defaults unless a specific exception is made for that site or route, with the reason written next to it.
+
 The defaults are strict on purpose, and changing one is a deliberate, visible act at one of two scopes.
 
 Site-wide: set the field on `HeaderConfig` (`PermissionsPolicy`, `FrameOptions`, `ReferrerPolicy`).
