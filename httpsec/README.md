@@ -57,6 +57,33 @@ source containing `;`, `,` or whitespace, so a configuration value cannot
 inject a directive. Reaching for `'unsafe-inline'` is possible and is a code
 smell worth a comment. Per-response nonces are not supported yet.
 
+### Rolling a policy onto a live site
+
+Tightening a CSP on a site that already ships inline scripts, inline styles or
+third-party assets will break pages, and nothing outside a browser tells you
+which. Run it as report-only first:
+
+```go
+mux.Handle("POST /csp-report", httpsec.ReportHandler(logger)) // outside the CSRF guard
+
+httpsec.Headers(httpsec.HeaderConfig{
+	CSPMode:   httpsec.CSPReportOnly, // blocks nothing; reports what it would block
+	ReportURI: "/csp-report",
+})
+```
+
+Browsers then POST each would-be violation to `/csp-report`, and `ReportHandler`
+logs it as one WARN line (`csp violation`, with the document, directive, blocked
+URI and source file). Fix what shows up, or `Allow` it deliberately, then drop
+`CSPMode` to enforce. `CSPOff` sends no CSP at all and keeps the other headers.
+
+`ReportHandler` is public, so it treats every field as hostile: values are cut
+to 300 bytes with control characters replaced (a report cannot forge or split a
+log line), the body is capped at 16 KiB, and a token bucket (a burst of 50,
+20 a second sustained) drops the excess while still answering 204. It accepts
+both `application/csp-report` and `application/reports+json`. Mount it outside
+`CSRF`: browsers send reports without a reliable `Origin`.
+
 A handler may overwrite any header for its own response, for example to send
 `default-src 'none'; sandbox` on user-supplied files. HSTS is two years with
 `includeSubDomains`; `preload` is opt-in.

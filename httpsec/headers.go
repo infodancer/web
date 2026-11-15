@@ -115,12 +115,37 @@ func checkSource(s string) {
 	}
 }
 
+// CSPMode says what to do with the Content-Security-Policy.
+type CSPMode int
+
+const (
+	// CSPEnforce sends Content-Security-Policy: the browser blocks violations.
+	// It is the zero value, so a HeaderConfig that never mentions the mode
+	// keeps enforcing.
+	CSPEnforce CSPMode = iota
+	// CSPReportOnly sends Content-Security-Policy-Report-Only: the browser
+	// blocks nothing and reports what the policy would have blocked (to
+	// HeaderConfig.ReportURI, collected by [ReportHandler]). Use it to roll a
+	// policy onto a live site before enforcing it.
+	CSPReportOnly
+	// CSPOff sends no CSP at all. The other headers still apply.
+	CSPOff
+)
+
 // HeaderConfig tunes [Headers]. The zero value is the strict default set.
 type HeaderConfig struct {
 	// Policy is the Content-Security-Policy. Nil means [DefaultPolicy]. The
 	// policy is rendered once when Headers is called; later changes to it
 	// have no effect.
 	Policy *Policy
+
+	// CSPMode selects enforce (the default), report-only or off.
+	CSPMode CSPMode
+	// ReportURI, when set, is appended to the policy as report-uri so browsers
+	// POST violations there (see [ReportHandler]). It must be a URL with no
+	// whitespace, ";" or ",": Headers panics otherwise, at startup, because
+	// such a value would inject a directive.
+	ReportURI string
 
 	// DisableHSTS omits Strict-Transport-Security, for plain-HTTP development.
 	DisableHSTS bool
@@ -155,6 +180,14 @@ func Headers(cfg HeaderConfig) func(http.Handler) http.Handler {
 		policy = DefaultPolicy()
 	}
 	csp := policy.String()
+	if cfg.ReportURI != "" {
+		checkSource(cfg.ReportURI)
+		csp += "; report-uri " + cfg.ReportURI
+	}
+	cspHeader := "Content-Security-Policy"
+	if cfg.CSPMode == CSPReportOnly {
+		cspHeader = "Content-Security-Policy-Report-Only"
+	}
 
 	hsts := ""
 	if !cfg.DisableHSTS {
@@ -174,7 +207,9 @@ func Headers(cfg HeaderConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
-			h.Set("Content-Security-Policy", csp)
+			if cfg.CSPMode != CSPOff {
+				h.Set(cspHeader, csp)
+			}
 			if hsts != "" {
 				h.Set("Strict-Transport-Security", hsts)
 			}
