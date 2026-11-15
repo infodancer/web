@@ -88,6 +88,23 @@ A handler may overwrite any header for its own response, for example to send
 `default-src 'none'; sandbox` on user-supplied files. HSTS is two years with
 `includeSubDomains`; `preload` is opt-in.
 
+### Changing a default
+
+The defaults are strict on purpose, and changing one is a deliberate, visible act at one of two scopes.
+
+Site-wide: set the field on `HeaderConfig` (`PermissionsPolicy`, `FrameOptions`, `ReferrerPolicy`).
+
+One route: wrap it with `Override`, inside `Headers`.
+
+```go
+cam := httpsec.Override(map[string]string{"Permissions-Policy": "camera=(self), microphone=(self)"})
+mux.Handle("GET /call", cam.Wrap(callHandler))
+```
+
+An override replaces the whole value for that header; nothing is merged, so the exception is written out in full. It panics at startup on a header that is not overridable (HSTS and the CSP are not), a misspelled name, an empty value or a control character.
+
+`HeaderConfig.Expected()` returns the exact headers the middleware sends, name to value, and `Override.Expect()` returns the same form for a route. They are the values a checker needs to verify the live headers.
+
 ## CSRF
 
 For every method except GET, HEAD and OPTIONS, the `Origin` header (or the
