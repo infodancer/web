@@ -54,6 +54,7 @@ require (
 
 require (
 	github.com/infodancer/web/blog v0.0.0
+	github.com/infodancer/web/httpsec v0.1.0 // indirect
 	github.com/infodancer/web/pgtest v0.1.0
 	github.com/infodancer/web/profile v0.0.0-00010101000000-000000000000
 	github.com/infodancer/web/timeline v0.0.0-00010101000000-000000000000
@@ -79,3 +80,5 @@ replace github.com/infodancer/web/blog => ../blog
 replace github.com/infodancer/web/pgtest => ../pgtest
 
 replace github.com/infodancer/web/antibot => ../antibot
+
+replace github.com/infodancer/web/httpsec => ../httpsec
