@@ -30,6 +30,10 @@ times, but I will take credible reports seriously.
   server limit that is looser than the README states.
 - **Body limit bypass:** a request body larger than the `BodyLimit` reaching
   a handler, with or without a declared `Content-Length`.
+- **Report endpoint abuse:** any way a `ReportHandler` request can forge or
+  split a log line, make the handler log or buffer more than its caps (300
+  bytes a field, 16 KiB a body, the token bucket), or panic on a malformed
+  body.
 - **Shutdown correctness:** `Serve` returning before in-flight requests
   finish inside the grace period, or hanging past it.
 

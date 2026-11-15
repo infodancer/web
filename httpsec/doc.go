@@ -17,6 +17,9 @@
 //	srv := httpsec.NewServer(":8080", h, httpsec.ServerConfig{})
 //	err := httpsec.Serve(ctx, srv, ln, 15*time.Second)
 //
+// A policy can be rolled out safely: [CSPReportOnly] with a ReportURI blocks
+// nothing and [ReportHandler] logs what it would have blocked.
+//
 // Request IDs and panic recovery are in obs and are not repeated here.
 //
 // The defaults are deliberately strict. A site that needs a third-party origin
