@@ -171,52 +171,60 @@ const (
 	defaultPermissionsPolicy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
 )
 
-// Headers sets the security response headers before calling the next handler,
-// so they ride on every response including errors. A handler may overwrite one
-// for its own response, for example to tighten the CSP on user-supplied files.
-func Headers(cfg HeaderConfig) func(http.Handler) http.Handler {
+// Expected returns every header [Headers] sends for this config, name to exact
+// value, defaults included. A header the config turns off (HSTS, CSP) is
+// absent. It is computed by the same code Headers runs, so a checker given
+// this map cannot disagree with the middleware. Like Headers it panics on a
+// ReportURI that would inject a directive.
+func (cfg HeaderConfig) Expected() map[string]string {
 	policy := cfg.Policy
 	if policy == nil {
 		policy = DefaultPolicy()
 	}
-	csp := policy.String()
-	if cfg.ReportURI != "" {
-		checkSource(cfg.ReportURI)
-		csp += "; report-uri " + cfg.ReportURI
+	out := map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":        orDefault(cfg.FrameOptions, defaultFrameOptions),
+		"Referrer-Policy":        orDefault(cfg.ReferrerPolicy, defaultReferrerPolicy),
+		"Permissions-Policy":     orDefault(cfg.PermissionsPolicy, defaultPermissionsPolicy),
 	}
-	cspHeader := "Content-Security-Policy"
-	if cfg.CSPMode == CSPReportOnly {
-		cspHeader = "Content-Security-Policy-Report-Only"
+	if cfg.CSPMode != CSPOff {
+		csp := policy.String()
+		if cfg.ReportURI != "" {
+			checkSource(cfg.ReportURI)
+			csp += "; report-uri " + cfg.ReportURI
+		}
+		name := "Content-Security-Policy"
+		if cfg.CSPMode == CSPReportOnly {
+			name = "Content-Security-Policy-Report-Only"
+		}
+		out[name] = csp
 	}
-
-	hsts := ""
 	if !cfg.DisableHSTS {
 		age := cfg.HSTSMaxAge
 		if age == 0 {
 			age = defaultHSTSMaxAge
 		}
-		hsts = "max-age=" + strconv.FormatInt(int64(age/time.Second), 10) + "; includeSubDomains"
+		hsts := "max-age=" + strconv.FormatInt(int64(age/time.Second), 10) + "; includeSubDomains"
 		if cfg.HSTSPreload {
 			hsts += "; preload"
 		}
+		out["Strict-Transport-Security"] = hsts
 	}
-	frame := orDefault(cfg.FrameOptions, defaultFrameOptions)
-	referrer := orDefault(cfg.ReferrerPolicy, defaultReferrerPolicy)
-	perms := orDefault(cfg.PermissionsPolicy, defaultPermissionsPolicy)
+	return out
+}
 
+// Headers sets the security response headers before calling the next handler,
+// so they ride on every response including errors. A handler may overwrite one
+// for its own response, for example to tighten the CSP on user-supplied files.
+// To change a header for one route only, wrap that route with [Override].
+func Headers(cfg HeaderConfig) func(http.Handler) http.Handler {
+	expected := cfg.Expected()
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
-			if cfg.CSPMode != CSPOff {
-				h.Set(cspHeader, csp)
+			for name, value := range expected {
+				h.Set(name, value)
 			}
-			if hsts != "" {
-				h.Set("Strict-Transport-Security", hsts)
-			}
-			h.Set("X-Content-Type-Options", "nosniff")
-			h.Set("X-Frame-Options", frame)
-			h.Set("Referrer-Policy", referrer)
-			h.Set("Permissions-Policy", perms)
 			next.ServeHTTP(w, r)
 		})
 	}
