@@ -26,6 +26,7 @@ import (
 	"github.com/infodancer/web/blog/bloguser"
 	"github.com/infodancer/web/blog/internal/render"
 	"github.com/infodancer/web/blog/store"
+	"github.com/infodancer/web/httpsec"
 )
 
 //go:embed all:templates
@@ -149,7 +150,7 @@ type Server struct {
 	pageSize     int
 	feedSize     int
 	maxBodyBytes int64
-	csrfDisabled bool
+	csrf         func(http.Handler) http.Handler
 	templates    *render.Templates
 	static       fs.FS
 	mux          *http.ServeMux
@@ -209,7 +210,7 @@ func New(d Deps) (*Server, error) {
 		pageSize:     d.PageSize,
 		feedSize:     d.FeedSize,
 		maxBodyBytes: d.MaxBodyBytes,
-		csrfDisabled: d.CSRFDisabled,
+		csrf:         httpsec.CSRF(httpsec.CSRFConfig{Disable: d.CSRFDisabled}),
 		templates:    tpls,
 		static:       withSuiteAssets(staticSub),
 		mux:          http.NewServeMux(),
@@ -222,7 +223,7 @@ func New(d Deps) (*Server, error) {
 // and CSRF middleware. Mount it at the configured BasePath with
 // http.StripPrefix.
 func (s *Server) Routes() http.Handler {
-	return s.resolveUserMiddleware(s.csrfGuard(s.mux))
+	return s.resolveUserMiddleware(s.csrf(s.mux))
 }
 
 func (s *Server) registerRoutes() {
