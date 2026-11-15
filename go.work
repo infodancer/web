@@ -8,6 +8,7 @@ use (
 	./contact
 	./errnotice
 	./faq
+	./httpsec
 	./integration
 	./media
 	./media/cmd/media-import
