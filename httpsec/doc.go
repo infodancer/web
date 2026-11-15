@@ -3,8 +3,11 @@
 // CSRF guard for state-changing requests, a request body limit, and
 // http.Server defaults with graceful shutdown.
 //
-// It is host-side middleware, like [github.com/infodancer/web/obs]. A mounted
-// component does not import it; the host wraps its mux:
+// [Headers], [BodyLimit], [NewServer] and [Serve] are host-side, like
+// [github.com/infodancer/web/obs]: the site that mounts the components wraps its
+// mux with them. [CSRF] is also imported by components, because a component
+// that serves its own state-changing form posts guards them itself (see
+// CONVENTIONS.md, "Security"):
 //
 //	h := httpsec.Chain(mux,
 //		httpsec.Headers(httpsec.HeaderConfig{}),

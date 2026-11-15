@@ -3,9 +3,10 @@
 Shared HTTP hardening for the `infodancer/web` suite: security response
 headers with a strict default Content-Security-Policy, a same-origin CSRF
 guard, a request body limit, and `http.Server` defaults with graceful
-shutdown. Like [obs](../obs/), this is **host-side middleware, not a
-component dependency**: a mounted component does not import it, the site that
-mounts the components wraps its mux with it.
+shutdown. Headers, the body limit and the server are **host-side**, like
+[obs](../obs/): the site that mounts the components wraps its mux with them.
+`CSRF` is also imported by components, because a component that serves its own
+state-changing form posts guards them itself.
 
 Request IDs and panic recovery are in `obs` and are not repeated here.
 
