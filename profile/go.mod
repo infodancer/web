@@ -15,6 +15,7 @@ require (
 	github.com/HugoSmits86/nativewebp v1.3.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
+	github.com/infodancer/web/httpsec v0.1.0
 	github.com/infodancer/web/pgtest v0.1.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -33,3 +34,5 @@ require (
 replace github.com/infodancer/web/media => ../media
 
 replace github.com/infodancer/web/pgtest => ../pgtest
+
+replace github.com/infodancer/web/httpsec => ../httpsec

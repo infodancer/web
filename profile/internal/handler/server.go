@@ -21,6 +21,7 @@ import (
 	uiassets "github.com/infodancer/ui"
 	"github.com/infodancer/ui/mdedit"
 
+	"github.com/infodancer/web/httpsec"
 	"github.com/infodancer/web/profile/internal/render"
 	"github.com/infodancer/web/profile/profileuser"
 	"github.com/infodancer/web/profile/store"
@@ -101,7 +102,7 @@ type Server struct {
 	onChange     func(ctx context.Context, userKey string)
 	ingestAvatar IngestAvatar
 	reserved     map[string]bool
-	csrfDisabled bool
+	csrf         func(http.Handler) http.Handler
 	templates    *render.Templates
 	static       fs.FS
 	mux          *http.ServeMux
@@ -155,7 +156,7 @@ func New(d Deps) (*Server, error) {
 		onChange:     d.OnChange,
 		ingestAvatar: d.IngestAvatar,
 		reserved:     reserved,
-		csrfDisabled: d.CSRFDisabled,
+		csrf:         httpsec.CSRF(httpsec.CSRFConfig{Disable: d.CSRFDisabled}),
 		templates:    tpls,
 		static:       withUIAssets(staticSub),
 		mux:          http.NewServeMux(),
@@ -167,7 +168,7 @@ func New(d Deps) (*Server, error) {
 // Routes returns the module's HTTP handler wrapped in the user-resolving and
 // CSRF middleware. Mount it at the configured BasePath with http.StripPrefix.
 func (s *Server) Routes() http.Handler {
-	return s.resolveUserMiddleware(s.csrfGuard(s.mux))
+	return s.resolveUserMiddleware(s.csrf(s.mux))
 }
 
 func (s *Server) registerRoutes() {
