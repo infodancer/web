@@ -74,6 +74,10 @@ and mount path from the host.
   ingests: the serving path uses a read-only pool.
 - Components are visibly secure by design — CSRF protection on state-changing
   form posts, anti-abuse on public intake, no secrets in the repo.
+- CSRF protection comes from `httpsec.CSRF`; do not write a private copy. The
+  host that mounts components also wraps its mux with `httpsec.Headers` (strict
+  default CSP), `httpsec.BodyLimit`, and serves with `httpsec.NewServer` and
+  `httpsec.Serve`, so every site starts from the same headers and timeouts.
 
 ## Logging and error reporting
 
