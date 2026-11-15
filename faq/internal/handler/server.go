@@ -14,6 +14,7 @@ import (
 	"github.com/infodancer/web/faq/faquser"
 	"github.com/infodancer/web/faq/internal/render"
 	"github.com/infodancer/web/faq/store"
+	"github.com/infodancer/web/httpsec"
 )
 
 // Deps captures everything the handler needs to do its job. The faq
@@ -80,9 +81,9 @@ type Deps struct {
 // Server is the HTTP layer of the faq module. Construct one with [New]
 // and mount its [http.Handler] via [Server.Routes].
 type Server struct {
-	deps         Deps
-	mux          *http.ServeMux
-	csrfDisabled bool
+	deps Deps
+	mux  *http.ServeMux
+	csrf func(http.Handler) http.Handler
 }
 
 // New validates deps and returns a wired Server. Returns an error if a
@@ -113,7 +114,8 @@ func New(d Deps) (*Server, error) {
 		d.EditGracePeriod = 10 * time.Minute
 	}
 
-	s := &Server{deps: d, mux: http.NewServeMux(), csrfDisabled: d.CSRFDisabled}
+	s := &Server{deps: d, mux: http.NewServeMux(),
+		csrf: httpsec.CSRF(httpsec.CSRFConfig{Disable: d.CSRFDisabled})}
 	s.registerRoutes()
 	return s, nil
 }
@@ -123,7 +125,7 @@ func New(d Deps) (*Server, error) {
 // in the host application's router using http.StripPrefix so the
 // module sees paths relative to its mount point.
 func (s *Server) Routes() http.Handler {
-	return s.limitBody(s.csrfGuard(s.subsiteDispatch(s.mux)))
+	return s.limitBody(s.csrf(s.subsiteDispatch(s.mux)))
 }
 
 // maxBodyBytes is the per-request body cap. Sized to comfortably hold
