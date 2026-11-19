@@ -8,8 +8,8 @@ import (
 )
 
 // overridable are the headers a route may replace. HSTS is a property of the
-// whole host and is never overridden per route. The CSP is left out until it
-// has its own per-route API.
+// whole host and is never overridden per route. The CSP is left out of the
+// values; a route that sends none uses [NoCSP].
 var overridable = map[string]bool{
 	"Permissions-Policy": true,
 	"X-Frame-Options":    true,
@@ -20,6 +20,7 @@ var overridable = map[string]bool{
 // rest keep the site's values from [Headers]. Build one with [Override].
 type HeaderOverride struct {
 	values map[string]string
+	noCSP  string // the reason this route sends no CSP; empty when it does
 }
 
 // Override returns an override that sets each given header, name to exact
@@ -50,6 +51,29 @@ func Override(headers map[string]string) *HeaderOverride {
 	return &HeaderOverride{values: maps.Clone(headers)}
 }
 
+// NoCSP returns an override for a route that sends no Content-Security-Policy,
+// for a response the policy has nothing to guard, such as an XML feed that a
+// browser draws with its own viewer. It removes both CSP header names and
+// leaves every other header at the site value. The reason is required, so the
+// exception is written down beside the route; read it back with NoCSPReason.
+// It panics, at startup, on a blank reason or one with a control character.
+func NoCSP(reason string) *HeaderOverride {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		panic("httpsec: NoCSP needs a reason")
+	}
+	for _, r := range reason {
+		if r < 0x20 || r == 0x7f {
+			panic("httpsec: control character in NoCSP reason")
+		}
+	}
+	return &HeaderOverride{values: map[string]string{}, noCSP: reason}
+}
+
+// NoCSPReason is the reason a [NoCSP] override gives for sending no policy, and
+// empty for any other override. A checker uses it to tell the route may send none.
+func (o *HeaderOverride) NoCSPReason() string { return o.noCSP }
+
 // Wrap applies the override to h. Put it inside [Headers] so it runs after the
 // site values are set. As with Headers, h may still overwrite a header itself.
 func (o *HeaderOverride) Wrap(h http.Handler) http.Handler {
@@ -57,6 +81,10 @@ func (o *HeaderOverride) Wrap(h http.Handler) http.Handler {
 		hdr := w.Header()
 		for name, value := range o.values {
 			hdr.Set(name, value)
+		}
+		if o.noCSP != "" {
+			hdr.Del("Content-Security-Policy")
+			hdr.Del("Content-Security-Policy-Report-Only")
 		}
 		h.ServeHTTP(w, r)
 	})
