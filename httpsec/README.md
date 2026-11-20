@@ -103,7 +103,16 @@ cam := httpsec.Override(map[string]string{"Permissions-Policy": "camera=(self), 
 mux.Handle("GET /call", cam.Wrap(callHandler))
 ```
 
-An override replaces the whole value for that header; nothing is merged, so the exception is written out in full. It panics at startup on a header that is not overridable (HSTS and the CSP are not), a misspelled name, an empty value or a control character.
+An override replaces the whole value for that header; nothing is merged, so the exception is written out in full. It panics at startup on a header that is not overridable (HSTS and the CSP are not; see below for the CSP), a misspelled name, an empty value or a control character.
+
+A route the CSP has nothing to guard, such as an XML feed that a browser draws with its own viewer, drops the policy with `NoCSP`:
+
+```go
+feed := httpsec.NoCSP("an XML feed with no markup for a policy to guard")
+mux.Handle("/feed.xml", feed.Wrap(h))
+```
+
+The reason is required (it panics on a blank one) and `NoCSPReason()` returns it, so a checker can record the exception. Every other header stays at the site value.
 
 `HeaderConfig.Expected()` returns the exact headers the middleware sends, name to value, and `Override.Expect()` returns the same form for a route. They are the values a checker needs to verify the live headers.
 

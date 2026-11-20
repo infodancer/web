@@ -132,3 +132,83 @@ func TestOverrideHandlerMayStillOverwrite(t *testing.T) {
 		t.Errorf("X-Frame-Options = %q, want the handler's own value", got)
 	}
 }
+
+func TestNoCSPDropsThePolicyOnThatRouteOnly(t *testing.T) {
+	for name, cfg := range map[string]httpsec.HeaderConfig{
+		"enforce":     {},
+		"report-only": {CSPMode: httpsec.CSPReportOnly, ReportURI: "/csp-report"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.Handle("/feed.xml", httpsec.NoCSP("an XML feed the viewer draws").Wrap(okHandler()))
+			mux.Handle("/", okHandler())
+			h := httpsec.Headers(cfg)(mux)
+			get := func(path string) http.Header {
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+				return rec.Header()
+			}
+
+			feed := get("/feed.xml")
+			for _, k := range []string{"Content-Security-Policy", "Content-Security-Policy-Report-Only"} {
+				if got := feed.Get(k); got != "" {
+					t.Errorf("/feed.xml %s = %q, want none", k, got)
+				}
+			}
+			// Everything else on that route stays at the site value.
+			for k, want := range cfg.Expected() {
+				if strings.HasPrefix(k, "Content-Security-Policy") {
+					continue
+				}
+				if got := feed.Get(k); got != want {
+					t.Errorf("/feed.xml %s = %q, want %q", k, got, want)
+				}
+			}
+			// The rest of the site keeps its policy.
+			page := get("/")
+			if page.Get("Content-Security-Policy") == "" && page.Get("Content-Security-Policy-Report-Only") == "" {
+				t.Error("/ lost its CSP")
+			}
+		})
+	}
+}
+
+func TestNoCSPReportsItsReasonAndExpectsNoPolicy(t *testing.T) {
+	o := httpsec.NoCSP("an XML feed")
+	if got := o.NoCSPReason(); got != "an XML feed" {
+		t.Errorf("NoCSPReason = %q", got)
+	}
+	exp := o.Expect()
+	for k := range exp {
+		if strings.HasPrefix(k, "Content-Security-Policy") {
+			t.Errorf("Expect lists %s for a route that sends none", k)
+		}
+	}
+	if got := httpsec.Override(map[string]string{"X-Frame-Options": "SAMEORIGIN"}).NoCSPReason(); got != "" {
+		t.Errorf("an ordinary override has NoCSPReason %q", got)
+	}
+}
+
+func TestNoCSPNeedsAReason(t *testing.T) {
+	for _, reason := range []string{"", "  ", "bad\nreason"} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("NoCSP(%q) did not panic", reason)
+				}
+			}()
+			httpsec.NoCSP(reason)
+		}()
+	}
+}
+
+func TestNoCSPHandlerMayStillSetAPolicy(t *testing.T) {
+	h := httpsec.NoCSP("a feed").Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'none'")
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if got := rec.Header().Get("Content-Security-Policy"); got != "default-src 'none'" {
+		t.Errorf("CSP = %q, want the handler's own", got)
+	}
+}
